@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html, body {
+    @apply bg-surface text-white;
+    font-family: 'Inter', system-ui, sans-serif;
+    height: 100%;
+    overscroll-behavior: none;
+  }
+
+  #__next {
+    height: 100%;
+  }
+}
+
+/* ── Skoleom Capsule Button (importé de SeSport) ─────────────────── */
+.skoleom-capsule-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: #00000047;
+  border: 1px solid #ffffff47;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: #fff;
+  font-family: Poppins, system-ui, sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  text-shadow: 0 1px 4px #0000008c;
+  cursor: pointer;
+  outline: none;
+  will-change: transform, opacity, box-shadow;
+  transition: transform .15s, background .2s, box-shadow .2s, opacity .2s, border-color .2s;
+}
+
+.skoleom-capsule-btn:hover {
+  transform: translateY(-1px);
+  background: #000000c7 !important;
+  border-color: #ffffff80 !important;
+}
+
+.skoleom-capsule-btn:active {
+  transform: scale(.94) !important;
+}
+
+.skoleom-capsule-btn-logo {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+  flex-shrink: 0;
+  filter: drop-shadow(0 1px 3px #0006);
+}
+
+@keyframes capsule-breathe {
+  0%, 100% { box-shadow: 0 0 0 0 #ffffff18, 0 2px 12px #0003; opacity: .92; }
+  50%       { box-shadow: 0 0 0 6px #ffffff08, 0 4px 20px #0005; opacity: 1; }
+}
+
+.skoleom-capsule-btn--breathe {
+  animation: capsule-breathe 3.4s ease-in-out infinite;
+}
+
+@keyframes capsule-glow {
+  0%, 100% { box-shadow: 0 0 8px 2px #4bdd2c33; }
+  50%       { box-shadow: 0 0 20px 6px #4bdd2c55; }
+}
+
+.skoleom-capsule-btn--glow {
+  animation: capsule-glow 5s ease-in-out infinite;
+}
+/* ─────────────────────────────────────────────────────────────────── */
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.animate-fade-in {
+  animation: fade-in 0.25s ease-out both;
+}
+
+@layer utilities {
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  .video-fill {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .capsule-glow {
+    box-shadow: 0 0 20px rgba(255, 45, 85, 0.4);
+  }
+}
