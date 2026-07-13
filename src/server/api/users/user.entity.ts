@@ -2,7 +2,7 @@ import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
   UpdateDateColumn, OneToMany,
 } from 'typeorm';
-import { UserRole } from '../../../shared/types/entities';
+import { UserRole, UserPlan } from '../../../shared/types/entities';
 import { Post } from '../posts/post.entity';
 import { Order } from '../orders/order.entity';
 import { Boost } from '../boosts/boost.entity';
@@ -15,7 +15,8 @@ export class User {
   @Column({ unique: true })
   email: string;
 
-  @Column()
+  // select: false — sinon le hash fuite via les relations eager (ex: Post.creator) dans les reponses API.
+  @Column({ select: false })
   password: string;
 
   @Column()
@@ -30,8 +31,12 @@ export class User {
   @Column({ nullable: true, type: 'text' })
   bio: string;
 
-  @Column({ type: 'enum', enum: UserRole, default: UserRole.CREATOR })
+  @Column({ type: 'simple-enum', enum: UserRole, default: UserRole.CREATOR })
   role: UserRole;
+
+  // Étiquette d'abonnement affichée sur le profil — purement cosmétique, aucune limite n'est appliquée côté serveur.
+  @Column({ type: 'simple-enum', enum: UserPlan, default: UserPlan.FREE })
+  plan: UserPlan;
 
   @Column({ default: false })
   isVerified: boolean;
@@ -43,7 +48,7 @@ export class User {
   totalEarnings: number;
 
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
-  pendingBalance: number;
+  walletBalance: number;
 
   @Column({ nullable: true })
   stripeAccountId: string;

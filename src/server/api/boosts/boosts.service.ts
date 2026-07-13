@@ -1,14 +1,21 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
+import { Cron, CronExpression } from '@nestjs/schedule';
 import { Repository, LessThan } from 'typeorm';
 import { Boost } from './boost.entity';
-import { BoostStatus, BoostObjective } from '../../../shared/types/entities';
+import { BoostStatus, BoostObjective, BoostScope } from '../../../shared/types/entities';
 import { PostsService } from '../posts/posts.service';
 
+// Tarifs fixes par palier de durée — le client ne choisit plus librement son budget.
+export const BOOST_PRICING: Record<BoostScope, Record<number, number>> = {
+  [BoostScope.POST]: { 1: 4.99, 3: 12.99, 7: 24.99, 30: 79.99 },
+  [BoostScope.ACCOUNT]: { 1: 12.99, 3: 29.99, 7: 59.99, 30: 199.99 },
+};
+
 export interface CreateBoostDto {
-  postId: string;
-  objective: BoostObjective;
-  budget: number;
+  scope: BoostScope;
+  postId?: string;
+  objective?: BoostObjective;
   currency?: string;
   durationDays: number;
 }
@@ -21,8 +28,28 @@ export class BoostsService {
     private postsService: PostsService,
   ) {}
 
+  getPricing() {
+    return BOOST_PRICING;
+  }
+
   async create(userId: string, dto: CreateBoostDto): Promise<Boost> {
-    const boost = this.boostsRepo.create({ ...dto, userId, currency: dto.currency || 'EUR' });
+    const scope = dto.scope || BoostScope.POST;
+    if (scope === BoostScope.POST && !dto.postId) {
+      throw new BadRequestException('postId requis pour booster un post');
+    }
+
+    const price = BOOST_PRICING[scope][dto.durationDays];
+    if (!price) throw new BadRequestException('Durée de boost invalide');
+
+    const boost = this.boostsRepo.create({
+      scope,
+      postId: scope === BoostScope.POST ? dto.postId : undefined,
+      objective: dto.objective,
+      durationDays: dto.durationDays,
+      budget: price,
+      currency: dto.currency || 'EUR',
+      userId,
+    });
     return this.boostsRepo.save(boost);
   }
 
@@ -48,13 +75,39 @@ export class BoostsService {
     });
 
     const boostScore = Math.floor(boost.budget * 10);
-    await this.postsService.incrementBoostScore(boost.postId, boostScore);
+    if (boost.scope === BoostScope.ACCOUNT) {
+      await this.postsService.boostAllByCreator(boost.userId, boostScore);
+    } else {
+      await this.postsService.incrementBoostScore(boost.postId, boostScore);
+    }
   }
 
   async trackImpression(boostId: string): Promise<void> {
     await this.boostsRepo.increment({ id: boostId }, 'impressions', 1);
   }
 
+  async cancel(boostId: string): Promise<void> {
+    const boost = await this.boostsRepo.findOne({ where: { id: boostId } });
+    if (!boost) throw new NotFoundException('Boost not found');
+    if (boost.status === BoostStatus.COMPLETED || boost.status === BoostStatus.CANCELLED) {
+      throw new BadRequestException('Ce boost est déjà terminé ou annulé.');
+    }
+
+    if (boost.status === BoostStatus.ACTIVE) {
+      const boostScore = Math.floor(boost.budget * 10);
+      if (boost.scope === BoostScope.ACCOUNT) {
+        await this.postsService.unboostAllByCreator(boost.userId, boostScore);
+      } else if (boost.postId) {
+        await this.postsService.decrementBoostScore(boost.postId, boostScore);
+      }
+    }
+
+    await this.boostsRepo.update(boostId, { status: BoostStatus.CANCELLED, endedAt: new Date() });
+  }
+
+  // Sans ce cron, un boost ACTIVE ne repassait jamais à COMPLETED une fois sa durée écoulée —
+  // rien dans le code n'appelait cette méthode.
+  @Cron(CronExpression.EVERY_10_MINUTES)
   async expireFinishedBoosts(): Promise<void> {
     const now = new Date();
     const expired = await this.boostsRepo.find({

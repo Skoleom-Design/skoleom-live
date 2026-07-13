@@ -13,6 +13,12 @@ export class CapsulesController {
     return this.capsulesService.getByPost(postId);
   }
 
+  @UseGuards(JwtAuthGuard)
+  @Get('mine')
+  getMine(@Request() req) {
+    return this.capsulesService.getMine(req.user.id);
+  }
+
   @Get(':id')
   getById(@Param('id') id: string) {
     return this.capsulesService.getById(id);
@@ -22,6 +28,12 @@ export class CapsulesController {
   @Post()
   create(@Request() req, @Body() dto: CreateCapsuleDto) {
     return this.capsulesService.create(req.user.id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/attach')
+  attach(@Param('id') id: string, @Body() body: { postId: string }, @Request() req) {
+    return this.capsulesService.attachToPost(id, body.postId, req.user.id);
   }
 
   @UseGuards(JwtAuthGuard)

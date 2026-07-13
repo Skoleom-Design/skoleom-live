@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { Capsule } from '../../../shared/types/api';
+import { api, ApiError, getToken } from '../../../shared/api/http';
 
 interface Props {
   capsule: Capsule;
@@ -15,33 +16,18 @@ export function CapsuleCheckout({ capsule, onBack }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
+      if (!getToken()) {
         window.location.href = '/auth/login';
         return;
       }
 
-      const res = await fetch('/api/payments/capsule/intent', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({
-          capsuleId: capsule.id,
-          selectedVariant: selectedVariant || undefined,
-        }),
+      const { clientSecret, orderId } = await api.post('/payments/capsule/intent', {
+        capsuleId: capsule.id,
+        selectedVariant: selectedVariant || undefined,
       });
-
-      if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.message || 'Erreur de paiement');
-      }
-
-      const { clientSecret, orderId } = await res.json();
       window.location.href = `/checkout/${orderId}?client_secret=${clientSecret}`;
-    } catch (e: any) {
-      setError(e.message);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Erreur de paiement');
     } finally {
       setLoading(false);
     }
@@ -107,7 +93,7 @@ export function CapsuleCheckout({ capsule, onBack }: Props) {
       <button
         onClick={handleBuy}
         disabled={loading}
-        className="w-full py-3.5 bg-brand hover:bg-brand-dark text-white font-semibold rounded-2xl transition-colors disabled:opacity-50"
+        className="w-full py-3.5 bg-brand hover:bg-brand-dark text-black font-semibold rounded-2xl transition-colors disabled:opacity-50"
       >
         {loading ? 'Traitement...' : `Acheter · ${capsule.price.toFixed(2)} ${capsule.currency}`}
       </button>

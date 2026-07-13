@@ -4,28 +4,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { ArrowLeft, Eye, ShoppingBag, Heart, TrendingUp } from 'lucide-react';
 import type { Post, User } from '../../shared/types/api';
-
-// ── Demo data ────────────────────────────────────────────────────────────────
-const DEMO_USERS: Record<string, User & { bio: string }> = {
-  u1: { id: 'u1', username: 'stylebylea', displayName: 'Léa Martin', avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&h=200&fit=crop', bio: 'Mode & lifestyle 🌸 Créatrice de contenu', totalEarnings: 1842 },
-  u2: { id: 'u2', username: 'sophiaglow', displayName: 'Sophia K.', avatarUrl: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200&h=200&fit=crop', bio: 'Beauty & wellness 🧴 Skincare addict', totalEarnings: 3210 },
-  u3: { id: 'u3', username: 'kicksbyomar', displayName: 'Omar B.', avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&h=200&fit=crop', bio: 'Sneakers & streetwear culture 👟', totalEarnings: 8140 },
-  me: { id: 'me', username: 'monprofil', displayName: 'Mon Profil', avatarUrl: '', bio: 'Créateur skoleomLive', totalEarnings: 0 },
-};
-
-const DEMO_POSTS_BY_USER: Record<string, Post[]> = {
-  u1: [
-    { id: 'demo-1', caption: 'Nouvelle collection été ☀️', type: 'photo', mediaUrl: 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=400&h=600&fit=crop', thumbnailUrl: 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=400&h=600&fit=crop', tags: ['mode'], viewCount: 14200, likeCount: 3840, isBoosted: true, creator: DEMO_USERS.u1, capsules: [{ id: 'cap-1', name: 'Robe Ibiza', description: '', price: 89.90, currency: 'EUR', imageUrl: '', images: [], stock: 12, soldCount: 5, commissionRate: 0.15, status: 'available' }, { id: 'cap-2', name: 'Chapeau paille', description: '', price: 34.50, currency: 'EUR', imageUrl: '', images: [], stock: 3, soldCount: 18, commissionRate: 0.15, status: 'available' }], createdAt: new Date(Date.now() - 86400000 * 2).toISOString() },
-    { id: 'p2', caption: 'Outfit du jour 🌿', type: 'photo', mediaUrl: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&h=600&fit=crop', thumbnailUrl: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=400&h=600&fit=crop', tags: ['mode', 'outfit'], viewCount: 6700, likeCount: 1200, isBoosted: false, creator: DEMO_USERS.u1, capsules: [], createdAt: new Date(Date.now() - 86400000 * 5).toISOString() },
-    { id: 'p3', caption: 'Shopping haul printemps 🌷', type: 'photo', mediaUrl: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400&h=600&fit=crop', thumbnailUrl: 'https://images.unsplash.com/photo-1483985988355-763728e1935b?w=400&h=600&fit=crop', tags: ['shopping'], viewCount: 9800, likeCount: 2300, isBoosted: false, creator: DEMO_USERS.u1, capsules: [{ id: 'cap-6', name: 'Sac tote lin', description: '', price: 45, currency: 'EUR', imageUrl: '', images: [], stock: 8, soldCount: 12, commissionRate: 0.15, status: 'available' }], createdAt: new Date(Date.now() - 86400000 * 10).toISOString() },
-  ],
-  u2: [
-    { id: 'demo-2', caption: 'Routine skincare du matin 🧴', type: 'photo', mediaUrl: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=400&h=600&fit=crop', thumbnailUrl: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=400&h=600&fit=crop', tags: ['skincare'], viewCount: 8900, likeCount: 2100, isBoosted: false, creator: DEMO_USERS.u2, capsules: [{ id: 'cap-3', name: 'Sérum Vitamine C', description: '', price: 42, currency: 'EUR', imageUrl: '', images: [], stock: 0, soldCount: 94, commissionRate: 0.18, status: 'sold_out' }], createdAt: new Date(Date.now() - 86400000).toISOString() },
-  ],
-  u3: [
-    { id: 'demo-3', caption: 'Sneakers edition limitée 🔥', type: 'photo', mediaUrl: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=600&fit=crop', thumbnailUrl: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=400&h=600&fit=crop', tags: ['sneakers'], viewCount: 31000, likeCount: 9200, isBoosted: true, creator: DEMO_USERS.u3, capsules: [{ id: 'cap-5', name: 'Air Max Exclusif', description: '', price: 189, currency: 'EUR', imageUrl: '', images: [], stock: 7, soldCount: 43, commissionRate: 0.12, status: 'available' }], createdAt: new Date(Date.now() - 86400000 * 3).toISOString() },
-  ],
-};
+import { api } from '../../shared/api/http';
 
 function fmt(n: number): string {
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
@@ -46,14 +25,13 @@ export default function ProfilePage() {
 
   useEffect(() => {
     if (!id) return;
-    const userId = id === 'me' ? 'me' : id;
 
     Promise.all([
-      fetch(`/api/users/${userId}`).then((r) => r.ok ? r.json() : null).catch(() => null),
-      fetch(`/api/posts/creator/${userId}`).then((r) => r.ok ? r.json() : null).catch(() => null),
+      api.get<User>(`/users/${id}`).catch(() => null),
+      api.get<Post[]>(`/posts/creator/${id}`).catch(() => []),
     ]).then(([userData, postsData]) => {
-      setUser(userData || DEMO_USERS[userId] || null);
-      setPosts(postsData || DEMO_POSTS_BY_USER[userId] || []);
+      setUser(userData);
+      setPosts(postsData || []);
     }).finally(() => setLoading(false));
   }, [id]);
 
@@ -92,11 +70,11 @@ export default function ProfilePage() {
             {user.avatarUrl ? (
               <img src={user.avatarUrl} alt={user.username} className="w-20 h-20 rounded-full object-cover border-2 border-white/10" />
             ) : (
-              <div className="w-20 h-20 rounded-full bg-brand flex items-center justify-center text-2xl font-bold text-white">
+              <div className="w-20 h-20 rounded-full bg-brand flex items-center justify-center text-2xl font-bold text-black">
                 {user.username[0].toUpperCase()}
               </div>
             )}
-            <button className="px-5 py-2 rounded-xl bg-brand hover:bg-brand-dark text-white text-sm font-semibold transition-colors">
+            <button className="px-5 py-2 rounded-xl bg-brand hover:bg-brand-dark text-black text-sm font-semibold transition-colors">
               Suivre
             </button>
           </div>
@@ -152,7 +130,7 @@ export default function ProfilePage() {
 
                 {post.isBoosted && (
                   <div className="absolute top-1.5 left-1.5">
-                    <span className="text-[10px] bg-brand/80 text-white px-1.5 py-0.5 rounded-full font-semibold">⚡</span>
+                    <span className="text-[10px] bg-brand/80 text-black px-1.5 py-0.5 rounded-full font-semibold">⚡</span>
                   </div>
                 )}
 
@@ -229,7 +207,7 @@ export default function ProfilePage() {
                         <img src={post.thumbnailUrl || post.mediaUrl} alt={post.caption} className="w-full h-full object-cover" />
                         {post.isBoosted && (
                           <div className="absolute top-1 left-1">
-                            <span className="text-[9px] bg-brand text-white px-1 py-0.5 rounded-full font-bold">⚡</span>
+                            <span className="text-[9px] bg-brand text-black px-1 py-0.5 rounded-full font-bold">⚡</span>
                           </div>
                         )}
                       </div>

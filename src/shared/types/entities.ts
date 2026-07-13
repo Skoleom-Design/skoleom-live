@@ -4,6 +4,12 @@ export enum UserRole {
   ADMIN = 'admin',
 }
 
+export enum UserPlan {
+  FREE = 'free',
+  PREMIUM = 'premium',
+  ULTRA = 'ultra',
+}
+
 export enum PostType {
   VIDEO = 'video',
   PHOTO = 'photo',
@@ -39,4 +45,14 @@ export enum BoostObjective {
   VIEWS = 'views',
   SALES = 'sales',
   FOLLOWERS = 'followers',
+}
+
+export enum BoostScope {
+  POST = 'post',
+  ACCOUNT = 'account',
+}
+
+export enum LiveStatus {
+  LIVE = 'live',
+  ENDED = 'ended',
 }

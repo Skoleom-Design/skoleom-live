@@ -3,6 +3,7 @@ import {
 } from '@nestjs/common';
 import { PostsService, CreatePostDto } from './posts.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { UserRole } from '../../../shared/types/entities';
 
 @Controller('posts')
 export class PostsController {
@@ -11,6 +12,12 @@ export class PostsController {
   @Get('feed')
   getFeed(@Query() query: { page?: number; limit?: number }) {
     return this.postsService.getFeed(query);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('liked/me')
+  getLiked(@Request() req) {
+    return this.postsService.getLikedByUser(req.user.id);
   }
 
   @Get(':id')
@@ -43,6 +50,28 @@ export class PostsController {
   @UseGuards(JwtAuthGuard)
   @Delete(':id')
   delete(@Param('id') id: string, @Request() req) {
-    return this.postsService.delete(id, req.user.id);
+    return this.postsService.delete(id, req.user.id, req.user.role === UserRole.ADMIN);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/like')
+  toggleLike(@Param('id') id: string, @Request() req) {
+    return this.postsService.toggleLike(id, req.user.id);
+  }
+
+  @Post(':id/share')
+  incrementShare(@Param('id') id: string) {
+    return this.postsService.incrementShare(id);
+  }
+
+  @Get(':id/comments')
+  getComments(@Param('id') id: string) {
+    return this.postsService.getComments(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post(':id/comments')
+  addComment(@Param('id') id: string, @Body() body: { text: string }, @Request() req) {
+    return this.postsService.addComment(id, req.user.id, body.text);
   }
 }

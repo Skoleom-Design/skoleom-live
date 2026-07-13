@@ -1,6 +1,9 @@
 import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
-import { X, UserCircle2, ShoppingCart, Plus, Layers, TrendingUp, Zap, Crown, Gift, Megaphone } from 'lucide-react';
+import {
+  X, UserCircle2, ShoppingCart, Plus, Layers, TrendingUp, Zap, Crown, Gift, Megaphone,
+  RefreshCw, Landmark, ShieldCheck, Handshake, Trophy, Shirt, Ticket, Laptop, Globe,
+} from 'lucide-react';
 
 type Tab = 'creator' | 'buyer' | 'skoleom';
 
@@ -32,7 +35,7 @@ function Step({
       <div
         className={`w-9 h-9 rounded-full flex items-center justify-center text-sm font-extrabold shrink-0 border ${
           isBlue
-            ? 'bg-[#0066FF]/14 text-[#0066FF] border-[#0066FF]/25'
+            ? 'bg-[#a8ff35]/14 text-[#a8ff35] border-[#a8ff35]/25'
             : 'bg-[#22c55e]/14 text-[#22c55e] border-[#22c55e]/25'
         }`}
       >
@@ -94,13 +97,13 @@ export function GuideModal({ open, onClose }: Props) {
           onClick={(e) => e.stopPropagation()}
         >
           {/* Blue glow line */}
-          <div className="h-px bg-gradient-to-r from-transparent via-[#0066FF] to-transparent shrink-0" />
+          <div className="h-px bg-gradient-to-r from-transparent via-[#a8ff35] to-transparent shrink-0" />
 
           {/* Header */}
           <div className="flex items-center justify-between px-6 pt-5 pb-0 shrink-0">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-[10px] bg-gradient-to-br from-[#0066FF] to-[#0044cc] flex items-center justify-center shrink-0">
-                <Layers size={16} className="text-white" />
+              <div className="w-8 h-8 rounded-[10px] bg-gradient-to-br from-[#a8ff35] to-[#6fe600] flex items-center justify-center shrink-0">
+                <Layers size={16} className="text-black" />
               </div>
               <div>
                 <p className="text-[15px] font-bold leading-tight">Comment ça marche ?</p>
@@ -121,8 +124,8 @@ export function GuideModal({ open, onClose }: Props) {
               onClick={() => setTab('creator')}
               className={`flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-semibold border transition-all duration-200 ${
                 tab === 'creator'
-                  ? 'bg-[#0066FF]/20 border-[#0066FF]/60 text-white shadow-[0_0_16px_rgba(0,102,255,0.2)]'
-                  : 'bg-[#0066FF]/10 border-[#0066FF]/20 text-[#7aabff] hover:border-[#0066FF]/40'
+                  ? 'bg-[#a8ff35]/20 border-[#a8ff35]/60 text-white shadow-[0_0_16px_rgba(168,255,53,0.2)]'
+                  : 'bg-[#a8ff35]/10 border-[#a8ff35]/20 text-[#c3ff70] hover:border-[#a8ff35]/40'
               }`}
             >
               <UserCircle2 size={15} />
@@ -158,7 +161,7 @@ export function GuideModal({ open, onClose }: Props) {
             {/* ── CREATOR ── */}
             {tab === 'creator' && (
               <div>
-                <p className="text-[11px] font-bold tracking-[0.12em] uppercase text-[#0066FF] mb-3">
+                <p className="text-[11px] font-bold tracking-[0.12em] uppercase text-[#a8ff35] mb-3">
                   Pour les créateurs &amp; vendeurs
                 </p>
                 <h2 className="text-[22px] font-extrabold tracking-tight leading-snug mb-1.5">
@@ -186,15 +189,19 @@ export function GuideModal({ open, onClose }: Props) {
                     extra={
                       <div className="flex items-center gap-2 mt-2">
                         <CapsulePreview />
-                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border border-[#22c55e]/30 bg-[#22c55e]/10 text-[#22c55e]">🔄 Occasion OK</span>
+                        <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border border-[#22c55e]/30 bg-[#22c55e]/10 text-[#22c55e]">
+                          <RefreshCw size={11} /> Occasion OK
+                        </span>
                       </div>
                     }
                   />
                 </div>
 
                 {/* Earn box */}
-                <div className="flex items-center gap-4 bg-gradient-to-r from-[#22c55e]/10 to-[#0066FF]/08 border border-[#22c55e]/20 rounded-[18px] p-4 mb-5">
-                  <span className="text-3xl leading-none">🏦</span>
+                <div className="flex items-center gap-4 bg-gradient-to-r from-[#22c55e]/10 to-[#a8ff35]/08 border border-[#22c55e]/20 rounded-[18px] p-4 mb-5">
+                  <div className="w-12 h-12 rounded-2xl bg-[#22c55e]/15 flex items-center justify-center shrink-0">
+                    <Landmark size={22} className="text-[#22c55e]" />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[14px] font-bold mb-0.5">Tes gains, tes règles</p>
                     <p className="text-[12px] text-white/48 leading-relaxed">Tu fixes ton prix, on s&apos;occupe du paiement. Tu touches ton pourcentage dès validation de la commande.</p>
@@ -205,7 +212,7 @@ export function GuideModal({ open, onClose }: Props) {
                 </div>
 
                 <div className="flex gap-2.5">
-                  <button className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-full bg-[#0066FF] text-white text-[14px] font-bold hover:brightness-110 hover:shadow-[0_0_24px_rgba(0,102,255,0.4)] transition-all duration-200 active:scale-[0.97]">
+                  <button className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-full bg-[#a8ff35] text-black text-[14px] font-bold hover:brightness-110 hover:shadow-[0_0_24px_rgba(168,255,53,0.4)] transition-all duration-200 active:scale-[0.97]">
                     <Plus size={16} />
                     Lancer mon premier Live
                   </button>
@@ -230,8 +237,12 @@ export function GuideModal({ open, onClose }: Props) {
                   Rejoins des Lives en direct et achète les produits que tu vois en temps réel — neufs ou d&apos;occasion. Plus besoin de chercher ailleurs.
                 </p>
                 <div className="flex gap-2 mb-4 flex-wrap">
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border border-[#ec4899]/30 bg-[#ec4899]/10 text-[#ec4899]">🎁 Envoie des cadeaux en Live</span>
-                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border border-[#22c55e]/30 bg-[#22c55e]/10 text-[#22c55e]">🔄 Articles d&apos;occasion acceptés</span>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border border-[#ec4899]/30 bg-[#ec4899]/10 text-[#ec4899]">
+                    <Gift size={11} /> Envoie des cadeaux en Live
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border border-[#22c55e]/30 bg-[#22c55e]/10 text-[#22c55e]">
+                    <RefreshCw size={11} /> Articles d&apos;occasion acceptés
+                  </span>
                 </div>
 
                 <div className="flex flex-col gap-3 mb-5">
@@ -254,8 +265,10 @@ export function GuideModal({ open, onClose }: Props) {
                 </div>
 
                 {/* Security box */}
-                <div className="flex items-center gap-4 bg-gradient-to-r from-[#22c55e]/09 to-[#0066FF]/07 border border-[#22c55e]/18 rounded-[18px] p-4 mb-5">
-                  <span className="text-3xl leading-none">🛡️</span>
+                <div className="flex items-center gap-4 bg-gradient-to-r from-[#22c55e]/09 to-[#a8ff35]/07 border border-[#22c55e]/18 rounded-[18px] p-4 mb-5">
+                  <div className="w-12 h-12 rounded-2xl bg-[#22c55e]/15 flex items-center justify-center shrink-0">
+                    <ShieldCheck size={22} className="text-[#22c55e]" />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[14px] font-bold mb-0.5">Paiement sécurisé</p>
                     <p className="text-[12px] text-white/48 leading-relaxed">Tous les achats sont traités via Stripe. Livraison directement par le créateur, suivi inclus.</p>
@@ -305,7 +318,7 @@ export function GuideModal({ open, onClose }: Props) {
                   </div>
 
                   {/* Instagram */}
-                  <div className="rounded-[16px] p-3.5 border" style={{ background: '#0066FF08', borderColor: '#0066FF30' }}>
+                  <div className="rounded-[16px] p-3.5 border" style={{ background: '#a8ff3508', borderColor: '#a8ff3530' }}>
                     <div className="flex items-center gap-2 mb-2">
                       <svg viewBox="0 0 24 24" className="w-5 h-5 shrink-0" fill="none" stroke="url(#ig-grad)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <defs>
@@ -320,7 +333,7 @@ export function GuideModal({ open, onClose }: Props) {
                         <circle cx="12" cy="12" r="5" />
                         <circle cx="17.5" cy="6.5" r="1" fill="url(#ig-grad)" stroke="none" />
                       </svg>
-                      <p className="text-[13px] font-extrabold" style={{ color: '#0066FF' }}>Instagram</p>
+                      <p className="text-[13px] font-extrabold" style={{ color: '#a8ff35' }}>Instagram</p>
                     </div>
                     <p className="text-[12px] text-white/50 leading-relaxed">Feed immersif, design soigné, DA cohérente — le scroll qui donne envie d&apos;acheter.</p>
                   </div>
@@ -395,8 +408,8 @@ export function GuideModal({ open, onClose }: Props) {
 
                   {/* Abonnements */}
                   <div className="flex gap-3.5 items-start bg-white/[0.03] border border-white/[0.07] rounded-[18px] p-4">
-                    <div className="w-9 h-9 rounded-full bg-[#0066FF]/14 border border-[#0066FF]/25 flex items-center justify-center shrink-0">
-                      <Zap size={16} className="text-[#0066FF]" />
+                    <div className="w-9 h-9 rounded-full bg-[#a8ff35]/14 border border-[#a8ff35]/25 flex items-center justify-center shrink-0">
+                      <Zap size={16} className="text-[#a8ff35]" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[14px] font-bold mb-1">Abonnements créateurs</p>
@@ -415,16 +428,16 @@ export function GuideModal({ open, onClose }: Props) {
                               plan.icon === 'gold'
                                 ? 'bg-[#f59e0b]/10 border-[#f59e0b]/30'
                                 : plan.icon === 'blue'
-                                ? 'bg-[#0066FF]/10 border-[#0066FF]/25'
+                                ? 'bg-[#a8ff35]/10 border-[#a8ff35]/25'
                                 : 'bg-white/[0.03] border-white/[0.07]'
                             }`}
                           >
                             <div className="flex justify-center mb-1.5">
                               {plan.icon === 'gold' && <Crown size={14} className="text-[#f59e0b]" />}
-                              {plan.icon === 'blue' && <Zap size={14} className="text-[#0066FF]" />}
+                              {plan.icon === 'blue' && <Zap size={14} className="text-[#a8ff35]" />}
                               {!plan.icon && <div className="w-3.5 h-3.5 rounded-full bg-white/20" />}
                             </div>
-                            <p className={`text-[11px] font-bold mb-1 ${plan.icon === 'gold' ? 'text-[#f59e0b]' : plan.icon === 'blue' ? 'text-[#0066FF]' : 'text-white/50'}`}>
+                            <p className={`text-[11px] font-bold mb-1 ${plan.icon === 'gold' ? 'text-[#f59e0b]' : plan.icon === 'blue' ? 'text-[#a8ff35]' : 'text-white/50'}`}>
                               {plan.name}
                             </p>
                             <p className="text-[15px] font-extrabold text-white leading-tight">{plan.price}</p>
@@ -472,8 +485,10 @@ export function GuideModal({ open, onClose }: Props) {
                 </div>
 
                 {/* Summary box */}
-                <div className="flex items-center gap-4 bg-gradient-to-r from-[#a855f7]/10 to-[#0066FF]/08 border border-[#a855f7]/20 rounded-[18px] p-4 mb-4">
-                  <span className="text-3xl leading-none">🤝</span>
+                <div className="flex items-center gap-4 bg-gradient-to-r from-[#a855f7]/10 to-[#a8ff35]/08 border border-[#a855f7]/20 rounded-[18px] p-4 mb-4">
+                  <div className="w-12 h-12 rounded-2xl bg-[#a855f7]/15 flex items-center justify-center shrink-0">
+                    <Handshake size={22} className="text-[#a855f7]" />
+                  </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-[14px] font-bold mb-0.5">Aligné avec les créateurs</p>
                     <p className="text-[12px] text-white/48 leading-relaxed">Skoleom ne gagne que si les créateurs vendent. Nos intérêts sont les mêmes — ton succès est notre succès.</p>
@@ -483,7 +498,7 @@ export function GuideModal({ open, onClose }: Props) {
                 {/* Top sellers rewards */}
                 <div className="bg-gradient-to-br from-[#f59e0b]/10 via-[#f97316]/06 to-[#ec4899]/08 border border-[#f59e0b]/30 rounded-[18px] p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-[22px] leading-none">🏆</span>
+                    <Trophy size={20} className="text-[#f59e0b]" />
                     <div>
                       <p className="text-[14px] font-extrabold text-white leading-tight">Récompenses Top Vendeurs</p>
                       <p className="text-[11px] text-[#f59e0b]/80">Pour les meilleurs créateurs du mois</p>
@@ -494,13 +509,13 @@ export function GuideModal({ open, onClose }: Props) {
                   </p>
                   <div className="grid grid-cols-2 gap-2">
                     {[
-                      { emoji: '🎽', label: 'Maillot Skoleom',   desc: 'Édition limitée signée' },
-                      { emoji: '🎫', label: 'Places de concert', desc: 'Événements partenaires' },
-                      { emoji: '💻', label: 'Gaming gear',        desc: 'Setup streaming offert' },
-                      { emoji: '🌍', label: 'Voyages exclusifs',  desc: 'Events créateurs off' },
+                      { icon: Shirt, label: 'Maillot Skoleom',   desc: 'Édition limitée signée' },
+                      { icon: Ticket, label: 'Places de concert', desc: 'Événements partenaires' },
+                      { icon: Laptop, label: 'Gaming gear',        desc: 'Setup streaming offert' },
+                      { icon: Globe, label: 'Voyages exclusifs',  desc: 'Events créateurs off' },
                     ].map(r => (
                       <div key={r.label} className="flex items-center gap-2.5 bg-white/[0.04] border border-white/[0.06] rounded-[12px] px-3 py-2.5">
-                        <span className="text-[20px] leading-none shrink-0">{r.emoji}</span>
+                        <r.icon size={17} className="text-[#f59e0b] shrink-0" />
                         <div className="min-w-0">
                           <p className="text-[12px] font-bold text-white truncate">{r.label}</p>
                           <p className="text-[10px] text-white/35 truncate">{r.desc}</p>

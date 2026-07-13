@@ -11,7 +11,7 @@
 
   html, body {
     @apply bg-surface text-white;
-    font-family: 'Inter', system-ui, sans-serif;
+    font-family: 'Poppins', system-ui, sans-serif;
     height: 100%;
     overscroll-behavior: none;
   }
@@ -19,6 +19,58 @@
   #__next {
     height: 100%;
   }
+}
+
+/* ── Direction artistique Skoleom Universe ──────────────────────── */
+.glass {
+  @apply bg-white/5 backdrop-blur-xl border border-white/10;
+}
+.glass-card {
+  @apply bg-white/5 backdrop-blur-xl border border-white/10 rounded-2xl;
+}
+
+.text-gradient {
+  background: linear-gradient(135deg, #faee21 0%, #6fe600 48%, #00ffff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.display-text {
+  font-family: 'Anton', system-ui, sans-serif;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+  line-height: 0.92;
+  text-transform: uppercase;
+}
+
+.btn-skoleom {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: #000;
+  background: linear-gradient(135deg, #a8ff35, #6fe600);
+  transition: box-shadow 0.3s, transform 0.3s;
+}
+.btn-skoleom:hover {
+  box-shadow: 0 0 40px rgba(168, 255, 53, 0.4);
+  transform: translateY(-1px);
+}
+
+.btn-skoleom-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  color: #a8ff35;
+  background: transparent;
+  border: 1px solid #a8ff35;
+  transition: all 0.3s;
+}
+.btn-skoleom-outline:hover {
+  background: linear-gradient(135deg, #a8ff35, #6fe600);
+  color: #000;
 }
 
 /* ── Skoleom Capsule Button (importé de SeSport) ─────────────────── */

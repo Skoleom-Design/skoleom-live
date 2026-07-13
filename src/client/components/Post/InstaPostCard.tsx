@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import {
   Heart,
   MessageCircle,
@@ -12,9 +13,13 @@ import {
 import type { Post } from '../../../shared/types/api';
 import { CapsuleDrawer } from '../Capsule/CapsuleDrawer';
 import { BoostBadge } from '../Boost/BoostBadge';
+import { CommentsDrawer } from './CommentsDrawer';
+import { ShareModal } from './ShareModal';
+import { api, ApiError, getToken } from '../../../shared/api/http';
 
 interface Props {
   post: Post;
+  liked?: boolean;
 }
 
 function fmt(n: number) {
@@ -23,13 +28,37 @@ function fmt(n: number) {
   return String(n);
 }
 
-export function InstaPostCard({ post }: Props) {
+export function InstaPostCard({ post, liked: likedProp = false }: Props) {
+  const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRef = useRef<HTMLDivElement>(null);
   const [isMuted, setIsMuted] = useState(true);
-  const [liked, setLiked] = useState(false);
+  const [liked, setLiked] = useState(likedProp);
+  const [likeCount, setLikeCount] = useState(post.likeCount);
+  const [likePending, setLikePending] = useState(false);
   const [saved, setSaved] = useState(false);
   const [capsuleOpen, setCapsuleOpen] = useState(false);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
+  const [commentCount, setCommentCount] = useState(post.commentCount ?? 0);
+
+  async function handleLike() {
+    if (!getToken()) {
+      router.push('/auth/login');
+      return;
+    }
+    if (likePending) return;
+    setLikePending(true);
+    try {
+      const res = await api.post<{ liked: boolean; likeCount: number }>(`/posts/${post.id}/like`);
+      setLiked(res.liked);
+      setLikeCount(res.likeCount);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) router.push('/auth/login');
+    } finally {
+      setLikePending(false);
+    }
+  }
 
   const hasCapsules = post.capsules && post.capsules.length > 0;
 
@@ -54,7 +83,7 @@ export function InstaPostCard({ post }: Props) {
           {post.creator.avatarUrl ? (
             <div className={`w-8 h-8 rounded-full overflow-hidden shrink-0 ${
               post.isBoosted
-                ? 'ring-2 ring-[#0066FF] ring-offset-1 ring-offset-black'
+                ? 'ring-2 ring-[#a8ff35] ring-offset-1 ring-offset-black'
                 : 'ring-1 ring-white/20'
             }`}>
               <img
@@ -64,7 +93,7 @@ export function InstaPostCard({ post }: Props) {
               />
             </div>
           ) : (
-            <div className="w-8 h-8 rounded-full bg-[#0066FF] flex items-center justify-center text-xs font-bold text-white shrink-0">
+            <div className="w-8 h-8 rounded-full bg-[#a8ff35] flex items-center justify-center text-xs font-bold text-black shrink-0">
               {post.creator.username[0].toUpperCase()}
             </div>
           )}
@@ -155,7 +184,7 @@ export function InstaPostCard({ post }: Props) {
       <div className="flex items-center px-3 pt-3 pb-1 gap-1">
         <div className="flex items-center gap-3 flex-1">
           <button
-            onClick={() => setLiked((l) => !l)}
+            onClick={handleLike}
             className="group p-0.5"
             aria-label="J'aime"
           >
@@ -168,13 +197,13 @@ export function InstaPostCard({ post }: Props) {
               }`}
             />
           </button>
-          <button className="group p-0.5" aria-label="Commenter">
+          <button onClick={() => setCommentsOpen(true)} className="group p-0.5" aria-label="Commenter">
             <MessageCircle
               size={25}
               className="text-white group-hover:text-white/70 transition-colors"
             />
           </button>
-          <button className="group p-0.5" aria-label="Partager">
+          <button onClick={() => setShareOpen(true)} className="group p-0.5" aria-label="Partager">
             <Send
               size={23}
               className="text-white group-hover:text-white/70 transition-colors -rotate-12"
@@ -198,7 +227,7 @@ export function InstaPostCard({ post }: Props) {
       {/* ── Likes ── */}
       <div className="px-3 py-0.5">
         <p className="text-[13px] font-semibold text-white">
-          {fmt(post.likeCount + (liked ? 1 : 0))} j&apos;aime
+          {fmt(likeCount)} j&apos;aime
         </p>
       </div>
 
@@ -217,11 +246,20 @@ export function InstaPostCard({ post }: Props) {
         </div>
       )}
 
+      {/* ── Comments ── */}
+      {commentCount > 0 && (
+        <button onClick={() => setCommentsOpen(true)} className="px-3 py-0.5 block">
+          <p className="text-[13px] text-white/40 hover:text-white/60 transition-colors">
+            Voir les {fmt(commentCount)} commentaire{commentCount > 1 ? 's' : ''}
+          </p>
+        </button>
+      )}
+
       {/* ── Tags ── */}
       {post.tags && post.tags.length > 0 && (
         <div className="px-3 py-0.5 flex gap-1.5 flex-wrap">
           {post.tags.map((tag) => (
-            <span key={tag} className="text-[12px] text-[#0066FF]/80 font-medium">
+            <span key={tag} className="text-[12px] text-[#a8ff35]/80 font-medium">
               #{tag}
             </span>
           ))}
@@ -242,6 +280,20 @@ export function InstaPostCard({ post }: Props) {
           onClose={() => setCapsuleOpen(false)}
         />
       )}
+
+      <CommentsDrawer
+        postId={post.id}
+        open={commentsOpen}
+        onClose={() => setCommentsOpen(false)}
+        onCommentAdded={() => setCommentCount((c) => c + 1)}
+      />
+
+      <ShareModal
+        postId={post.id}
+        caption={post.caption}
+        open={shareOpen}
+        onClose={() => setShareOpen(false)}
+      />
     </article>
   );
 }

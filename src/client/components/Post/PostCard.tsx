@@ -95,7 +95,7 @@ export function PostCard({ post }: Props) {
                   className="w-9 h-9 rounded-full object-cover border-2 border-white/30"
                 />
               ) : (
-                <div className="w-9 h-9 rounded-full bg-brand flex items-center justify-center text-sm font-bold text-white">
+                <div className="w-9 h-9 rounded-full bg-brand flex items-center justify-center text-sm font-bold text-black">
                   {post.creator.username[0].toUpperCase()}
                 </div>
               )}

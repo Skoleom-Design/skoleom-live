@@ -1,522 +1,427 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { createPortal } from 'react-dom';
 import {
-  Home, Search, Video, User, Settings2,
-  Plus, X, Trash2, Crown, Zap,
-  Package, BarChart2, Grid3x3, ChevronDown, ChevronUp,
+  LogOut, Plus, Trash2, Package, BarChart2, Grid3x3, Loader2, Pencil, Camera, X,
+  Heart, Zap, Wallet, ArrowDownToLine, ArrowUpFromLine, Radio, Settings, Check,
 } from 'lucide-react';
-import { GuideButton } from '../../client/components/Guide/GuideModal';
+import { AppSidebar } from '../../client/components/Layout/Sidebar';
+import { BoostModal } from '../../client/components/Boost/BoostModal';
+import { api, ApiError, getToken, getStoredUser, clearSession } from '../../shared/api/http';
 
-/* ── Plans ──────────────────────────────────────────────────── */
-interface Plan {
-  id: 'free' | 'premium' | 'ultra';
-  name: string;
-  price: string;
-  maxCapsules: number | null;
-  maxProductsPerCapsule: number;
-  color: string;
-  badge: string;
-}
+type PlanKey = 'free' | 'premium' | 'ultra';
 
-const PLANS: Plan[] = [
-  { id: 'free',    name: 'Gratuit',       price: '0€',     maxCapsules: 2,    maxProductsPerCapsule: 2,  color: 'white',    badge: 'Gratuit' },
-  { id: 'premium', name: 'Premium',       price: '9,90€',  maxCapsules: 15,   maxProductsPerCapsule: 5,  color: '#0066FF',  badge: 'Premium' },
-  { id: 'ultra',   name: 'Ultra Premium', price: '29,90€', maxCapsules: null, maxProductsPerCapsule: 10, color: '#f59e0b',  badge: 'Ultra' },
-];
-
-/* ── Types ──────────────────────────────────────────────────── */
-interface Product {
+interface MeUser {
   id: string;
-  name: string;
-  description: string;
-  price: string;
-  imageUrl: string;
-}
-
-interface Capsule {
-  id: string;
-  name: string;
-  products: Product[];
-}
-
-/* ── Demo accounts ──────────────────────────────────────────── */
-type AccountId = 'karim' | 'anis' | 'ultra';
-
-interface DemoAccount {
   username: string;
-  avatar: string;
-  planId: 'free' | 'premium' | 'ultra';
-  capsules: Capsule[];
+  displayName?: string;
+  avatarUrl?: string;
+  bio?: string;
+  role: string;
+  plan?: PlanKey;
+  walletBalance?: number;
+  totalEarnings?: number;
 }
 
-const DEMO_ACCOUNTS: Record<AccountId, DemoAccount> = {
-  karim: {
-    username: 'karim.hmd',
-    avatar: 'K',
-    planId: 'free',
-    capsules: [
-      {
-        id: 'cap-k1',
-        name: 'Capsule Mode',
-        products: [
-          { id: 'pk1', name: 'Hoodie Skoleom', description: 'Oversize, coton bio 300g.', price: '69.90', imageUrl: 'https://images.unsplash.com/photo-1556821840-3a63f15732ce?w=300&h=300&fit=crop' },
-        ],
-      },
-    ],
-  },
-  anis: {
-    username: 'anis.live',
-    avatar: 'A',
-    planId: 'premium',
-    capsules: [
-      {
-        id: 'cap-a1',
-        name: 'Capsule Sneakers',
-        products: [
-          { id: 'pa1', name: 'Air Max Exclusif', description: 'Édition limitée 50 paires.', price: '189.00', imageUrl: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=300&h=300&fit=crop' },
-          { id: 'pa2', name: 'Jordan Retro OG', description: 'Coloris vintage, taille 40-45.', price: '159.00', imageUrl: 'https://images.unsplash.com/photo-1600185365483-26d7a4cc7519?w=300&h=300&fit=crop' },
-          { id: 'pa3', name: 'Chaussettes Sport x3', description: 'Pack 3 paires, coton bio.', price: '19.90', imageUrl: 'https://images.unsplash.com/photo-1586350977771-b3b0abd50c82?w=300&h=300&fit=crop' },
-        ],
-      },
-      {
-        id: 'cap-a2',
-        name: 'Capsule Streetwear',
-        products: [
-          { id: 'pa4', name: 'Cargo Pants Black', description: 'Coupe droite, multi-poches.', price: '79.90', imageUrl: 'https://images.unsplash.com/photo-1473966968600-fa801b869a1a?w=300&h=300&fit=crop' },
-          { id: 'pa5', name: 'Tee OG Logo', description: 'Coton peigné, coupe droite.', price: '34.90', imageUrl: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=300&h=300&fit=crop' },
-        ],
-      },
-    ],
-  },
-  ultra: {
-    username: 'lina.ultra',
-    avatar: 'L',
-    planId: 'ultra',
-    capsules: [
-      {
-        id: 'cap-u1',
-        name: 'Capsule Déco',
-        products: [
-          { id: 'pu1', name: 'Vase Céramique', description: 'Fait main, 30cm.', price: '45.00', imageUrl: 'https://images.unsplash.com/photo-1578500494198-246f612d3b3d?w=300&h=300&fit=crop' },
-          { id: 'pu2', name: 'Bougie Soja', description: '40h combustion.', price: '22.00', imageUrl: 'https://images.unsplash.com/photo-1602607140002-9e2bc40e72a2?w=300&h=300&fit=crop' },
-          { id: 'pu3', name: 'Plaid Alpaga', description: '100% alpaga péruvien.', price: '89.00', imageUrl: 'https://images.unsplash.com/photo-1584100936595-c0654b55a2e2?w=300&h=300&fit=crop' },
-          { id: 'pu4', name: 'Miroir Laiton', description: 'Contour laiton brossé, 60cm.', price: '129.00', imageUrl: 'https://images.unsplash.com/photo-1618220179428-22790b461013?w=300&h=300&fit=crop' },
-        ],
-      },
-      {
-        id: 'cap-u2',
-        name: 'Capsule Cuisine',
-        products: [
-          { id: 'pu5', name: 'Cafetière Italienne', description: '6 tasses, inox brossé.', price: '39.00', imageUrl: 'https://images.unsplash.com/photo-1495474472287-4d71bcdd2085?w=300&h=300&fit=crop' },
-          { id: 'pu6', name: 'Planche Bois Noyer', description: 'Bois de noyer massif, 40x25cm.', price: '55.00', imageUrl: 'https://images.unsplash.com/photo-1556909114-f6e7ad7d3136?w=300&h=300&fit=crop' },
-        ],
-      },
-    ],
-  },
+const PLAN_BADGE: Record<PlanKey, { label: string; color: string }> = {
+  free: { label: 'Free', color: 'rgba(255,255,255,0.5)' },
+  premium: { label: 'Premium', color: '#00ffff' },
+  ultra: { label: 'Ultra', color: '#f59e0b' },
 };
 
-/* ── Sidebar ────────────────────────────────────────────────── */
-function InstaSidebar() {
-  const router = useRouter();
-  const NAV = [
-    { href: '/live',       icon: Video,  label: 'Live' },
-    { href: '/',           icon: Home,   label: 'Explorer' },
-    { href: '/explore',    icon: Search, label: 'Rechercher' },
-    { href: '/profile/me', icon: User,   label: 'Profil' },
-  ];
-  return (
-    <aside className="hidden md:flex flex-col w-[244px] h-full bg-black border-r border-white/[0.06] px-3 py-5 shrink-0">
-      <div className="px-3 pb-6 pt-2">
-        <img src="/skoleom-mark.png" alt="skoleomLive" className="h-7 object-contain" />
-      </div>
-      <nav className="flex-1 space-y-0.5">
-        {NAV.map((item) => {
-          const Icon = item.icon;
-          const isActive = router.pathname === item.href;
-          return (
-            <Link key={item.label} href={item.href}
-              className={`flex items-center gap-4 px-3 py-2.5 rounded-xl text-[15px] transition-colors ${
-                isActive ? 'font-bold text-white bg-white/[0.06]' : 'font-normal text-white/80 hover:bg-white/[0.04] hover:text-white'
-              }`}
-            >
-              <Icon size={24} strokeWidth={isActive ? 2.5 : 1.75} />
-              {item.label}
-            </Link>
-          );
-        })}
-        <GuideButton />
-      </nav>
-      <div className="border-t border-white/[0.06] pt-3 mt-2">
-        <Link href="/admin" className="flex items-center gap-4 px-3 py-2.5 rounded-xl text-[15px] text-white/40 hover:text-white hover:bg-white/[0.04] transition-colors">
-          <Settings2 size={22} strokeWidth={1.75} />
-          Admin
-        </Link>
-      </div>
-    </aside>
-  );
+const LANGUAGES = [
+  { code: 'fr', label: 'Français' },
+  { code: 'en', label: 'English' },
+  { code: 'es', label: 'Español' },
+  { code: 'ar', label: 'العربية' },
+];
+
+const PLANS: { key: PlanKey; price: string; perks: string[] }[] = [
+  { key: 'free', price: '0€/mois', perks: ['2 capsules par post', 'Fonctionnalités de base'] },
+  { key: 'premium', price: '9,90€/mois', perks: ['15 capsules par post', 'Badge Premium', 'Support prioritaire'] },
+  { key: 'ultra', price: '29,90€/mois', perks: ['Capsules illimitées', 'Badge Ultra', 'Mise en avant boostée'] },
+];
+
+interface CapsuleData {
+  id: string;
+  name: string;
+  price: number;
+  currency: string;
+  stock: number;
+  soldCount: number;
+  imageUrl?: string;
 }
 
-/* ── Upgrade modal ──────────────────────────────────────────── */
-function UpgradeModal({ reason, onClose }: { reason: 'capsule' | 'product'; onClose: () => void }) {
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-[6px]" onClick={onClose}>
-      <div
-        className="relative w-full max-w-[520px] bg-[#0d0d10] border border-white/[0.08] rounded-[28px] overflow-hidden"
-        style={{ boxShadow: '0 40px 80px rgba(0,0,0,0.7)' }}
-        onClick={e => e.stopPropagation()}
-      >
-        <div className="h-px bg-gradient-to-r from-transparent via-[#f59e0b] to-transparent" />
-        <div className="px-7 pt-6 pb-7">
-          <button onClick={onClose} className="absolute top-5 right-5 w-8 h-8 rounded-full bg-white/[0.07] hover:bg-white/[0.14] flex items-center justify-center text-white/50 hover:text-white transition-all">
-            <X size={15} />
-          </button>
-
-          <div className="flex items-center gap-3 mb-2">
-            <div className="w-11 h-11 rounded-[14px] bg-gradient-to-br from-[#f59e0b] to-[#d97706] flex items-center justify-center shrink-0">
-              <Crown size={20} className="text-white" />
-            </div>
-            <div>
-              <p className="text-[17px] font-extrabold text-white leading-tight">Limite atteinte</p>
-              <p className="text-[12px] text-white/45">
-                {reason === 'capsule' ? 'Tu as utilisé toutes tes Capsules disponibles.' : 'Cette Capsule est pleine.'}
-              </p>
-            </div>
-          </div>
-
-          {/* Plans grid */}
-          <div className="grid grid-cols-3 gap-2.5 my-5">
-            {PLANS.map(plan => {
-              const isGold = plan.id === 'ultra';
-              const isBlue = plan.id === 'premium';
-              return (
-                <div
-                  key={plan.id}
-                  className={`rounded-[18px] p-4 border ${
-                    isGold ? 'bg-[#f59e0b]/10 border-[#f59e0b]/35' :
-                    isBlue ? 'bg-[#0066FF]/10 border-[#0066FF]/30' :
-                    'bg-white/[0.03] border-white/[0.07]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <p className={`text-[12px] font-bold uppercase tracking-wide ${isGold ? 'text-[#f59e0b]' : isBlue ? 'text-[#0066FF]' : 'text-white/40'}`}>
-                      {plan.name}
-                    </p>
-                    {isGold && <Crown size={12} className="text-[#f59e0b]" />}
-                    {isBlue && <Zap size={12} className="text-[#0066FF]" />}
-                  </div>
-
-                  <div className="space-y-1.5 mb-3">
-                    <div className={`text-[11px] font-semibold rounded-lg px-2 py-1 ${isGold ? 'bg-[#f59e0b]/10 text-[#f59e0b]' : isBlue ? 'bg-[#0066FF]/10 text-[#7aabff]' : 'bg-white/[0.05] text-white/45'}`}>
-                      {plan.maxCapsules === null ? '∞' : plan.maxCapsules} Capsules
-                    </div>
-                    <div className={`text-[11px] font-semibold rounded-lg px-2 py-1 ${isGold ? 'bg-[#f59e0b]/10 text-[#f59e0b]' : isBlue ? 'bg-[#0066FF]/10 text-[#7aabff]' : 'bg-white/[0.05] text-white/45'}`}>
-                      {plan.maxProductsPerCapsule} articles / Capsule
-                    </div>
-                  </div>
-
-                  <p className="text-[18px] font-extrabold text-white">{plan.price}</p>
-                  <p className="text-[10px] text-white/35">/mois</p>
-
-                  {plan.id !== 'free' && (
-                    <button className={`w-full mt-3 py-1.5 rounded-full text-[11px] font-bold transition-all ${
-                      isGold ? 'bg-[#f59e0b] text-black hover:brightness-110' : 'bg-[#0066FF] text-white hover:brightness-110'
-                    }`}>
-                      Choisir
-                    </button>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-
-          <button onClick={onClose} className="w-full py-2.5 text-white/35 text-[13px] hover:text-white/60 transition-colors">
-            Rester sur le plan gratuit
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body,
-  );
+interface PostData {
+  id: string;
+  caption?: string;
+  mediaUrl: string;
+  thumbnailUrl?: string;
+  type: 'photo' | 'video';
+  viewCount: number;
+  likeCount: number;
+  capsules: CapsuleData[];
 }
 
-/* ── Add product modal ──────────────────────────────────────── */
-function AddProductModal({ onClose, onAdd }: { onClose: () => void; onAdd: (p: Product) => void }) {
-  const [form, setForm] = useState({ name: '', description: '', price: '', imageUrl: '' });
-  function submit() {
-    if (!form.name.trim() || !form.price.trim()) return;
-    onAdd({ id: Date.now().toString(), ...form, imageUrl: form.imageUrl || 'https://images.unsplash.com/photo-1523275335684-37898b6baf30?w=300&h=300&fit=crop' });
-    onClose();
-  }
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-[6px]" onClick={onClose}>
-      <div className="relative w-full max-w-[440px] bg-[#0d0d10] border border-white/[0.08] rounded-[28px] overflow-hidden" style={{ boxShadow: '0 40px 80px rgba(0,0,0,0.7)' }} onClick={e => e.stopPropagation()}>
-        <div className="h-px bg-gradient-to-r from-transparent via-[#0066FF] to-transparent" />
-        <div className="px-6 pt-6 pb-7">
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-[10px] bg-[#0066FF]/20 border border-[#0066FF]/30 flex items-center justify-center">
-                <Package size={16} className="text-[#0066FF]" />
-              </div>
-              <p className="text-[16px] font-bold">Ajouter un article</p>
-            </div>
-            <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/[0.07] hover:bg-white/[0.14] flex items-center justify-center text-white/50 hover:text-white transition-all"><X size={15} /></button>
-          </div>
-          <div className="space-y-3">
-            {[
-              { key: 'name',        label: 'Nom *',                placeholder: 'ex: Hoodie Premium' },
-              { key: 'price',       label: 'Prix (€) *',           placeholder: 'ex: 49.90' },
-              { key: 'description', label: 'Description',          placeholder: 'Courte description...' },
-              { key: 'imageUrl',    label: 'URL image (optionnel)', placeholder: 'https://...' },
-            ].map(f => (
-              <div key={f.key}>
-                <label className="block text-[11px] font-semibold text-white/45 mb-1.5 uppercase tracking-wide">{f.label}</label>
-                <input type="text" placeholder={f.placeholder} value={(form as Record<string, string>)[f.key]}
-                  onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-[14px] text-white placeholder-white/25 outline-none focus:border-[#0066FF]/60 transition-all"
-                />
-              </div>
-            ))}
-          </div>
-          <button onClick={submit} disabled={!form.name.trim() || !form.price.trim()}
-            className="w-full mt-5 py-3.5 rounded-full bg-[#0066FF] text-white text-[14px] font-bold hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-            Ajouter à la Capsule
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body,
-  );
+interface LikedPost {
+  id: string;
+  caption?: string;
+  mediaUrl: string;
+  thumbnailUrl?: string;
+  type: 'photo' | 'video' | 'youtube';
+  creator: { id: string; username: string };
 }
 
-/* ── Add capsule modal ──────────────────────────────────────── */
-function AddCapsuleModal({ onClose, onAdd }: { onClose: () => void; onAdd: (name: string) => void }) {
-  const [name, setName] = useState('');
-  return createPortal(
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-[6px]" onClick={onClose}>
-      <div className="relative w-full max-w-[400px] bg-[#0d0d10] border border-white/[0.08] rounded-[28px] overflow-hidden" style={{ boxShadow: '0 40px 80px rgba(0,0,0,0.7)' }} onClick={e => e.stopPropagation()}>
-        <div className="h-px bg-gradient-to-r from-transparent via-[#0066FF] to-transparent" />
-        <div className="px-6 pt-6 pb-7">
-          <div className="flex items-center justify-between mb-5">
-            <p className="text-[16px] font-bold">Nouvelle Capsule</p>
-            <button onClick={onClose} className="w-8 h-8 rounded-full bg-white/[0.07] hover:bg-white/[0.14] flex items-center justify-center text-white/50 hover:text-white transition-all"><X size={15} /></button>
-          </div>
-          <label className="block text-[11px] font-semibold text-white/45 mb-1.5 uppercase tracking-wide">Nom de la Capsule *</label>
-          <input type="text" placeholder="ex: Capsule Mode Été" value={name} onChange={e => setName(e.target.value)}
-            className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-[14px] text-white placeholder-white/25 outline-none focus:border-[#0066FF]/60 transition-all mb-5" />
-          <button onClick={() => { if (name.trim()) { onAdd(name.trim()); onClose(); } }} disabled={!name.trim()}
-            className="w-full py-3.5 rounded-full bg-[#0066FF] text-white text-[14px] font-bold hover:brightness-110 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
-            Créer la Capsule
-          </button>
-        </div>
-      </div>
-    </div>,
-    document.body,
-  );
+interface Analytics {
+  posts: PostData[];
+  totals: { views: number; likes: number; sold: number; revenue: number };
 }
 
-/* ── Capsule card ───────────────────────────────────────────── */
-function CapsuleCard({
-  capsule, maxProducts, onAddProduct, onRemoveProduct, onRemoveCapsule,
-}: {
-  capsule: Capsule;
-  maxProducts: number;
-  onAddProduct: (capsuleId: string) => void;
-  onRemoveProduct: (capsuleId: string, productId: string) => void;
-  onRemoveCapsule: (capsuleId: string) => void;
-}) {
-  const [open, setOpen] = useState(true);
-  const isFull = capsule.products.length >= maxProducts;
-
-  return (
-    <div className="bg-white/[0.03] border border-white/[0.07] rounded-[20px] overflow-hidden">
-      {/* Capsule header */}
-      <div className="flex items-center justify-between px-4 py-3.5">
-        <button className="flex items-center gap-3 flex-1 text-left" onClick={() => setOpen(o => !o)}>
-          <div className="w-8 h-8 rounded-full bg-[#0066FF]/15 border border-[#0066FF]/25 flex items-center justify-center shrink-0">
-            <img src="/skoleom-mark.png" alt="" className="w-4 h-4 object-contain" />
-          </div>
-          <div>
-            <p className="text-[14px] font-bold text-white">{capsule.name}</p>
-            <p className="text-[11px] text-white/40">{capsule.products.length}/{maxProducts} articles</p>
-          </div>
-          {open ? <ChevronUp size={16} className="text-white/30 ml-2" /> : <ChevronDown size={16} className="text-white/30 ml-2" />}
-        </button>
-
-        {/* Progress mini */}
-        <div className="flex items-center gap-2 ml-3">
-          <div className="flex gap-1">
-            {Array.from({ length: maxProducts }).map((_, i) => (
-              <div key={i} className={`w-2 h-2 rounded-full ${i < capsule.products.length ? 'bg-[#0066FF]' : 'bg-white/[0.1]'}`} />
-            ))}
-          </div>
-          <button onClick={() => onRemoveCapsule(capsule.id)} className="w-7 h-7 rounded-full hover:bg-red-500/20 flex items-center justify-center text-white/20 hover:text-red-400 transition-all ml-1">
-            <Trash2 size={13} />
-          </button>
-        </div>
-      </div>
-
-      {/* Products */}
-      {open && (
-        <div className="px-4 pb-4 space-y-2 border-t border-white/[0.05] pt-3">
-          {capsule.products.map(p => (
-            <div key={p.id} className="flex items-center gap-3 bg-white/[0.03] rounded-[14px] p-3 group">
-              <img src={p.imageUrl} alt={p.name} className="w-11 h-11 rounded-lg object-cover shrink-0" />
-              <div className="flex-1 min-w-0">
-                <p className="text-[13px] font-semibold text-white truncate">{p.name}</p>
-                <p className="text-[13px] font-extrabold text-[#0066FF]">{p.price} €</p>
-              </div>
-              <button onClick={() => onRemoveProduct(capsule.id, p.id)} className="w-7 h-7 rounded-full hover:bg-red-500/20 flex items-center justify-center text-white/20 hover:text-red-400 transition-all opacity-0 group-hover:opacity-100">
-                <Trash2 size={12} />
-              </button>
-            </div>
-          ))}
-
-          {/* Add product slot */}
-          {!isFull ? (
-            <button onClick={() => onAddProduct(capsule.id)}
-              className="w-full flex items-center gap-3 bg-white/[0.015] border border-dashed border-white/[0.1] rounded-[14px] p-3 hover:bg-white/[0.03] hover:border-white/[0.2] transition-all group">
-              <div className="w-11 h-11 rounded-lg bg-white/[0.04] border border-dashed border-white/[0.1] flex items-center justify-center shrink-0">
-                <Plus size={16} className="text-white/20 group-hover:text-white/40 transition-colors" />
-              </div>
-              <p className="text-[12px] text-white/30 group-hover:text-white/55 transition-colors">Ajouter un article</p>
-            </button>
-          ) : (
-            <div className="flex items-center gap-2 px-3 py-2 bg-[#f59e0b]/06 border border-[#f59e0b]/20 rounded-[14px]">
-              <Crown size={13} className="text-[#f59e0b] shrink-0" />
-              <p className="text-[11px] text-[#f59e0b]/80">Capsule pleine — passe à Pro pour + d&apos;articles</p>
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/* ── Profile page ───────────────────────────────────────────── */
-type Tab = 'capsule' | 'posts' | 'stats';
+type Tab = 'posts' | 'capsules' | 'favoris' | 'wallet' | 'stats';
 
 export default function ProfilePage() {
-  const [activeAccount, setActiveAccount] = useState<AccountId>('karim');
-  const [tab, setTab] = useState<Tab>('capsule');
-  const [capsules, setCapsules] = useState<Record<AccountId, Capsule[]>>({
-    karim: DEMO_ACCOUNTS.karim.capsules,
-    anis: DEMO_ACCOUNTS.anis.capsules,
-    ultra: DEMO_ACCOUNTS.ultra.capsules,
-  });
-  const [upgrade, setUpgrade] = useState<'capsule' | 'product' | null>(null);
-  const [addingProductTo, setAddingProductTo] = useState<string | null>(null);
-  const [showAddCapsule, setShowAddCapsule] = useState(false);
+  const router = useRouter();
+  const [user, setUser] = useState<MeUser | null>(null);
+  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [tab, setTab] = useState<Tab>('posts');
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const account = DEMO_ACCOUNTS[activeAccount];
-  const plan = PLANS.find(p => p.id === account.planId)!;
-  const currentCapsules = capsules[activeAccount];
-  const capsuleLimit = plan.maxCapsules;
-  const capsuleFull = capsuleLimit !== null && currentCapsules.length >= capsuleLimit;
+  const [editOpen, setEditOpen] = useState(false);
+  const [editDisplayName, setEditDisplayName] = useState('');
+  const [editBio, setEditBio] = useState('');
+  const [editAvatarFile, setEditAvatarFile] = useState<File | null>(null);
+  const [editAvatarPreview, setEditAvatarPreview] = useState('');
+  const [editError, setEditError] = useState('');
+  const [editSaving, setEditSaving] = useState(false);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
-  function handleAddCapsule() {
-    if (capsuleFull) { setUpgrade('capsule'); return; }
-    setShowAddCapsule(true);
+  const [capsuleModalOpen, setCapsuleModalOpen] = useState(false);
+  const [newCapsulePostId, setNewCapsulePostId] = useState('');
+  const [newCapsuleName, setNewCapsuleName] = useState('');
+  const [newCapsulePrice, setNewCapsulePrice] = useState('');
+  const [newCapsuleStock, setNewCapsuleStock] = useState('');
+  const [newCapsuleError, setNewCapsuleError] = useState('');
+  const [newCapsuleSaving, setNewCapsuleSaving] = useState(false);
+
+  const [likedPosts, setLikedPosts] = useState<LikedPost[]>([]);
+  const [planSaving, setPlanSaving] = useState(false);
+  const [planError, setPlanError] = useState('');
+  const [boostOpen, setBoostOpen] = useState(false);
+  const [boostPost, setBoostPost] = useState<PostData | null>(null);
+
+  const [topupOpen, setTopupOpen] = useState(false);
+  const [topupAmount, setTopupAmount] = useState('20');
+  const [topupError, setTopupError] = useState('');
+  const [topupLoading, setTopupLoading] = useState(false);
+
+  const [withdrawOpen, setWithdrawOpen] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState('');
+  const [withdrawError, setWithdrawError] = useState('');
+  const [withdrawLoading, setWithdrawLoading] = useState(false);
+
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [language, setLanguage] = useState('fr');
+  const [notice, setNotice] = useState('');
+
+  function showComingSoon(label: string) {
+    setNotice(`${label} — bientôt disponible 🚧`);
+    setTimeout(() => setNotice(''), 3000);
   }
 
-  function addCapsule(name: string) {
-    setCapsules(prev => ({
-      ...prev,
-      [activeAccount]: [...prev[activeAccount], { id: Date.now().toString(), name, products: [] }],
-    }));
+  useEffect(() => {
+    if (!getToken()) {
+      router.replace('/auth/login');
+      return;
+    }
+    if (getStoredUser()?.role === 'admin') {
+      router.replace('/admin');
+      return;
+    }
+    (async () => {
+      try {
+        const [me, stats, liked] = await Promise.all([
+          api.get<MeUser>('/auth/me'),
+          api.get<Analytics>('/posts/analytics/me'),
+          api.get<LikedPost[]>('/posts/liked/me').catch(() => []),
+        ]);
+        setUser(me);
+        setAnalytics(stats);
+        setLikedPosts(liked);
+      } catch (err) {
+        setError(err instanceof ApiError ? err.message : 'Impossible de charger le profil.');
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  async function handleChangePlan(plan: PlanKey) {
+    if (!user || plan === user.plan) return;
+    setPlanSaving(true);
+    setPlanError('');
+    try {
+      const updated = await api.patch<MeUser>('/users/me', { plan });
+      setUser((prev) => (prev ? { ...prev, ...updated } : updated));
+    } catch (err) {
+      setPlanError(err instanceof ApiError ? err.message : 'Une erreur est survenue.');
+    } finally {
+      setPlanSaving(false);
+    }
   }
 
-  function removeCapsule(id: string) {
-    setCapsules(prev => ({ ...prev, [activeAccount]: prev[activeAccount].filter(c => c.id !== id) }));
+  async function handleTopup(e: React.FormEvent) {
+    e.preventDefault();
+    setTopupError('');
+    const amount = parseFloat(topupAmount);
+    if (!amount || amount <= 0) {
+      setTopupError('Montant invalide.');
+      return;
+    }
+    setTopupLoading(true);
+    try {
+      const { clientSecret } = await api.post<{ clientSecret: string }>('/payments/wallet/topup', { amount });
+      router.push(`/checkout/wallet?client_secret=${clientSecret}`);
+    } catch (err) {
+      setTopupError(err instanceof ApiError ? err.message : 'Une erreur est survenue.');
+      setTopupLoading(false);
+    }
   }
 
-  function handleAddProduct(capsuleId: string) {
-    const cap = currentCapsules.find(c => c.id === capsuleId)!;
-    if (cap.products.length >= plan.maxProductsPerCapsule) { setUpgrade('product'); return; }
-    setAddingProductTo(capsuleId);
+  async function handleWithdraw(e: React.FormEvent) {
+    e.preventDefault();
+    setWithdrawError('');
+    const amount = parseFloat(withdrawAmount);
+    if (!amount || amount <= 0) {
+      setWithdrawError('Montant invalide.');
+      return;
+    }
+    setWithdrawLoading(true);
+    try {
+      const res = await api.post<{ walletBalance: number }>('/payments/wallet/withdraw', { amount });
+      setUser((prev) => (prev ? { ...prev, walletBalance: res.walletBalance } : prev));
+      setWithdrawOpen(false);
+      setWithdrawAmount('');
+    } catch (err) {
+      setWithdrawError(err instanceof ApiError ? err.message : 'Une erreur est survenue.');
+    } finally {
+      setWithdrawLoading(false);
+    }
   }
 
-  function addProduct(product: Product) {
-    if (!addingProductTo) return;
-    setCapsules(prev => ({
-      ...prev,
-      [activeAccount]: prev[activeAccount].map(c =>
-        c.id === addingProductTo ? { ...c, products: [...c.products, product] } : c,
-      ),
-    }));
+  async function handleRemoveCapsule(capsuleId: string) {
+    try {
+      await api.delete(`/capsules/${capsuleId}`);
+      setAnalytics((prev) =>
+        prev
+          ? {
+              ...prev,
+              posts: prev.posts.map((p) => ({
+                ...p,
+                capsules: p.capsules.filter((c) => c.id !== capsuleId),
+              })),
+            }
+          : prev,
+      );
+    } catch {
+      // silent — la liste reflète toujours l'état serveur au prochain rechargement
+    }
   }
 
-  function removeProduct(capsuleId: string, productId: string) {
-    setCapsules(prev => ({
-      ...prev,
-      [activeAccount]: prev[activeAccount].map(c =>
-        c.id === capsuleId ? { ...c, products: c.products.filter(p => p.id !== productId) } : c,
-      ),
-    }));
+  async function handleDeletePost(postId: string) {
+    if (!window.confirm('Supprimer ce post ? Cette action est irréversible.')) return;
+    try {
+      await api.delete(`/posts/${postId}`);
+      setAnalytics((prev) => (prev ? { ...prev, posts: prev.posts.filter((p) => p.id !== postId) } : prev));
+    } catch {
+      // silent — la liste reflète toujours l'état serveur au prochain rechargement
+    }
   }
+
+  function handleLogout() {
+    clearSession();
+    router.push('/auth/login');
+  }
+
+  function openEdit() {
+    if (!user) return;
+    setEditDisplayName(user.displayName || '');
+    setEditBio(user.bio || '');
+    setEditAvatarFile(null);
+    setEditAvatarPreview(user.avatarUrl || '');
+    setEditError('');
+    setEditOpen(true);
+  }
+
+  function onAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    setEditAvatarFile(f);
+    setEditAvatarPreview(URL.createObjectURL(f));
+  }
+
+  async function handleSaveProfile(e: React.FormEvent) {
+    e.preventDefault();
+    setEditError('');
+    setEditSaving(true);
+    try {
+      let avatarUrl = user?.avatarUrl;
+
+      if (editAvatarFile) {
+        const extension = editAvatarFile.name.split('.').pop() || 'jpg';
+        const { uploadUrl, fileUrl } = await api.post('/files/upload-url', {
+          folder: 'avatars',
+          mimeType: editAvatarFile.type,
+          extension,
+        });
+        const putRes = await fetch(uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': editAvatarFile.type },
+          body: editAvatarFile,
+        });
+        if (!putRes.ok) throw new Error("Échec de l'upload de la photo.");
+        avatarUrl = fileUrl;
+      }
+
+      const updated = await api.patch<MeUser>('/users/me', {
+        displayName: editDisplayName.trim() || undefined,
+        bio: editBio.trim() || undefined,
+        avatarUrl,
+      });
+      setUser((prev) => (prev ? { ...prev, ...updated } : updated));
+      setEditOpen(false);
+    } catch (err) {
+      setEditError(err instanceof ApiError || err instanceof Error ? err.message : 'Une erreur est survenue.');
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  function openCapsuleModal() {
+    setNewCapsulePostId(analytics?.posts[0]?.id || '');
+    setNewCapsuleName('');
+    setNewCapsulePrice('');
+    setNewCapsuleStock('');
+    setNewCapsuleError('');
+    setCapsuleModalOpen(true);
+  }
+
+  async function handleCreateCapsule(e: React.FormEvent) {
+    e.preventDefault();
+    setNewCapsuleError('');
+
+    const price = parseFloat(newCapsulePrice);
+    const stock = parseInt(newCapsuleStock, 10);
+    if (!newCapsulePostId) {
+      setNewCapsuleError('Créez d\'abord un post pour pouvoir y attacher une capsule.');
+      return;
+    }
+    if (!newCapsuleName.trim() || !price || !stock) {
+      setNewCapsuleError('Nom, prix et stock sont requis.');
+      return;
+    }
+    if (price < 1) {
+      setNewCapsuleError('Le prix minimum est de 1€.');
+      return;
+    }
+
+    setNewCapsuleSaving(true);
+    try {
+      const created = await api.post<CapsuleData>('/capsules', {
+        postId: newCapsulePostId,
+        name: newCapsuleName.trim(),
+        price,
+        stock,
+      });
+      setAnalytics((prev) =>
+        prev
+          ? {
+              ...prev,
+              posts: prev.posts.map((p) =>
+                p.id === newCapsulePostId ? { ...p, capsules: [...p.capsules, created] } : p,
+              ),
+            }
+          : prev,
+      );
+      setCapsuleModalOpen(false);
+    } catch (err) {
+      setNewCapsuleError(err instanceof ApiError ? err.message : 'Une erreur est survenue.');
+    } finally {
+      setNewCapsuleSaving(false);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-black">
+        <Loader2 className="animate-spin text-white/40" size={28} />
+      </div>
+    );
+  }
+
+  if (error || !user || !analytics) {
+    return (
+      <div className="flex h-screen flex-col items-center justify-center gap-3 bg-black text-white/60">
+        <p>{error || 'Profil introuvable.'}</p>
+        <Link href="/auth/login" className="text-[#a8ff35] underline text-sm">Se reconnecter</Link>
+      </div>
+    );
+  }
+
+  const capsules = analytics.posts.flatMap((post) =>
+    post.capsules.map((c) => ({ ...c, post })),
+  );
 
   const TABS = [
-    { key: 'capsule' as Tab, label: 'Capsule', icon: Package },
-    { key: 'posts'   as Tab, label: 'Posts',   icon: Grid3x3 },
-    { key: 'stats'   as Tab, label: 'Stats',   icon: BarChart2 },
+    { key: 'posts' as Tab, label: 'Posts', icon: Grid3x3 },
+    { key: 'capsules' as Tab, label: 'Capsules', icon: Package },
+    { key: 'favoris' as Tab, label: 'Favoris', icon: Heart },
+    { key: 'wallet' as Tab, label: 'Wallet', icon: Wallet },
+    { key: 'stats' as Tab, label: 'Stats', icon: BarChart2 },
   ];
-
-  const planColor = plan.id === 'ultra' ? '#f59e0b' : plan.id === 'premium' ? '#0066FF' : 'white';
 
   return (
     <>
       <Head><title>Mon profil — skoleomLive</title></Head>
       <div className="flex h-screen bg-black overflow-hidden">
-        <InstaSidebar />
+        <AppSidebar />
 
         <main className="flex-1 overflow-y-auto scrollbar-hide">
           <div className="max-w-[700px] mx-auto px-4 py-8">
 
-            {/* ── Account switcher (demo) ── */}
-            <div className="flex gap-2 mb-6">
-              {(Object.keys(DEMO_ACCOUNTS) as AccountId[]).map(key => {
-                const acc = DEMO_ACCOUNTS[key];
-                const p = PLANS.find(pl => pl.id === acc.planId)!;
-                const isActive = activeAccount === key;
-                const c = p.id === 'ultra' ? '#f59e0b' : p.id === 'premium' ? '#0066FF' : undefined;
-                return (
-                  <button key={key} onClick={() => setActiveAccount(key)}
-                    className={`flex items-center gap-2 px-3.5 py-2 rounded-full text-[12px] font-semibold border transition-all ${
-                      isActive ? 'bg-white/[0.08] border-white/20 text-white' : 'border-white/[0.08] text-white/45 hover:text-white/70 hover:border-white/15'
-                    }`}
-                  >
-                    <div className="w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0"
-                      style={{ backgroundColor: c ?? '#444' }}>{acc.avatar}</div>
-                    {acc.username}
-                    <span className="text-[10px] font-bold opacity-60" style={{ color: c }}>{p.badge}</span>
-                  </button>
-                );
-              })}
-            </div>
-
-            {/* ── Profile header ── */}
+            {/* Profile header */}
             <div className="flex items-center gap-6 mb-8">
-              <div className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-extrabold text-white shrink-0 ring-2 ring-offset-2 ring-offset-black"
-                style={{ background: `linear-gradient(135deg, ${planColor === 'white' ? '#555' : planColor}, ${planColor === '#f59e0b' ? '#d97706' : planColor === '#0066FF' ? '#0044cc' : '#333'})`, ringColor: planColor }}>
-                {account.avatar}
+              <div className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-extrabold text-black shrink-0 bg-gradient-to-br from-[#a8ff35] to-[#6fe600] overflow-hidden">
+                {user.avatarUrl ? (
+                  <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
+                ) : (
+                  (user.displayName || user.username)[0]?.toUpperCase()
+                )}
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1">
-                  <h1 className="text-[20px] font-extrabold text-white">{account.username}</h1>
-                  <span className="text-[11px] font-bold px-2.5 py-0.5 rounded-full border"
-                    style={{ color: planColor === 'white' ? 'rgba(255,255,255,0.5)' : planColor, borderColor: `${planColor === 'white' ? 'rgba(255,255,255,0.15)' : planColor}44`, background: `${planColor === 'white' ? 'rgba(255,255,255,0.06)' : planColor}18` }}>
-                    {plan.name}
-                  </span>
+                  <h1 className="text-[20px] font-extrabold text-white">{user.displayName || user.username}</h1>
+                  <span className="text-[11px] text-white/40">@{user.username}</span>
+                  {user.plan && (
+                    <span
+                      className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                      style={{
+                        color: PLAN_BADGE[user.plan].color,
+                        background: `${PLAN_BADGE[user.plan].color === 'rgba(255,255,255,0.5)' ? 'rgba(255,255,255,0.08)' : PLAN_BADGE[user.plan].color}1a`,
+                      }}
+                    >
+                      {PLAN_BADGE[user.plan].label}
+                    </span>
+                  )}
                 </div>
-                <div className="flex gap-1.5 text-[12px] text-white/40 mb-3">
-                  <span>{capsuleLimit === null ? '∞' : capsuleLimit} Capsules max</span>
-                  <span>·</span>
-                  <span>{plan.maxProductsPerCapsule} articles/Capsule</span>
-                </div>
+                {user.bio && <p className="text-[13px] text-white/45 mb-3">{user.bio}</p>}
                 <div className="flex gap-6">
-                  {[{ label: 'Capsules', value: currentCapsules.length }, { label: 'Ventes', value: 24 }, { label: 'Revenus', value: '1 284€' }].map(s => (
+                  {[
+                    { label: 'Vues', value: analytics.totals.views },
+                    { label: 'Ventes', value: analytics.totals.sold },
+                    { label: 'Revenus', value: `${analytics.totals.revenue.toFixed(2)} €` },
+                  ].map((s) => (
                     <div key={s.label} className="text-center">
                       <p className="text-[16px] font-extrabold text-white">{s.value}</p>
                       <p className="text-[11px] text-white/40">{s.label}</p>
@@ -524,11 +429,46 @@ export default function ProfilePage() {
                   ))}
                 </div>
               </div>
+              <div className="flex flex-col items-end gap-2">
+                <Link href="/studio"
+                  className="btn-skoleom flex items-center gap-2 px-4 py-2 rounded-full text-[13px] hover:shadow-glow-lime-sm transition-all">
+                  <Plus size={14} /> Nouveau post
+                </Link>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    onClick={() => router.push('/studio/live')}
+                    title="Démarrer un live"
+                    className="w-9 h-9 rounded-full border border-white/10 hover:bg-white/10 flex items-center justify-center transition-all"
+                  >
+                    <Radio size={15} className="text-red-400" />
+                  </button>
+                  <button
+                    onClick={() => { setBoostPost(null); setBoostOpen(true); }}
+                    title="Booster mon compte"
+                    className="w-9 h-9 rounded-full border border-white/10 hover:bg-white/10 flex items-center justify-center transition-all"
+                  >
+                    <Zap size={15} className="text-[#a8ff35]" />
+                  </button>
+                  <button
+                    onClick={() => setSettingsOpen(true)}
+                    title="Paramètres"
+                    className="w-9 h-9 rounded-full border border-white/10 hover:bg-white/10 flex items-center justify-center transition-all"
+                  >
+                    <Settings size={15} className="text-white/70" />
+                  </button>
+                </div>
+              </div>
             </div>
 
-            {/* ── Tabs ── */}
+            {notice && (
+              <p className="mb-5 text-center text-xs text-amber-300 bg-amber-400/10 border border-amber-400/20 rounded-xl px-4 py-2.5">
+                {notice}
+              </p>
+            )}
+
+            {/* Tabs */}
             <div className="flex gap-1 border-b border-white/[0.06] mb-6">
-              {TABS.map(t => {
+              {TABS.map((t) => {
                 const Icon = t.icon;
                 const active = tab === t.key;
                 return (
@@ -540,82 +480,189 @@ export default function ProfilePage() {
               })}
             </div>
 
-            {/* ── Capsule tab ── */}
-            {tab === 'capsule' && (
-              <div>
-                {/* Header */}
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <p className="text-[14px] font-bold text-white mb-0.5">Mes Capsules</p>
-                    <p className="text-[12px] text-white/40">
-                      {currentCapsules.length}/{capsuleLimit === null ? '∞' : capsuleLimit} Capsules
-                      {capsuleFull && <span className="text-[#f59e0b] ml-2 font-semibold">— Limite atteinte</span>}
-                    </p>
+            {tab === 'posts' && (
+              analytics.posts.length === 0 ? (
+                <EmptyState text="Aucun post publié pour l'instant." />
+              ) : (
+                <div className="grid grid-cols-3 gap-1">
+                  {analytics.posts.map((post) => (
+                    <div key={post.id} className="relative aspect-square bg-white/[0.04] rounded-lg overflow-hidden group">
+                      <Link href={`/post/${post.id}`} className="block w-full h-full">
+                        {post.thumbnailUrl || post.type === 'photo' ? (
+                          <img src={post.thumbnailUrl || post.mediaUrl} alt="" className="w-full h-full object-cover" />
+                        ) : (
+                          <video src={post.mediaUrl} className="w-full h-full object-cover" muted />
+                        )}
+                      </Link>
+                      <button
+                        onClick={() => { setBoostPost(post); setBoostOpen(true); }}
+                        title="Mettre en avant"
+                        className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-black/80 transition-all"
+                      >
+                        <Zap size={13} className="text-[#a8ff35]" />
+                      </button>
+                      <button
+                        onClick={() => handleDeletePost(post.id)}
+                        title="Supprimer ce post"
+                        className="absolute top-1.5 left-1.5 w-7 h-7 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500/70 transition-all"
+                      >
+                        <Trash2 size={13} className="text-white" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
+
+            {tab === 'capsules' && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-[13px] font-semibold text-white/70 uppercase tracking-wider mb-3">
+                    Abonnement — plus de capsules par post
+                  </h3>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-2">
+                    {PLANS.map((p) => {
+                      const active = user.plan === p.key;
+                      return (
+                        <button
+                          key={p.key}
+                          onClick={() => handleChangePlan(p.key)}
+                          disabled={planSaving}
+                          className={`text-left p-4 rounded-[16px] border transition-all disabled:opacity-60 ${
+                            active
+                              ? 'border-[#a8ff35] bg-[#a8ff35]/10 shadow-glow-lime-sm'
+                              : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06]'
+                          }`}
+                        >
+                          <div className="flex items-center justify-between mb-1">
+                            <span
+                              className="text-[13px] font-bold"
+                              style={{ color: active ? PLAN_BADGE[p.key].color : 'white' }}
+                            >
+                              {PLAN_BADGE[p.key].label}
+                            </span>
+                            {active && <span className="text-[10px] font-bold text-[#a8ff35]">Actuel</span>}
+                          </div>
+                          <p className="text-[12px] text-white/40 mb-2">{p.price}</p>
+                          <ul className="space-y-1">
+                            {p.perks.map((perk) => (
+                              <li key={perk} className="text-[11px] text-white/50">• {perk}</li>
+                            ))}
+                          </ul>
+                        </button>
+                      );
+                    })}
                   </div>
-                  <button onClick={handleAddCapsule}
-                    className={`flex items-center gap-2 px-4 py-2 rounded-full text-[13px] font-bold transition-all ${
-                      capsuleFull
-                        ? 'bg-[#f59e0b]/15 border border-[#f59e0b]/40 text-[#f59e0b] hover:bg-[#f59e0b]/25'
-                        : 'bg-[#0066FF] text-white hover:brightness-110 hover:shadow-[0_0_20px_rgba(0,102,255,0.35)]'
-                    }`}
-                  >
-                    {capsuleFull ? <><Crown size={14} /><span>Passer à Pro</span></> : <><Plus size={14} /><span>Nouvelle Capsule</span></>}
-                  </button>
+                  {planError && <p className="text-red-400 text-xs">{planError}</p>}
+                  <p className="text-[11px] text-white/25">
+                    Changement de palier immédiat — aucun paiement réel n&apos;est requis pour l&apos;instant.
+                  </p>
                 </div>
 
-                {/* Capsule progress bar */}
-                {capsuleLimit !== null && (
-                  <div className="w-full h-1.5 bg-white/[0.06] rounded-full mb-6 overflow-hidden">
-                    <div className={`h-full rounded-full transition-all duration-500 ${capsuleFull ? 'bg-[#f59e0b]' : 'bg-[#0066FF]'}`}
-                      style={{ width: `${Math.min((currentCapsules.length / capsuleLimit) * 100, 100)}%` }} />
+                <button
+                  onClick={openCapsuleModal}
+                  className="btn-skoleom flex items-center gap-2 px-4 py-2 rounded-full text-[13px] hover:shadow-glow-lime-sm transition-all"
+                >
+                  <Plus size={14} /> Créer une capsule
+                </button>
+
+                {capsules.length === 0 ? (
+                  <EmptyState text="Aucune capsule créée pour l'instant." />
+                ) : (
+                  <div className="space-y-3">
+                    {capsules.map((c) => (
+                    <div key={c.id} className="flex items-center gap-3 bg-white/[0.03] border border-white/[0.07] rounded-[16px] p-3">
+                      <div className="w-12 h-12 rounded-lg bg-white/[0.05] overflow-hidden shrink-0 flex items-center justify-center">
+                        {c.imageUrl ? (
+                          <img src={c.imageUrl} alt={c.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <Package size={18} className="text-white/25" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-semibold text-white truncate">{c.name}</p>
+                        <p className="text-[12px] text-white/40">
+                          {c.price.toFixed(2)} {c.currency} · {c.soldCount} vendues · {c.stock} en stock
+                        </p>
+                      </div>
+                      <button onClick={() => handleRemoveCapsule(c.id)}
+                        className="w-8 h-8 rounded-full hover:bg-red-500/20 flex items-center justify-center text-white/25 hover:text-red-400 transition-all">
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                    ))}
                   </div>
                 )}
-
-                {/* Capsules list */}
-                <div className="space-y-3">
-                  {currentCapsules.map(cap => (
-                    <CapsuleCard key={cap.id} capsule={cap} maxProducts={plan.maxProductsPerCapsule}
-                      onAddProduct={handleAddProduct} onRemoveProduct={removeProduct} onRemoveCapsule={removeCapsule} />
-                  ))}
-
-                  {/* Empty slot */}
-                  {!capsuleFull && (
-                    <button onClick={handleAddCapsule}
-                      className="w-full flex items-center gap-4 bg-white/[0.015] border border-dashed border-white/[0.1] rounded-[20px] p-4 hover:bg-white/[0.03] hover:border-white/[0.2] transition-all group">
-                      <div className="w-12 h-12 rounded-xl bg-white/[0.04] border border-dashed border-white/[0.1] flex items-center justify-center shrink-0">
-                        <Plus size={18} className="text-white/20 group-hover:text-white/40 transition-colors" />
-                      </div>
-                      <p className="text-[13px] text-white/30 group-hover:text-white/55 transition-colors">Créer une nouvelle Capsule</p>
-                    </button>
-                  )}
-
-                  {/* Upsell when full */}
-                  {capsuleFull && (
-                    <button onClick={() => setUpgrade('capsule')}
-                      className="w-full flex items-center gap-4 bg-gradient-to-r from-[#f59e0b]/08 to-[#0066FF]/06 border border-dashed border-[#f59e0b]/30 rounded-[20px] p-4 hover:from-[#f59e0b]/14 hover:border-[#f59e0b]/50 transition-all group">
-                      <div className="w-12 h-12 rounded-xl bg-[#f59e0b]/10 border border-[#f59e0b]/20 flex items-center justify-center shrink-0">
-                        <Crown size={18} className="text-[#f59e0b]" />
-                      </div>
-                      <div className="text-left">
-                        <p className="text-[13px] font-bold text-[#f59e0b]">Débloquer plus de Capsules</p>
-                        <p className="text-[12px] text-white/35 mt-0.5">Premium : 15 Capsules · Ultra : illimitées</p>
-                      </div>
-                    </button>
-                  )}
-                </div>
               </div>
             )}
 
-            {tab === 'posts' && (
-              <div className="grid grid-cols-3 gap-1">
-                {[...Array(9)].map((_, i) => <div key={i} className="aspect-square bg-white/[0.04] rounded-lg" />)}
+            {tab === 'favoris' && (
+              likedPosts.length === 0 ? (
+                <EmptyState text="Aucun post mis en favori pour l'instant." />
+              ) : (
+                <div className="grid grid-cols-3 gap-1">
+                  {likedPosts.map((post) => (
+                    <Link key={post.id} href={`/post/${post.id}`} className="relative aspect-square bg-white/[0.04] rounded-lg overflow-hidden group">
+                      {post.thumbnailUrl || post.type === 'photo' ? (
+                        <img src={post.thumbnailUrl || post.mediaUrl} alt="" className="w-full h-full object-cover" />
+                      ) : post.type === 'video' ? (
+                        <video src={post.mediaUrl} className="w-full h-full object-cover" muted />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center bg-white/[0.03]">
+                          <Heart size={20} className="text-white/15" />
+                        </div>
+                      )}
+                      <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent px-2 py-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <p className="text-[11px] text-white/90 truncate">@{post.creator.username}</p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              )
+            )}
+
+            {tab === 'wallet' && (
+              <div className="space-y-5 max-w-sm">
+                <div className="bg-white/[0.03] border border-white/[0.07] rounded-[20px] p-5">
+                  <p className="text-[11px] text-white/40 uppercase tracking-wider mb-1">Solde disponible</p>
+                  <p className="text-[32px] font-extrabold text-white mb-4">
+                    {(user.walletBalance ?? 0).toFixed(2)} €
+                  </p>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => { setTopupOpen(true); setTopupError(''); }}
+                      className="btn-skoleom flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full text-[13px] hover:shadow-glow-lime-sm transition-all"
+                    >
+                      <ArrowDownToLine size={14} /> Ajouter des fonds
+                    </button>
+                    <button
+                      onClick={() => { setWithdrawOpen(true); setWithdrawError(''); }}
+                      className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full border border-white/10 text-white/70 text-[13px] font-semibold hover:text-white hover:border-white/25 transition-all"
+                    >
+                      <ArrowUpFromLine size={14} /> Retirer
+                    </button>
+                  </div>
+                </div>
+                <div className="bg-white/[0.03] border border-white/[0.07] rounded-[16px] p-4">
+                  <p className="text-[12px] text-white/40">Revenus totaux (ventes de capsules)</p>
+                  <p className="text-[18px] font-bold text-white">{(user.totalEarnings ?? 0).toFixed(2)} €</p>
+                </div>
               </div>
             )}
 
             {tab === 'stats' && (
-              <div className="flex flex-col items-center justify-center py-16 text-white/30">
-                <BarChart2 size={40} className="mb-3 opacity-30" />
-                <p className="text-[14px]">Analytics disponibles bientôt</p>
+              <div className="grid grid-cols-2 gap-3">
+                {[
+                  { label: 'Vues totales', value: analytics.totals.views },
+                  { label: 'Likes totaux', value: analytics.totals.likes },
+                  { label: 'Capsules vendues', value: analytics.totals.sold },
+                  { label: 'Revenu net', value: `${analytics.totals.revenue.toFixed(2)} €` },
+                ].map((s) => (
+                  <div key={s.label} className="bg-white/[0.03] border border-white/[0.07] rounded-[16px] p-4">
+                    <p className="text-[20px] font-extrabold text-white">{s.value}</p>
+                    <p className="text-[12px] text-white/40 mt-1">{s.label}</p>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -623,9 +670,327 @@ export default function ProfilePage() {
         </main>
       </div>
 
-      {upgrade && <UpgradeModal reason={upgrade} onClose={() => setUpgrade(null)} />}
-      {showAddCapsule && <AddCapsuleModal onClose={() => setShowAddCapsule(false)} onAdd={addCapsule} />}
-      {addingProductTo && <AddProductModal onClose={() => setAddingProductTo(null)} onAdd={p => { addProduct(p); setAddingProductTo(null); }} />}
+      {editOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-white font-bold text-base">Modifier le profil</h2>
+              <button onClick={() => setEditOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
+                <X size={16} className="text-white" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveProfile} className="space-y-4">
+              <div className="flex flex-col items-center gap-2">
+                <input
+                  ref={avatarInputRef}
+                  type="file"
+                  accept="image/*"
+                  onChange={onAvatarChange}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="relative w-20 h-20 rounded-full overflow-hidden bg-gradient-to-br from-[#a8ff35] to-[#6fe600] flex items-center justify-center text-2xl font-extrabold text-black"
+                >
+                  {editAvatarPreview ? (
+                    <img src={editAvatarPreview} alt="" className="w-full h-full object-cover" />
+                  ) : (
+                    (editDisplayName || user.username)[0]?.toUpperCase()
+                  )}
+                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                    <Camera size={20} className="text-white" />
+                  </div>
+                  <div className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-[#a8ff35] border-2 border-[#0d0d0f] flex items-center justify-center">
+                    <Camera size={11} className="text-black" />
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => avatarInputRef.current?.click()}
+                  className="text-xs text-[#a8ff35] font-semibold hover:underline"
+                >
+                  Changer la photo
+                </button>
+              </div>
+
+              <div>
+                <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
+                  Nom affiché
+                </label>
+                <input
+                  type="text"
+                  value={editDisplayName}
+                  onChange={(e) => setEditDisplayName(e.target.value)}
+                  placeholder={user.username}
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
+                  Bio
+                </label>
+                <textarea
+                  value={editBio}
+                  onChange={(e) => setEditBio(e.target.value)}
+                  placeholder="Parle de toi en quelques mots..."
+                  rows={3}
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all resize-none"
+                />
+              </div>
+
+              {editError && (
+                <p className="text-red-400 text-sm bg-red-400/10 px-4 py-2.5 rounded-xl border border-red-400/20">
+                  {editError}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={editSaving}
+                className="btn-skoleom w-full py-3.5 rounded-full text-sm shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.98] disabled:opacity-60 gap-2"
+              >
+                {editSaving ? <Loader2 size={16} className="animate-spin" /> : 'Enregistrer'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {capsuleModalOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-white font-bold text-base">Créer une capsule</h2>
+              <button onClick={() => setCapsuleModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
+                <X size={16} className="text-white" />
+              </button>
+            </div>
+
+            {analytics.posts.length === 0 ? (
+              <p className="text-white/40 text-sm text-center py-6">
+                Créez d'abord un post — une capsule doit toujours être rattachée à un post.
+              </p>
+            ) : (
+              <form onSubmit={handleCreateCapsule} className="space-y-4">
+                <div>
+                  <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
+                    Rattacher au post
+                  </label>
+                  <select
+                    value={newCapsulePostId}
+                    onChange={(e) => setNewCapsulePostId(e.target.value)}
+                    className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                  >
+                    {analytics.posts.map((p) => (
+                      <option key={p.id} value={p.id} className="bg-[#0d0d0f]">
+                        {p.caption || `Post du ${p.id.slice(0, 8)}`}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <input
+                  type="text"
+                  value={newCapsuleName}
+                  onChange={(e) => setNewCapsuleName(e.target.value)}
+                  placeholder="Nom du produit"
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                />
+                <input
+                  type="number"
+                  step="0.01"
+                  min="1"
+                  value={newCapsulePrice}
+                  onChange={(e) => setNewCapsulePrice(e.target.value)}
+                  placeholder="Prix (€)"
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                />
+                <input
+                  type="number"
+                  value={newCapsuleStock}
+                  onChange={(e) => setNewCapsuleStock(e.target.value)}
+                  placeholder="Stock"
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                />
+
+                {newCapsuleError && (
+                  <p className="text-red-400 text-sm bg-red-400/10 px-4 py-2.5 rounded-xl border border-red-400/20">
+                    {newCapsuleError}
+                  </p>
+                )}
+
+                <button
+                  type="submit"
+                  disabled={newCapsuleSaving}
+                  className="btn-skoleom w-full py-3.5 rounded-full text-sm shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.98] disabled:opacity-60 gap-2"
+                >
+                  {newCapsuleSaving ? <Loader2 size={16} className="animate-spin" /> : 'Créer la capsule'}
+                </button>
+              </form>
+            )}
+          </div>
+        </div>
+      )}
+
+      {boostOpen && (
+        <BoostModal
+          post={boostPost ?? undefined}
+          open={boostOpen}
+          onClose={() => { setBoostOpen(false); setBoostPost(null); }}
+        />
+      )}
+
+      {topupOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-white font-bold text-base">Ajouter des fonds</h2>
+              <button onClick={() => setTopupOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
+                <X size={16} className="text-white" />
+              </button>
+            </div>
+            <form onSubmit={handleTopup} className="space-y-4">
+              <div>
+                <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
+                  Montant (€)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="1"
+                  value={topupAmount}
+                  onChange={(e) => setTopupAmount(e.target.value)}
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                />
+              </div>
+              {topupError && (
+                <p className="text-red-400 text-sm bg-red-400/10 px-4 py-2.5 rounded-xl border border-red-400/20">
+                  {topupError}
+                </p>
+              )}
+              <button
+                type="submit"
+                disabled={topupLoading}
+                className="btn-skoleom w-full py-3.5 rounded-full text-sm shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.98] disabled:opacity-60 gap-2"
+              >
+                {topupLoading ? <Loader2 size={16} className="animate-spin" /> : 'Continuer vers le paiement'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {withdrawOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-white font-bold text-base">Retirer vers mon compte bancaire</h2>
+              <button onClick={() => setWithdrawOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
+                <X size={16} className="text-white" />
+              </button>
+            </div>
+            <form onSubmit={handleWithdraw} className="space-y-4">
+              <p className="text-[12px] text-white/40">
+                Solde disponible : {(user.walletBalance ?? 0).toFixed(2)} €
+              </p>
+              <div>
+                <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
+                  Montant (€)
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="1"
+                  value={withdrawAmount}
+                  onChange={(e) => setWithdrawAmount(e.target.value)}
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                />
+              </div>
+              {withdrawError && (
+                <p className="text-red-400 text-sm bg-red-400/10 px-4 py-2.5 rounded-xl border border-red-400/20">
+                  {withdrawError}
+                </p>
+              )}
+              <button
+                type="submit"
+                disabled={withdrawLoading}
+                className="btn-skoleom w-full py-3.5 rounded-full text-sm shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.98] disabled:opacity-60 gap-2"
+              >
+                {withdrawLoading ? <Loader2 size={16} className="animate-spin" /> : 'Demander le retrait'}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {settingsOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-white font-bold text-base">Paramètres</h2>
+              <button onClick={() => setSettingsOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
+                <X size={16} className="text-white" />
+              </button>
+            </div>
+
+            <button
+              onClick={() => { setSettingsOpen(false); openEdit(); }}
+              className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/[0.05] text-white/80 hover:text-white text-[13px] font-medium transition-all mb-4"
+            >
+              <Pencil size={15} /> Modifier le profil
+            </button>
+
+            <div className="mb-5">
+              <label className="block text-[11px] text-white/40 mb-2 font-medium uppercase tracking-wider">
+                Langue
+              </label>
+              <div className="space-y-1">
+                {LANGUAGES.map((l) => (
+                  <button
+                    key={l.code}
+                    onClick={() => (l.code === 'fr' ? setLanguage('fr') : showComingSoon(`Langue ${l.label}`))}
+                    className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all ${
+                      l.code === language
+                        ? 'bg-[#a8ff35]/10 text-[#a8ff35]'
+                        : 'text-white/50 hover:bg-white/[0.05] hover:text-white/80'
+                    }`}
+                  >
+                    <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-white/10 tracking-wider">
+                      {l.code.toUpperCase()}
+                    </span>
+                    <span className="flex-1 text-left">{l.label}</span>
+                    {l.code === language && <Check size={14} />}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={handleLogout}
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-full border border-red-500/20 text-red-400 text-[13px] font-semibold hover:bg-red-500/10 transition-all"
+            >
+              <LogOut size={14} /> Déconnexion
+            </button>
+          </div>
+        </div>
+      )}
     </>
+  );
+}
+
+function EmptyState({ text }: { text: string }) {
+  return (
+    <div className="flex flex-col items-center justify-center py-16 text-white/30">
+      <Package size={40} className="mb-3 opacity-30" />
+      <p className="text-[14px]">{text}</p>
+    </div>
   );
 }

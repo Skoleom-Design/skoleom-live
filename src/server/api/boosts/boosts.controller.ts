@@ -8,6 +8,11 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 export class BoostsController {
   constructor(private readonly boostsService: BoostsService) {}
 
+  @Get('pricing')
+  getPricing() {
+    return this.boostsService.getPricing();
+  }
+
   @UseGuards(JwtAuthGuard)
   @Get('my')
   getMyBoosts(@Request() req) {

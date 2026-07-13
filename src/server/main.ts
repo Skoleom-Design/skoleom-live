@@ -11,6 +11,10 @@ async function bootstrap() {
   // Serve extension bundles (content.js, background.js, CSS)
   app.use('/static', express.static(join(process.cwd(), 'static')));
 
+  // Stockage local des médias (fallback quand S3 n'est pas configuré)
+  app.use('/uploads', express.static(join(process.cwd(), 'uploads')));
+  app.use('/api/files/local-upload', express.raw({ type: '*/*', limit: '200mb' }));
+
   app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
   app.enableCors({

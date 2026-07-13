@@ -2,7 +2,7 @@ import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
   UpdateDateColumn, ManyToOne, JoinColumn,
 } from 'typeorm';
-import { BoostStatus, BoostObjective } from '../../../shared/types/entities';
+import { BoostStatus, BoostObjective, BoostScope } from '../../../shared/types/entities';
 import { User } from '../users/user.entity';
 import { Post } from '../posts/post.entity';
 
@@ -11,11 +11,14 @@ export class Boost {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'enum', enum: BoostStatus, default: BoostStatus.PENDING })
+  @Column({ type: 'simple-enum', enum: BoostStatus, default: BoostStatus.PENDING })
   status: BoostStatus;
 
-  @Column({ type: 'enum', enum: BoostObjective, default: BoostObjective.VIEWS })
+  @Column({ type: 'simple-enum', enum: BoostObjective, default: BoostObjective.VIEWS })
   objective: BoostObjective;
+
+  @Column({ type: 'simple-enum', enum: BoostScope, default: BoostScope.POST })
+  scope: BoostScope;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
   budget: number;
@@ -54,11 +57,11 @@ export class Boost {
   @Column()
   userId: string;
 
-  @ManyToOne(() => Post, (post) => post.boosts)
+  @ManyToOne(() => Post, (post) => post.boosts, { nullable: true })
   @JoinColumn({ name: 'postId' })
   post: Post;
 
-  @Column()
+  @Column({ nullable: true })
   postId: string;
 
   @CreateDateColumn()

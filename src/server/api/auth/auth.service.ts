@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import { User } from '../users/user.entity';
+import { UserPlan } from '../../../shared/types/entities';
 
 @Injectable()
 export class AuthService {
@@ -13,19 +14,23 @@ export class AuthService {
     private jwtService: JwtService,
   ) {}
 
-  async register(email: string, username: string, password: string) {
+  async register(email: string, username: string, password: string, plan?: UserPlan) {
     const exists = await this.usersRepo.findOne({ where: [{ email }, { username }] });
     if (exists) throw new ConflictException('Email or username already taken');
 
     const hashed = await bcrypt.hash(password, 12);
-    const user = this.usersRepo.create({ email, username, password: hashed });
+    const user = this.usersRepo.create({ email, username, password: hashed, plan });
     const saved = await this.usersRepo.save(user);
     const { password: _, ...result } = saved;
     return { user: result, token: this.jwtService.sign({ sub: saved.id, role: saved.role }) };
   }
 
-  async login(email: string, password: string) {
-    const user = await this.usersRepo.findOne({ where: { email } });
+  async login(identifier: string, password: string) {
+    const user = await this.usersRepo
+      .createQueryBuilder('user')
+      .addSelect('user.password')
+      .where('user.email = :identifier OR user.username = :identifier', { identifier })
+      .getOne();
     if (!user || !(await bcrypt.compare(password, user.password))) {
       throw new UnauthorizedException('Invalid credentials');
     }

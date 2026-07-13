@@ -26,7 +26,7 @@ function ProductView({
 }) {
   const images = [
     ...(capsule.imageUrl ? [capsule.imageUrl] : []),
-    ...capsule.images,
+    ...(capsule.images || []),
   ];
   const [imgIdx, setImgIdx] = useState(0);
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
@@ -115,7 +115,7 @@ function ProductView({
                 onClick={() => setImgIdx(i)}
                 className={`w-12 h-12 rounded-lg overflow-hidden shrink-0 transition-all border-2 ${
                   imgIdx === i
-                    ? 'border-[#0066FF] opacity-100'
+                    ? 'border-[#a8ff35] opacity-100'
                     : 'border-white/10 opacity-50 hover:opacity-80'
                 }`}
               >
@@ -135,7 +135,7 @@ function ProductView({
 
         {/* Price */}
         <div className="flex items-baseline gap-2">
-          <span className="text-[#0066FF] font-bold text-2xl">
+          <span className="text-[#a8ff35] font-bold text-2xl">
             {capsule.price.toFixed(2)}€
           </span>
         </div>
@@ -180,7 +180,7 @@ function ProductView({
                     {variant.name}
                   </span>
                   {selectedOptions[variant.name] && (
-                    <span className="text-[11px] font-bold text-[#0066FF]">
+                    <span className="text-[11px] font-bold text-[#a8ff35]">
                       {selectedOptions[variant.name]}
                     </span>
                   )}
@@ -196,7 +196,7 @@ function ProductView({
                         }
                         className={`px-4 py-2 rounded-[10px] text-sm font-medium transition-all duration-200 border min-w-[44px] ${
                           isSelected
-                            ? 'bg-[#0066FF] text-white border-[#0066FF] shadow-[0_0_16px_rgba(0,102,255,0.35)]'
+                            ? 'bg-[#a8ff35] text-black border-[#a8ff35] shadow-[0_0_16px_rgba(168,255,53,0.35)]'
                             : 'bg-white/[0.04] text-white/75 border-white/10 hover:bg-white/[0.08] hover:border-white/20'
                         }`}
                       >
@@ -222,14 +222,14 @@ function ProductView({
               : addedToCart
               ? 'bg-green-500 text-white shadow-[0_0_30px_rgba(34,197,94,0.4)]'
               : allSelected
-              ? 'bg-[#0066FF] text-white hover:shadow-[0_0_30px_rgba(0,102,255,0.5)] hover:brightness-110 active:scale-[0.98]'
+              ? 'bg-gradient-to-r from-[#a8ff35] to-[#6fe600] text-black hover:shadow-[0_0_30px_rgba(168,255,53,0.5)] hover:brightness-110 active:scale-[0.98]'
               : 'bg-white/[0.06] text-white/30 cursor-not-allowed'
           }`}
         >
           {addedToCart ? (
             <><Check size={19} strokeWidth={3} />Ajouté au panier</>
           ) : isAdding ? (
-            <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
           ) : isSoldOut ? (
             'Épuisé'
           ) : allSelected ? (
@@ -297,7 +297,7 @@ export function CapsuleDrawer({ capsules, open, onClose }: Props) {
           }`}
         >
           {/* Blue glow line */}
-          <div className="h-[1px] bg-gradient-to-r from-transparent via-[#0066FF] to-transparent" />
+          <div className="h-[1px] bg-gradient-to-r from-transparent via-[#a8ff35] to-transparent" />
 
           <div className="relative bg-[#0d0d0f]/97 backdrop-blur-2xl rounded-t-[24px] border-t border-x border-white/[0.06] overflow-hidden"
             style={{ maxHeight: '88vh' }}
@@ -359,7 +359,7 @@ export function CapsuleDrawer({ capsules, open, onClose }: Props) {
                           <p className="text-xs text-white/35 line-clamp-1 mt-0.5">{capsule.description}</p>
                         )}
                         <div className="flex items-center gap-2 mt-1.5">
-                          <span className="text-[#0066FF] font-bold text-sm">€{capsule.price.toFixed(2)}</span>
+                          <span className="text-[#a8ff35] font-bold text-sm">€{capsule.price.toFixed(2)}</span>
                           {capsule.status === 'sold_out' ? (
                             <span className="text-xs text-red-400">Épuisé</span>
                           ) : (

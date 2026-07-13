@@ -11,7 +11,7 @@ export class Order {
   @PrimaryGeneratedColumn('uuid')
   id: string;
 
-  @Column({ type: 'enum', enum: OrderStatus, default: OrderStatus.PENDING })
+  @Column({ type: 'simple-enum', enum: OrderStatus, default: OrderStatus.PENDING })
   status: OrderStatus;
 
   @Column({ type: 'decimal', precision: 10, scale: 2 })
@@ -55,6 +55,10 @@ export class Order {
 
   @Column()
   capsuleId: string;
+
+  @ManyToOne(() => User)
+  @JoinColumn({ name: 'creatorId' })
+  creator: User;
 
   @Column()
   creatorId: string;

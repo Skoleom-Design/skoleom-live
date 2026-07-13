@@ -6,6 +6,7 @@ import { ArrowLeft, Heart, MessageCircle, Share2, VolumeX, Volume2, Music } from
 import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
 import { BoostBadge } from '../../client/components/Boost/BoostBadge';
 import type { Post } from '../../shared/types/api';
+import { api } from '../../shared/api/http';
 
 // Demo posts repris du feed pour la démo
 const DEMO_POSTS: Record<string, Post> = {
@@ -77,8 +78,8 @@ export default function PostDetailPage() {
   useEffect(() => {
     if (!id) return;
     // Try API, fall back to demo
-    fetch(`/api/posts/${id}`)
-      .then((r) => r.ok ? r.json() : null)
+    api
+      .get<Post>(`/posts/${id}`)
       .then((data) => setPost(data || DEMO_POSTS[id] || null))
       .catch(() => setPost(DEMO_POSTS[id] || null))
       .finally(() => setLoading(false));
@@ -187,7 +188,7 @@ export default function PostDetailPage() {
               {post.creator.avatarUrl ? (
                 <img src={post.creator.avatarUrl} alt={post.creator.username} className="w-10 h-10 rounded-full object-cover border-2 border-white/30" />
               ) : (
-                <div className="w-10 h-10 rounded-full bg-brand flex items-center justify-center font-bold text-white">
+                <div className="w-10 h-10 rounded-full bg-brand flex items-center justify-center font-bold text-black">
                   {post.creator.username[0].toUpperCase()}
                 </div>
               )}
@@ -310,7 +311,7 @@ export default function PostDetailPage() {
                       </div>
                     )}
                     {capsule.status !== 'sold_out' && (
-                      <button className="w-full mt-3 py-2 bg-brand hover:bg-brand-dark text-white text-sm font-semibold rounded-xl transition-colors">
+                      <button className="w-full mt-3 py-2 bg-brand hover:bg-brand-dark text-black text-sm font-semibold rounded-xl transition-colors">
                         Acheter · {capsule.price.toFixed(2)} €
                       </button>
                     )}

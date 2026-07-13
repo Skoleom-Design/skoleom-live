@@ -1,6 +1,6 @@
 import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
-  UpdateDateColumn, ManyToOne, OneToMany, JoinColumn,
+  UpdateDateColumn, ManyToOne, ManyToMany, OneToMany, JoinColumn, JoinTable,
 } from 'typeorm';
 import { PostType, PostStatus } from '../../../shared/types/entities';
 import { User } from '../users/user.entity';
@@ -15,10 +15,10 @@ export class Post {
   @Column({ type: 'text', nullable: true })
   caption: string;
 
-  @Column({ type: 'enum', enum: PostType, default: PostType.VIDEO })
+  @Column({ type: 'simple-enum', enum: PostType, default: PostType.VIDEO })
   type: PostType;
 
-  @Column({ type: 'enum', enum: PostStatus, default: PostStatus.ACTIVE })
+  @Column({ type: 'simple-enum', enum: PostStatus, default: PostStatus.ACTIVE })
   status: PostStatus;
 
   @Column()
@@ -40,6 +40,9 @@ export class Post {
   shareCount: number;
 
   @Column({ default: 0 })
+  commentCount: number;
+
+  @Column({ default: 0 })
   boostScore: number;
 
   @Column({ default: false })
@@ -58,8 +61,13 @@ export class Post {
   @Column()
   creatorId: string;
 
-  @OneToMany(() => Capsule, (capsule) => capsule.post, { cascade: true })
+  @ManyToMany(() => Capsule, (capsule) => capsule.posts, { cascade: true })
+  @JoinTable({ name: 'post_capsules' })
   capsules: Capsule[];
+
+  @ManyToMany(() => User)
+  @JoinTable({ name: 'post_likes' })
+  likedBy: User[];
 
   @OneToMany(() => Boost, (boost) => boost.post)
   boosts: Boost[];

@@ -1,6 +1,6 @@
 import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
-  UpdateDateColumn, ManyToOne, OneToMany, JoinColumn,
+  UpdateDateColumn, ManyToMany, OneToMany,
 } from 'typeorm';
 import { CapsuleStatus } from '../../../shared/types/entities';
 import { Post } from '../posts/post.entity';
@@ -23,7 +23,7 @@ export class Capsule {
   @Column({ default: 'EUR' })
   currency: string;
 
-  @Column({ type: 'enum', enum: CapsuleStatus, default: CapsuleStatus.AVAILABLE })
+  @Column({ type: 'simple-enum', enum: CapsuleStatus, default: CapsuleStatus.AVAILABLE })
   status: CapsuleStatus;
 
   @Column({ nullable: true })
@@ -48,12 +48,8 @@ export class Capsule {
   @Column({ type: 'decimal', precision: 5, scale: 2, default: 15 })
   commissionRate: number;
 
-  @ManyToOne(() => Post, (post) => post.capsules)
-  @JoinColumn({ name: 'postId' })
-  post: Post;
-
-  @Column()
-  postId: string;
+  @ManyToMany(() => Post, (post) => post.capsules)
+  posts: Post[];
 
   @Column()
   creatorId: string;

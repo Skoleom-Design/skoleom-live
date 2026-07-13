@@ -2,25 +2,39 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
-import { ArrowLeft, Check } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
+import { api, ApiError, getToken, setSession, getStoredUser } from '../../shared/api/http';
 
 type Tab = 'login' | 'register';
+
+const DEMO_PASSWORD = 'Demo1234!';
+
+const DEMO_ACCOUNTS = [
+  { plan: 'free', label: 'Free', email: 'demo-free@skoleom.live', username: 'demo_free', color: 'white' },
+  { plan: 'premium', label: 'Premium', email: 'demo-premium@skoleom.live', username: 'demo_premium', color: '#00ffff' },
+  { plan: 'ultra', label: 'Ultra', email: 'demo-ultra@skoleom.live', username: 'demo_ultra', color: '#f59e0b' },
+] as const;
 
 export default function LoginPage() {
   const router = useRouter();
   const [tab, setTab] = useState<Tab>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
+  const [username, setUsername] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [demoLoading, setDemoLoading] = useState<string | null>(null);
 
   // Redirect if already logged in
   useEffect(() => {
-    if (localStorage.getItem('skoleom:authToken')) {
-      router.replace('/studio');
+    if (getToken()) {
+      router.replace(getStoredUser()?.role === 'admin' ? '/admin' : '/');
+      return;
     }
-  }, []);
+    if (router.query.suspended === '1') {
+      setError('Ta session a été interrompue par un administrateur — reconnecte-toi.');
+    }
+  }, [router.query.suspended]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -30,21 +44,53 @@ export default function LoginPage() {
       setError('Veuillez remplir tous les champs.');
       return;
     }
-    if (tab === 'register' && !name.trim()) {
-      setError('Veuillez entrer votre nom.');
+    if (tab === 'register' && !username.trim()) {
+      setError("Veuillez entrer un nom d'utilisateur.");
       return;
     }
 
     setLoading(true);
-    await new Promise((r) => setTimeout(r, 900));
+    try {
+      const { token, user } =
+        tab === 'login'
+          ? await api.post('/auth/login', { email, password })
+          : await api.post('/auth/register', { email, username: username.trim(), password });
 
-    localStorage.setItem('skoleom:authToken', `sk_${Date.now()}`);
-    localStorage.setItem(
-      'skoleom:user',
-      JSON.stringify({ name: name.trim() || email.split('@')[0], email })
-    );
+      setSession(token, user);
+      router.push(user.role === 'admin' ? '/admin' : tab === 'login' ? '/' : '/studio');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Une erreur est survenue.');
+    } finally {
+      setLoading(false);
+    }
+  }
 
-    router.push('/studio');
+  async function loginAsDemo(account: (typeof DEMO_ACCOUNTS)[number]) {
+    setError('');
+    setDemoLoading(account.plan);
+    try {
+      let session;
+      try {
+        session = await api.post('/auth/login', { email: account.email, password: DEMO_PASSWORD });
+      } catch (err) {
+        if (err instanceof ApiError && err.status === 401) {
+          session = await api.post('/auth/register', {
+            email: account.email,
+            username: account.username,
+            password: DEMO_PASSWORD,
+            plan: account.plan,
+          });
+        } else {
+          throw err;
+        }
+      }
+      setSession(session.token, session.user);
+      router.push('/');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Une erreur est survenue.');
+    } finally {
+      setDemoLoading(null);
+    }
   }
 
   return (
@@ -75,7 +121,7 @@ export default function LoginPage() {
           <div className="w-full max-w-sm">
             {/* Heading */}
             <div className="text-center mb-8">
-              <div className="w-14 h-14 rounded-2xl bg-[#0066FF]/10 border border-[#0066FF]/20 flex items-center justify-center mx-auto mb-4">
+              <div className="w-14 h-14 rounded-2xl bg-[#a8ff35]/10 border border-[#a8ff35]/20 flex items-center justify-center mx-auto mb-4">
                 <img src="/skoleom-mark.png" alt="" className="w-8 h-8 object-contain" />
               </div>
               <h1 className="text-2xl font-bold text-white mb-2">
@@ -109,30 +155,30 @@ export default function LoginPage() {
               {tab === 'register' && (
                 <div>
                   <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
-                    Nom d'affichage
+                    Nom d'utilisateur
                   </label>
                   <input
                     type="text"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    placeholder="Votre nom"
-                    autoComplete="name"
-                    className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#0066FF]/50 focus:border-[#0066FF]/30 transition-all"
+                    value={username}
+                    onChange={(e) => setUsername(e.target.value)}
+                    placeholder="@pseudo"
+                    autoComplete="username"
+                    className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
                   />
                 </div>
               )}
 
               <div>
                 <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
-                  Email
+                  {tab === 'login' ? 'Email ou identifiant' : 'Email'}
                 </label>
                 <input
-                  type="email"
+                  type={tab === 'login' ? 'text' : 'email'}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="votre@email.com"
+                  placeholder={tab === 'login' ? 'email ou identifiant' : 'votre@email.com'}
                   autoComplete="email"
-                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#0066FF]/50 focus:border-[#0066FF]/30 transition-all"
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
                 />
               </div>
 
@@ -146,7 +192,7 @@ export default function LoginPage() {
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
                   autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
-                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#0066FF]/50 focus:border-[#0066FF]/30 transition-all"
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
                 />
               </div>
 
@@ -159,15 +205,51 @@ export default function LoginPage() {
               <button
                 type="submit"
                 disabled={loading}
-                className="w-full py-3.5 rounded-full bg-[#0066FF] text-white font-semibold text-sm hover:brightness-110 active:scale-[0.98] transition-all disabled:opacity-60 flex items-center justify-center gap-2 mt-2"
+                className="btn-skoleom w-full py-3.5 rounded-full text-sm shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.98] disabled:opacity-60 gap-2 mt-2"
               >
                 {loading ? (
-                  <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
                 ) : (
                   tab === 'login' ? 'Se connecter' : 'Créer mon compte'
                 )}
               </button>
             </form>
+
+            {/* Demo accounts */}
+            <div className="mt-7">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="h-px flex-1 bg-white/[0.08]" />
+                <span className="text-[11px] text-white/30 uppercase tracking-wider">Comptes de démo</span>
+                <div className="h-px flex-1 bg-white/[0.08]" />
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {DEMO_ACCOUNTS.map((account) => (
+                  <button
+                    key={account.plan}
+                    type="button"
+                    onClick={() => loginAsDemo(account)}
+                    disabled={demoLoading !== null}
+                    className="flex flex-col items-center gap-1.5 py-3 rounded-xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] transition-all disabled:opacity-50"
+                    style={{ borderColor: `${account.color}33` }}
+                  >
+                    {demoLoading === account.plan ? (
+                      <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    ) : (
+                      <span
+                        className="text-[11px] font-bold px-2 py-0.5 rounded-full"
+                        style={{
+                          color: account.color === 'white' ? 'rgba(255,255,255,0.7)' : account.color,
+                          background: `${account.color === 'white' ? 'rgba(255,255,255,0.08)' : account.color}1a`,
+                        }}
+                      >
+                        {account.label}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-white/30">Essayer</span>
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {/* Footer note */}
             <p className="text-center text-xs text-white/25 mt-6">

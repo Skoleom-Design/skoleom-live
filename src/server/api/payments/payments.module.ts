@@ -4,11 +4,12 @@ import { Order } from '../orders/order.entity';
 import { Boost } from '../boosts/boost.entity';
 import { User } from '../users/user.entity';
 import { Capsule } from '../capsules/capsule.entity';
+import { BoostsModule } from '../boosts/boosts.module';
 import { PaymentsService } from './payments.service';
 import { PaymentsController } from './payments.controller';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Order, Boost, User, Capsule])],
+  imports: [TypeOrmModule.forFeature([Order, Boost, User, Capsule]), BoostsModule],
   providers: [PaymentsService],
   controllers: [PaymentsController],
   exports: [PaymentsService],

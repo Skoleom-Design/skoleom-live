@@ -1,11 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Between } from 'typeorm';
+import { Repository, Between, In } from 'typeorm';
 import { Order } from '../orders/order.entity';
 import { Boost } from '../boosts/boost.entity';
 import { User } from '../users/user.entity';
 import { Post } from '../posts/post.entity';
-import { OrderStatus, BoostStatus, PostStatus } from '../../../shared/types/entities';
+import { Gift } from '../lives/gift.entity';
+import { LiveSession } from '../lives/live-session.entity';
+import { BoostsService } from '../boosts/boosts.service';
+import { AdminActionLog, AdminActionType } from './admin-action-log.entity';
+import { OrderStatus, BoostStatus, PostStatus, UserPlan, BoostScope, BoostObjective } from '../../../shared/types/entities';
 
 @Injectable()
 export class AdminService {
@@ -18,17 +22,40 @@ export class AdminService {
     private usersRepo: Repository<User>,
     @InjectRepository(Post)
     private postsRepo: Repository<Post>,
+    @InjectRepository(Gift)
+    private giftsRepo: Repository<Gift>,
+    @InjectRepository(LiveSession)
+    private livesRepo: Repository<LiveSession>,
+    @InjectRepository(AdminActionLog)
+    private logsRepo: Repository<AdminActionLog>,
+    private boostsService: BoostsService,
   ) {}
 
-  async getDashboardStats() {
+  async getDashboardStats(period: 'day' | 'month' | 'quarter' | 'year' = 'month') {
     const now = new Date();
-    const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    let start: Date;
+    switch (period) {
+      case 'day':
+        start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        break;
+      case 'quarter':
+        start = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1);
+        break;
+      case 'year':
+        start = new Date(now.getFullYear(), 0, 1);
+        break;
+      case 'month':
+      default:
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        break;
+    }
 
     const [
       totalUsers,
       totalPosts,
-      monthlyOrders,
-      monthlyBoosts,
+      periodOrders,
+      periodBoosts,
+      periodGifts,
       pendingBoosts,
     ] = await Promise.all([
       this.usersRepo.count(),
@@ -36,40 +63,60 @@ export class AdminService {
       this.ordersRepo.find({
         where: {
           status: OrderStatus.PAID,
-          createdAt: Between(startOfMonth, now),
+          createdAt: Between(start, now),
         },
       }),
       this.boostsRepo.find({
-        where: { createdAt: Between(startOfMonth, now) },
+        where: { createdAt: Between(start, now) },
+      }),
+      this.giftsRepo.find({
+        where: { createdAt: Between(start, now) },
       }),
       this.boostsRepo.count({ where: { status: BoostStatus.PENDING } }),
     ]);
 
-    const monthlyGMV = monthlyOrders.reduce((sum, o) => sum + Number(o.amount), 0);
-    const monthlyCommissions = monthlyOrders.reduce((sum, o) => sum + Number(o.commissionAmount), 0);
-    const monthlyBoostRevenue = monthlyBoosts.reduce((sum, b) => sum + Number(b.budget), 0);
-    const totalRevenue = monthlyCommissions + monthlyBoostRevenue;
+    // GMV (Gross Merchandise Value) = valeur totale des ventes de capsules avant commission —
+    // à ne pas confondre avec "Revenus totaux", qui est ce que la plateforme encaisse réellement
+    // (commissions + boosts + part plateforme des cadeaux), pas le montant brut des ventes.
+    const periodGMV = periodOrders.reduce((sum, o) => sum + Number(o.amount), 0);
+    const periodCommissions = periodOrders.reduce((sum, o) => sum + Number(o.commissionAmount), 0);
+    const periodBoostRevenue = periodBoosts.reduce((sum, b) => sum + Number(b.budget), 0);
+    const periodGiftRevenue = periodGifts.reduce((sum, g) => sum + Number(g.platformAmount), 0);
+    const totalRevenue = periodCommissions + periodBoostRevenue + periodGiftRevenue;
 
     return {
       totalUsers,
       totalPosts,
-      monthlyGMV: monthlyGMV.toFixed(2),
-      monthlyCommissions: monthlyCommissions.toFixed(2),
-      monthlyBoostRevenue: monthlyBoostRevenue.toFixed(2),
+      periodGMV: periodGMV.toFixed(2),
+      periodCommissions: periodCommissions.toFixed(2),
+      periodBoostRevenue: periodBoostRevenue.toFixed(2),
+      periodGiftRevenue: periodGiftRevenue.toFixed(2),
       totalRevenue: totalRevenue.toFixed(2),
       pendingBoosts,
-      ordersCount: monthlyOrders.length,
+      ordersCount: periodOrders.length,
     };
   }
 
-  async getCommissions(page = 1, limit = 20) {
-    const [orders, total] = await this.ordersRepo.findAndCount({
-      where: { status: OrderStatus.PAID },
-      relations: ['buyer', 'capsule'],
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+  async getCommissions(page = 1, limit = 20, search?: string) {
+    const qb = this.ordersRepo
+      .createQueryBuilder('order')
+      .leftJoinAndSelect('order.buyer', 'buyer')
+      .leftJoinAndSelect('order.capsule', 'capsule')
+      .leftJoinAndSelect('order.creator', 'creator')
+      .where('order.status = :status', { status: OrderStatus.PAID })
+      .orderBy('order.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    if (search?.trim()) {
+      qb.andWhere(
+        '(order.id LIKE :search OR buyer.username LIKE :search OR creator.username LIKE :search ' +
+          'OR capsule.name LIKE :search OR order.createdAt LIKE :search)',
+        { search: `%${search.trim()}%` },
+      );
+    }
+
+    const [orders, total] = await qb.getManyAndCount();
     return { orders, total, page, limit };
   }
 
@@ -85,15 +132,275 @@ export class AdminService {
     return { boosts, total, page, limit };
   }
 
-  async getTopCreators(limit = 10) {
-    return this.usersRepo.find({
-      order: { totalEarnings: 'DESC' },
-      take: limit,
-      select: ['id', 'username', 'displayName', 'avatarUrl', 'totalEarnings'],
-    });
+  async getUsers(page = 1, limit = 20, search?: string) {
+    const qb = this.usersRepo
+      .createQueryBuilder('user')
+      .select([
+        'user.id', 'user.username', 'user.displayName', 'user.email', 'user.role',
+        'user.isActive', 'user.plan', 'user.walletBalance', 'user.totalEarnings', 'user.createdAt',
+      ])
+      .orderBy('user.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    if (search?.trim()) {
+      qb.andWhere('(user.username LIKE :search OR user.email LIKE :search OR user.displayName LIKE :search)', {
+        search: `%${search.trim()}%`,
+      });
+    }
+
+    const [users, total] = await qb.getManyAndCount();
+    return { users, total, page, limit };
+  }
+
+  async getPosts(page = 1, limit = 20, status?: string, search?: string) {
+    const qb = this.postsRepo
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.creator', 'creator')
+      .orderBy('post.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    // 'hidden' est un statut virtuel côté admin — modéré et archivé ont le même effet réel
+    // (le post disparaît du feed), donc l'UI les traite comme un seul état "Caché".
+    if (status === 'hidden') {
+      qb.andWhere('post.status IN (:...statuses)', { statuses: [PostStatus.MODERATED, PostStatus.ARCHIVED] });
+    } else if (status) {
+      qb.andWhere('post.status = :status', { status });
+    }
+    if (search?.trim()) {
+      qb.andWhere('(post.caption LIKE :search OR creator.username LIKE :search)', {
+        search: `%${search.trim()}%`,
+      });
+    }
+
+    const [posts, total] = await qb.getManyAndCount();
+    return { posts, total, page, limit };
+  }
+
+  // Un même capsule peut être vendue depuis le feed ou pendant un Live — comme les commandes
+  // ne stockent pas le canal d'origine, on déduit "vente Live" quand la commande tombe dans la
+  // fenêtre temporelle d'un live auquel la capsule était attachée ; sinon on la compte en "feed".
+  async getTopCreatorsByChannel(limit = 10) {
+    const [lives, orders] = await Promise.all([
+      this.livesRepo.find({ relations: ['capsules'] }),
+      this.ordersRepo.find({ where: { status: OrderStatus.PAID } }),
+    ]);
+
+    const windowsByCapsule = new Map<string, { start: Date; end: Date }[]>();
+    for (const live of lives) {
+      if (!live.startedAt) continue;
+      const end = live.endedAt ?? new Date();
+      for (const capsule of live.capsules) {
+        const list = windowsByCapsule.get(capsule.id) ?? [];
+        list.push({ start: live.startedAt, end });
+        windowsByCapsule.set(capsule.id, list);
+      }
+    }
+
+    const feedByCreator = new Map<string, number>();
+    const liveByCreator = new Map<string, number>();
+
+    for (const order of orders) {
+      const windows = windowsByCapsule.get(order.capsuleId) ?? [];
+      const isLiveSale = windows.some((w) => order.createdAt >= w.start && order.createdAt <= w.end);
+      const map = isLiveSale ? liveByCreator : feedByCreator;
+      map.set(order.creatorId, (map.get(order.creatorId) ?? 0) + Number(order.creatorAmount));
+    }
+
+    const buildRanked = async (map: Map<string, number>) => {
+      const sorted = [...map.entries()].sort((a, b) => b[1] - a[1]).slice(0, limit);
+      if (!sorted.length) return [];
+      const users = await this.usersRepo.find({
+        where: { id: In(sorted.map(([id]) => id)) },
+        select: ['id', 'username', 'displayName', 'avatarUrl'],
+      });
+      const byId = new Map(users.map((u) => [u.id, u]));
+      return sorted
+        .filter(([id]) => byId.has(id))
+        .map(([id, revenue]) => ({ ...byId.get(id), revenue }));
+    };
+
+    const [feed, live] = await Promise.all([buildRanked(feedByCreator), buildRanked(liveByCreator)]);
+    return { feed, live };
+  }
+
+  async getTopDonors(limit = 10) {
+    return this.giftsRepo
+      .createQueryBuilder('gift')
+      .leftJoin('gift.sender', 'sender')
+      .select('sender.id', 'id')
+      .addSelect('sender.username', 'username')
+      .addSelect('sender.displayName', 'displayName')
+      .addSelect('sender.avatarUrl', 'avatarUrl')
+      .addSelect('SUM(gift.amount)', 'totalSent')
+      .addSelect('COUNT(gift.id)', 'giftCount')
+      .groupBy('sender.id')
+      .addGroupBy('sender.username')
+      .addGroupBy('sender.displayName')
+      .addGroupBy('sender.avatarUrl')
+      .orderBy('totalSent', 'DESC')
+      .limit(limit)
+      .getRawMany();
+  }
+
+  async getTopLivers(limit = 10) {
+    return this.livesRepo
+      .createQueryBuilder('live')
+      .leftJoin('live.creator', 'creator')
+      .select('creator.id', 'id')
+      .addSelect('creator.username', 'username')
+      .addSelect('creator.displayName', 'displayName')
+      .addSelect('creator.avatarUrl', 'avatarUrl')
+      .addSelect('COUNT(live.id)', 'liveCount')
+      .groupBy('creator.id')
+      .addGroupBy('creator.username')
+      .addGroupBy('creator.displayName')
+      .addGroupBy('creator.avatarUrl')
+      .orderBy('liveCount', 'DESC')
+      .limit(limit)
+      .getRawMany();
+  }
+
+  async getTopPosters(limit = 10) {
+    return this.postsRepo
+      .createQueryBuilder('post')
+      .leftJoin('post.creator', 'creator')
+      .select('creator.id', 'id')
+      .addSelect('creator.username', 'username')
+      .addSelect('creator.displayName', 'displayName')
+      .addSelect('creator.avatarUrl', 'avatarUrl')
+      .addSelect('COUNT(post.id)', 'postCount')
+      .groupBy('creator.id')
+      .addGroupBy('creator.username')
+      .addGroupBy('creator.displayName')
+      .addGroupBy('creator.avatarUrl')
+      .orderBy('postCount', 'DESC')
+      .limit(limit)
+      .getRawMany();
   }
 
   async moderatePost(postId: string, status: PostStatus): Promise<void> {
     await this.postsRepo.update(postId, { status });
+  }
+
+  async setUserActive(userId: string, isActive: boolean, adminId: string): Promise<void> {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    await this.usersRepo.update(userId, { isActive });
+    await this.logsRepo.save(this.logsRepo.create({
+      action: AdminActionType.STATUS_CHANGE,
+      adminId,
+      targetUserId: userId,
+      details: { from: user?.isActive, to: isActive },
+    }));
+  }
+
+  async setUserPlan(userId: string, plan: UserPlan, adminId: string): Promise<void> {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    await this.usersRepo.update(userId, { plan });
+    await this.logsRepo.save(this.logsRepo.create({
+      action: AdminActionType.PLAN_CHANGE,
+      adminId,
+      targetUserId: userId,
+      details: { from: user?.plan, to: plan },
+    }));
+  }
+
+  async creditWallet(userId: string, amount: number, adminId: string): Promise<{ walletBalance: number }> {
+    if (!amount || amount <= 0) throw new BadRequestException('Montant invalide');
+
+    await this.usersRepo.increment({ id: userId }, 'walletBalance', amount);
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    await this.logsRepo.save(this.logsRepo.create({
+      action: AdminActionType.CREDIT,
+      adminId,
+      targetUserId: userId,
+      details: { amount },
+    }));
+    return { walletBalance: user!.walletBalance };
+  }
+
+  async grantBoost(userId: string, durationDays: number, objective: BoostObjective, adminId: string): Promise<Boost> {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) throw new BadRequestException('Utilisateur introuvable');
+
+    // Boost offert par un admin : créé puis activé immédiatement, sans passer par Stripe —
+    // contrairement à un boost payé par le créateur lui-même (voir BoostsService.create/activate).
+    const boost = await this.boostsService.create(userId, {
+      scope: BoostScope.ACCOUNT,
+      objective,
+      durationDays,
+    });
+    await this.boostsService.activate(boost.id);
+
+    await this.logsRepo.save(this.logsRepo.create({
+      action: AdminActionType.BOOST_GRANT,
+      adminId,
+      targetUserId: userId,
+      details: { durationDays, objective, budget: boost.budget },
+    }));
+
+    return boost;
+  }
+
+  async cancelBoost(boostId: string, adminId: string): Promise<void> {
+    const boost = await this.boostsRepo.findOne({ where: { id: boostId } });
+    if (!boost) throw new BadRequestException('Boost introuvable');
+
+    await this.boostsService.cancel(boostId);
+
+    await this.logsRepo.save(this.logsRepo.create({
+      action: AdminActionType.BOOST_CANCEL,
+      adminId,
+      targetUserId: boost.userId,
+      details: { objective: boost.objective, durationDays: boost.durationDays, budget: boost.budget },
+    }));
+  }
+
+  // Un boost payé par un créateur reste PENDING tant que le webhook Stripe de confirmation
+  // n'a pas été reçu — en dev/démo sans vrai paiement, il n'arrive jamais. Cette action permet
+  // à l'admin de valider manuellement (ex: paiement confirmé par un autre moyen) sans attendre.
+  async approveBoost(boostId: string, adminId: string): Promise<void> {
+    const boost = await this.boostsRepo.findOne({ where: { id: boostId } });
+    if (!boost) throw new BadRequestException('Boost introuvable');
+    // Activable depuis "en attente" (validation normale) ou "annulé" (l'admin revient sur un
+    // retrait précédent) — seuls "actif" et "terminé" n'ont pas de raison d'être réactivés ici.
+    if (boost.status === BoostStatus.ACTIVE || boost.status === BoostStatus.COMPLETED) {
+      throw new BadRequestException('Ce boost est déjà actif ou terminé.');
+    }
+
+    await this.boostsService.activate(boostId);
+
+    await this.logsRepo.save(this.logsRepo.create({
+      action: AdminActionType.BOOST_APPROVE,
+      adminId,
+      targetUserId: boost.userId,
+      details: { objective: boost.objective, durationDays: boost.durationDays, budget: boost.budget },
+    }));
+  }
+
+  async getUserDetail(userId: string) {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) throw new BadRequestException('Utilisateur introuvable');
+
+    const [boosts, logs, giftsSent] = await Promise.all([
+      this.boostsRepo.find({
+        where: { userId },
+        order: { createdAt: 'DESC' },
+        take: 50,
+      }),
+      this.logsRepo.find({
+        where: { targetUserId: userId },
+        order: { createdAt: 'DESC' },
+        take: 50,
+      }),
+      this.giftsRepo.find({
+        where: { senderId: userId },
+        order: { createdAt: 'DESC' },
+        take: 50,
+      }),
+    ]);
+
+    return { user, boosts, logs, giftsSent };
   }
 }

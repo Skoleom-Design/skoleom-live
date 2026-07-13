@@ -1,13 +1,9 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
-import Link from 'next/link';
-import { useRouter } from 'next/router';
-import {
-  Home, Search, Video, User, Settings2,
-} from 'lucide-react';
 import { InstaPostCard } from '../client/components/Post/InstaPostCard';
-import { GuideButton } from '../client/components/Guide/GuideModal';
+import { AppSidebar } from '../client/components/Layout/Sidebar';
 import type { Post } from '../shared/types/api';
+import { api, getToken } from '../shared/api/http';
 
 const DEMO_POSTS: Post[] = [
   {
@@ -373,79 +369,29 @@ const DEMO_POSTS: Post[] = [
   },
 ];
 
-/* ── Instagram-style sidebar ───────────────────────────────── */
-function InstaSidebar() {
-  const router = useRouter();
-
-  const NAV = [
-    { href: '/live',      icon: Video,   label: 'Live' },
-    { href: '/',          icon: Home,    label: 'Explorer' },
-    { href: '/explore',   icon: Search,  label: 'Rechercher' },
-    { href: '/profile/me',icon: User,    label: 'Profil' },
-  ];
-
-  return (
-    <aside className="hidden md:flex flex-col w-[244px] h-full bg-black border-r border-white/[0.06] px-3 py-5 shrink-0">
-      {/* Logo */}
-      <div className="px-3 pb-6 pt-2">
-        <img src="/skoleom-mark.png" alt="skoleomLive" className="h-7 object-contain" />
-      </div>
-
-      <nav className="flex-1 space-y-0.5">
-        {NAV.map((item) => {
-          const Icon = item.icon;
-          const isActive =
-            item.href === '/'
-              ? router.pathname === '/'
-              : router.pathname.startsWith(item.href);
-
-          return (
-            <Link
-              key={item.label}
-              href={item.href}
-              className={`flex items-center gap-4 px-3 py-2.5 rounded-xl text-[15px] transition-colors ${
-                isActive
-                  ? 'font-bold text-white bg-white/[0.06]'
-                  : 'font-normal text-white/80 hover:bg-white/[0.04] hover:text-white'
-              }`}
-            >
-              <Icon size={24} strokeWidth={isActive ? 2.5 : 1.75} />
-              {item.label}
-            </Link>
-          );
-        })}
-        <GuideButton />
-      </nav>
-
-      <div className="border-t border-white/[0.06] pt-3 mt-2 space-y-0.5">
-        <Link
-          href="/admin"
-          className="flex items-center gap-4 px-3 py-2.5 rounded-xl text-[15px] text-white/40 hover:text-white hover:bg-white/[0.04] transition-colors"
-        >
-          <Settings2 size={22} strokeWidth={1.75} />
-          Admin
-        </Link>
-      </div>
-    </aside>
-  );
-}
 
 /* ── Feed page ──────────────────────────────────────────────── */
 export default function FeedPage() {
   const [posts, setPosts] = useState<Post[]>(DEMO_POSTS);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [apiError, setApiError] = useState(false);
+  const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     loadFeed();
+    if (getToken()) {
+      api.get<Post[]>('/posts/liked/me')
+        .then((liked) => setLikedIds(new Set(liked.map((p) => p.id))))
+        .catch(() => {});
+    }
   }, []);
 
   async function loadFeed() {
     setLoading(true);
     try {
-      const res = await fetch(`/api/posts/feed?page=${page}&limit=10`);
-      if (!res.ok) throw new Error('API unavailable');
-      const data = await res.json();
+      const data = await api.get<{ posts: Post[]; total: number }>(`/posts/feed?page=${page}&limit=10`);
+      setApiError(false);
       if (data.posts?.length) {
         setPosts((prev) => {
           const existingIds = new Set(
@@ -458,7 +404,7 @@ export default function FeedPage() {
         setPage((p) => p + 1);
       }
     } catch {
-      // Backend not available — demo posts already shown
+      setApiError(true);
     } finally {
       setLoading(false);
     }
@@ -472,7 +418,7 @@ export default function FeedPage() {
       </Head>
 
       <div className="flex h-screen bg-black overflow-hidden">
-        <InstaSidebar />
+        <AppSidebar />
 
         {/* Center feed */}
         <main
@@ -484,8 +430,13 @@ export default function FeedPage() {
           }}
         >
           <div className="max-w-[470px] mx-auto">
+            {apiError && (
+              <div className="mx-3 mt-3 px-4 py-2.5 rounded-xl bg-amber-400/10 border border-amber-400/20 text-amber-300 text-xs text-center">
+                Backend indisponible — affichage de contenu de démonstration.
+              </div>
+            )}
             {posts.map((post) => (
-              <InstaPostCard key={post.id} post={post} />
+              <InstaPostCard key={post.id} post={post} liked={likedIds.has(post.id)} />
             ))}
 
             {loading && (

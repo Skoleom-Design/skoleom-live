@@ -1,7 +1,9 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Post } from './post.entity';
+import { Comment } from './comment.entity';
+import { User } from '../users/user.entity';
 import { PostStatus, PostType } from '../../../shared/types/entities';
 
 export interface CreatePostDto {
@@ -25,6 +27,8 @@ export class PostsService {
   constructor(
     @InjectRepository(Post)
     private postsRepo: Repository<Post>,
+    @InjectRepository(Comment)
+    private commentsRepo: Repository<Comment>,
   ) {}
 
   async getFeed(query: FeedQuery): Promise<{ posts: Post[]; total: number }> {
@@ -60,8 +64,10 @@ export class PostsService {
     return this.postsRepo.save(post);
   }
 
-  async delete(id: string, creatorId: string): Promise<void> {
-    const post = await this.postsRepo.findOne({ where: { id, creatorId } });
+  async delete(id: string, requesterId: string, isAdmin = false): Promise<void> {
+    const post = await this.postsRepo.findOne({
+      where: isAdmin ? { id } : { id, creatorId: requesterId },
+    });
     if (!post) throw new NotFoundException('Post not found');
     await this.postsRepo.update(id, { status: PostStatus.ARCHIVED });
   }
@@ -69,6 +75,85 @@ export class PostsService {
   async incrementBoostScore(postId: string, score: number): Promise<void> {
     await this.postsRepo.increment({ id: postId }, 'boostScore', score);
     await this.postsRepo.update(postId, { isBoosted: true });
+  }
+
+  async boostAllByCreator(creatorId: string, score: number): Promise<void> {
+    await this.postsRepo.increment({ creatorId, status: PostStatus.ACTIVE }, 'boostScore', score);
+    await this.postsRepo.update({ creatorId, status: PostStatus.ACTIVE }, { isBoosted: true });
+  }
+
+  async decrementBoostScore(postId: string, score: number): Promise<void> {
+    await this.postsRepo.decrement({ id: postId }, 'boostScore', score);
+  }
+
+  async unboostAllByCreator(creatorId: string, score: number): Promise<void> {
+    await this.postsRepo.decrement({ creatorId, status: PostStatus.ACTIVE }, 'boostScore', score);
+  }
+
+  async toggleLike(postId: string, userId: string): Promise<{ liked: boolean; likeCount: number }> {
+    const post = await this.postsRepo.findOne({ where: { id: postId } });
+    if (!post) throw new NotFoundException('Post not found');
+
+    // Passer par l'API de relation plutôt que par push()+save() sur le tableau likedBy —
+    // cette dernière ne persistait pas la ligne dans la table pivot post_likes (le like
+    // "marchait" côté compteur mais ne s'enregistrait jamais réellement pour l'utilisateur).
+    const likers = await this.postsRepo
+      .createQueryBuilder()
+      .relation(Post, 'likedBy')
+      .of(postId)
+      .loadMany<User>();
+    const alreadyLiked = likers.some((u) => u.id === userId);
+
+    const relation = this.postsRepo.createQueryBuilder().relation(Post, 'likedBy').of(postId);
+    if (alreadyLiked) {
+      await relation.remove(userId);
+      post.likeCount = Math.max(0, post.likeCount - 1);
+    } else {
+      await relation.add(userId);
+      post.likeCount += 1;
+    }
+    await this.postsRepo.update(postId, { likeCount: post.likeCount });
+    return { liked: !alreadyLiked, likeCount: post.likeCount };
+  }
+
+  async addComment(postId: string, userId: string, text: string): Promise<Comment> {
+    const trimmed = text?.trim();
+    if (!trimmed) throw new BadRequestException('Commentaire vide');
+
+    const post = await this.postsRepo.findOne({ where: { id: postId } });
+    if (!post) throw new NotFoundException('Post not found');
+
+    const saved = await this.commentsRepo.save(
+      this.commentsRepo.create({ postId, userId, text: trimmed.slice(0, 1000) }),
+    );
+    await this.postsRepo.increment({ id: postId }, 'commentCount', 1);
+
+    // save() ne recharge pas la relation eager "user" sur l'entité retournée — seul un
+    // find/findOne le fait — donc on la recharge explicitement pour renvoyer un objet complet.
+    return (await this.commentsRepo.findOne({ where: { id: saved.id } }))!;
+  }
+
+  async incrementShare(postId: string): Promise<void> {
+    await this.postsRepo.increment({ id: postId }, 'shareCount', 1);
+  }
+
+  async getComments(postId: string): Promise<Comment[]> {
+    return this.commentsRepo.find({
+      where: { postId },
+      order: { createdAt: 'DESC' },
+      take: 100,
+    });
+  }
+
+  async getLikedByUser(userId: string): Promise<Post[]> {
+    return this.postsRepo
+      .createQueryBuilder('post')
+      .innerJoin('post.likedBy', 'liker', 'liker.id = :userId', { userId })
+      .leftJoinAndSelect('post.creator', 'creator')
+      .leftJoinAndSelect('post.capsules', 'capsules')
+      .where('post.status = :status', { status: PostStatus.ACTIVE })
+      .orderBy('post.createdAt', 'DESC')
+      .getMany();
   }
 
   async getByCreator(creatorId: string): Promise<Post[]> {
@@ -90,6 +175,7 @@ export class PostsService {
     });
 
     let totalViews = 0, totalLikes = 0, totalSold = 0, totalRevenue = 0;
+    const countedCapsules = new Set<string>();
 
     const enriched = posts.map((post) => {
       const sold = post.capsules.reduce((s, c) => s + c.soldCount, 0);
@@ -98,8 +184,14 @@ export class PostsService {
 
       totalViews += post.viewCount;
       totalLikes += post.likeCount;
-      totalSold += sold;
-      totalRevenue += revenue;
+
+      // Une capsule peut être rattachée à plusieurs posts — ne compter ses ventes qu'une fois dans les totaux.
+      post.capsules.forEach((c) => {
+        if (countedCapsules.has(c.id)) return;
+        countedCapsules.add(c.id);
+        totalSold += c.soldCount;
+        totalRevenue += c.price * c.soldCount * (1 - c.commissionRate / 100);
+      });
 
       return { ...post, totalSold: sold, revenue, engagementRate };
     });

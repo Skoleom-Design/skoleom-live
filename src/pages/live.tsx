@@ -1,9 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
-import Link from 'next/link';
-import { useRouter } from 'next/router';
-import { Home, Search, Video, User, Settings2, Heart, Users, Send, Gift, Wallet, Plus } from 'lucide-react';
-import { GuideButton } from '../client/components/Guide/GuideModal';
+import { Heart, Users, Send, Gift, Wallet, Plus } from 'lucide-react';
+import { AppSidebar } from '../client/components/Layout/Sidebar';
 import { CapsuleDrawer } from '../client/components/Capsule/CapsuleDrawer';
 import type { Capsule } from '../shared/types/api';
 
@@ -146,47 +144,6 @@ interface Comment {
   giftEmoji?: string;
 }
 
-/* ── Sidebar ────────────────────────────────────────────────── */
-function InstaSidebar() {
-  const router = useRouter();
-  const NAV = [
-    { href: '/live',       icon: Video,  label: 'Live' },
-    { href: '/',           icon: Home,   label: 'Explorer' },
-    { href: '/explore',    icon: Search, label: 'Rechercher' },
-    { href: '/profile/me', icon: User,   label: 'Profil' },
-  ];
-  return (
-    <aside className="hidden md:flex flex-col w-[244px] h-full bg-black border-r border-white/[0.06] px-3 py-5 shrink-0">
-      <div className="px-3 pb-6 pt-2">
-        <img src="/skoleom-mark.png" alt="skoleomLive" className="h-7 object-contain" />
-      </div>
-      <nav className="flex-1 space-y-0.5">
-        {NAV.map((item) => {
-          const Icon = item.icon;
-          const isActive = router.pathname === item.href;
-          return (
-            <Link key={item.label} href={item.href}
-              className={`flex items-center gap-4 px-3 py-2.5 rounded-xl text-[15px] transition-colors ${
-                isActive ? 'font-bold text-white bg-white/[0.06]' : 'font-normal text-white/80 hover:bg-white/[0.04] hover:text-white'
-              }`}
-            >
-              <Icon size={24} strokeWidth={isActive ? 2.5 : 1.75} />
-              {item.label}
-            </Link>
-          );
-        })}
-        <GuideButton />
-      </nav>
-      <div className="border-t border-white/[0.06] pt-3 mt-2">
-        <Link href="/admin" className="flex items-center gap-4 px-3 py-2.5 rounded-xl text-[15px] text-white/40 hover:text-white hover:bg-white/[0.04] transition-colors">
-          <Settings2 size={22} strokeWidth={1.75} />
-          Admin
-        </Link>
-      </div>
-    </aside>
-  );
-}
-
 /* ── Chat panel ─────────────────────────────────────────────── */
 type ChatTab = 'chat' | 'gifts';
 
@@ -227,7 +184,7 @@ function ChatPanel({ live, viewers }: { live: LiveConfig; viewers: number }) {
 
   function send() {
     if (!inputVal.trim()) return;
-    setComments(prev => [...prev.slice(-40), { id: idRef.current++, user: 'moi', text: inputVal.trim(), color: '#0066FF' }]);
+    setComments(prev => [...prev.slice(-40), { id: idRef.current++, user: 'moi', text: inputVal.trim(), color: '#a8ff35' }]);
     setInputVal('');
   }
 
@@ -265,7 +222,7 @@ function ChatPanel({ live, viewers }: { live: LiveConfig; viewers: number }) {
           Chat
         </button>
         <button onClick={() => setTab('gifts')}
-          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[13px] font-semibold transition-colors border-b-2 ${tab === 'gifts' ? 'border-[#f59e0b] text-[#f59e0b]' : 'border-transparent text-white/35 hover:text-white/60'}`}>
+          className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[13px] font-semibold transition-colors border-b-2 ${tab === 'gifts' ? 'bg-[#f59e0b]/[0.16] border-[#f59e0b] text-[#f59e0b]' : 'bg-[#f59e0b]/[0.08] border-[#f59e0b]/30 text-[#f59e0b]/80 hover:bg-[#f59e0b]/[0.12]'}`}>
           <Gift size={13} />
           Cadeaux
         </button>
@@ -298,7 +255,7 @@ function ChatPanel({ live, viewers }: { live: LiveConfig; viewers: number }) {
                 onKeyDown={e => e.key === 'Enter' && send()}
                 className="flex-1 bg-transparent text-white text-[13px] placeholder-white/30 outline-none"
               />
-              <button onClick={send} className="text-[#0066FF] hover:text-[#4488ff] transition-colors shrink-0">
+              <button onClick={send} className="text-[#a8ff35] hover:text-[#c3ff70] transition-colors shrink-0">
                 <Send size={16} />
               </button>
             </div>
@@ -435,7 +392,7 @@ function LiveCard({ live, onVisible }: { live: LiveConfig; onVisible: () => void
               LIVE
             </span>
             <div className="flex items-center gap-1.5 bg-black/50 backdrop-blur-sm rounded-full px-2.5 py-1">
-              <div className="w-5 h-5 rounded-full bg-[#0066FF] flex items-center justify-center text-[9px] font-bold text-white shrink-0">
+              <div className="w-5 h-5 rounded-full bg-[#a8ff35] flex items-center justify-center text-[9px] font-bold text-black shrink-0">
                 {live.avatar}
               </div>
               <span className="text-white text-[12px] font-semibold">{live.creator}</span>
@@ -485,7 +442,7 @@ export default function LivePage() {
     <>
       <Head><title>skoleomLive — Live</title></Head>
       <div className="flex h-screen bg-black overflow-hidden">
-        <InstaSidebar />
+        <AppSidebar />
 
         <main className="flex flex-1 overflow-hidden">
           {/* Snap-scroll live videos */}
