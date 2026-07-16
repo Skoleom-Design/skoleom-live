@@ -27,6 +27,21 @@ export enum CapsuleStatus {
   ARCHIVED = 'archived',
 }
 
+export enum CapsuleCondition {
+  NEW_WITH_TAG = 'neuf_avec_etiquette',
+  NEW_WITHOUT_TAG = 'neuf_sans_etiquette',
+  VERY_GOOD = 'tres_bon_etat',
+  GOOD = 'bon_etat',
+  SATISFACTORY = 'satisfaisant',
+}
+
+export enum CapsuleCategory {
+  CLOTHING = 'vetement',
+  SHOES = 'chaussures',
+  ACCESSORY = 'accessoire',
+  OTHER = 'objet',
+}
+
 export enum OrderStatus {
   PENDING = 'pending',
   PAID = 'paid',

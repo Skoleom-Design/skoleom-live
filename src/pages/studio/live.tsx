@@ -42,6 +42,10 @@ export default function StudioLivePage() {
   const streamRef = useRef<MediaStream | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
+  // Incremente a chaque requestMedia() — permet a une requete getUserMedia en cours de se
+  // reconnaitre perimee (ex: StrictMode qui monte/demonte/remonte l'effet en dev) et de liberer
+  // immediatement le flux obtenu au lieu de le laisser fuiter et verrouiller la camera.
+  const mediaRequestIdRef = useRef(0);
   const myId = getStoredUser()?.id;
 
   const [mediaError, setMediaError] = useState('');
@@ -75,21 +79,7 @@ export default function StudioLivePage() {
       return;
     }
 
-    let cancelled = false;
-    navigator.mediaDevices
-      ?.getUserMedia({ video: true, audio: true })
-      .then((stream) => {
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        streamRef.current = stream;
-        if (videoRef.current) videoRef.current.srcObject = stream;
-        setMediaReady(true);
-      })
-      .catch(() => {
-        setMediaError("Impossible d'accéder à la caméra/micro — vérifie les permissions de ton navigateur.");
-      });
+    requestMedia();
 
     api.get<Capsule[]>('/capsules/mine').then(setMyCapsules).catch(() => {});
 
@@ -100,10 +90,65 @@ export default function StudioLivePage() {
     }).catch(() => {});
 
     return () => {
-      cancelled = true;
+      // Invalide toute requete getUserMedia en cours pour cet effet.
+      mediaRequestIdRef.current += 1;
       streamRef.current?.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
     };
   }, []);
+
+  function requestMedia() {
+    setMediaError('');
+    setMediaReady(false);
+
+    // Un flux precedent encore ouvert (ex: double-clic sur Reessayer) doit etre libere
+    // avant d'en demander un nouveau, sinon la camera reste verrouillee par nous-memes.
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((t) => t.stop());
+      streamRef.current = null;
+    }
+
+    if (!navigator.mediaDevices?.getUserMedia) {
+      setMediaError(
+        "Ton navigateur ne supporte pas l'accès à la caméra ici — vérifie que la page est bien chargée en HTTPS (ou localhost) et que tu n'es pas en navigation privée restreinte.",
+      );
+      return;
+    }
+
+    const requestId = ++mediaRequestIdRef.current;
+
+    navigator.mediaDevices
+      .getUserMedia({ video: true, audio: true })
+      .then((stream) => {
+        if (mediaRequestIdRef.current !== requestId) {
+          // Cette requete a ete supplantee (nouvel effet StrictMode, ou nouveau Reessayer) —
+          // on libere immediatement ce flux au lieu de le laisser fuiter et verrouiller la camera.
+          stream.getTracks().forEach((t) => t.stop());
+          return;
+        }
+        streamRef.current = stream;
+        if (videoRef.current) videoRef.current.srcObject = stream;
+        setMediaReady(true);
+      })
+      .catch((err) => {
+        if (mediaRequestIdRef.current !== requestId) return;
+        const name = err instanceof DOMException ? err.name : '';
+        const messages: Record<string, string> = {
+          NotAllowedError: "Accès à la caméra/micro refusé. Clique sur l'icône cadenas (ou caméra barrée) dans la barre d'adresse de ton navigateur, autorise la caméra et le micro pour ce site, puis réessaie.",
+          PermissionDeniedError: "Accès à la caméra/micro refusé. Clique sur l'icône cadenas (ou caméra barrée) dans la barre d'adresse de ton navigateur, autorise la caméra et le micro pour ce site, puis réessaie.",
+          NotFoundError: "Aucune caméra ou aucun micro détecté sur cet appareil.",
+          DevicesNotFoundError: "Aucune caméra ou aucun micro détecté sur cet appareil.",
+          NotReadableError: "Ta caméra ou ton micro est déjà utilisé par une autre application (Zoom, Teams, un autre onglet...). Ferme-la puis réessaie.",
+          TrackStartError: "Ta caméra ou ton micro est déjà utilisé par une autre application (Zoom, Teams, un autre onglet...). Ferme-la puis réessaie.",
+          OverconstrainedError: "Aucune caméra ne correspond aux paramètres demandés.",
+          SecurityError: "L'accès à la caméra nécessite une connexion sécurisée (HTTPS) ou localhost.",
+          NotSupportedError: "Ton navigateur bloque l'accès à la caméra/micro dans ce contexte (permissions système désactivées, ou site ouvert dans un navigateur intégré type app/webview). Vérifie les autorisations caméra/micro de ton navigateur au niveau du système d'exploitation.",
+        };
+        setMediaError(
+          messages[name] || "Impossible d'accéder à la caméra/micro — vérifie les permissions de ton navigateur.",
+        );
+      });
+  }
 
   useEffect(() => {
     if (!live) return;
@@ -229,7 +274,7 @@ export default function StudioLivePage() {
         <title>Live — skoleomLive</title>
       </Head>
 
-      <div className="flex h-screen bg-[#050505] overflow-hidden">
+      <div className="flex h-screen cosmic-bg overflow-hidden">
         <AppSidebar />
 
         <main className="flex-1 flex flex-col overflow-hidden">
@@ -261,8 +306,15 @@ export default function StudioLivePage() {
               <div className="w-full max-w-md">
                 <div className="relative w-full aspect-[9/16] max-h-[65vh] mx-auto rounded-2xl overflow-hidden bg-black border border-white/[0.08]">
                   {mediaError ? (
-                    <div className="w-full h-full flex items-center justify-center px-6 text-center">
+                    <div className="w-full h-full flex flex-col items-center justify-center gap-4 px-6 text-center">
                       <p className="text-white/45 text-sm">{mediaError}</p>
+                      <button
+                        type="button"
+                        onClick={() => requestMedia()}
+                        className="px-4 py-2 rounded-full border border-white/15 text-white/70 text-xs font-semibold hover:bg-white/10 hover:text-white transition-all"
+                      >
+                        Réessayer
+                      </button>
                     </div>
                   ) : !mediaReady ? (
                     <div className="w-full h-full flex items-center justify-center">

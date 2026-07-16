@@ -53,6 +53,19 @@ export class User {
   @Column({ nullable: true })
   stripeAccountId: string;
 
+  @Column({ nullable: true })
+  instagramUserId: string;
+
+  @Column({ nullable: true })
+  instagramUsername: string;
+
+  // select: false — meme raison que le hash de mot de passe : un token d'acces ne doit pas fuiter via les relations eager.
+  @Column({ nullable: true, select: false })
+  instagramAccessToken: string;
+
+  @Column({ nullable: true })
+  instagramTokenExpiresAt: Date;
+
   @OneToMany(() => Post, (post) => post.creator)
   posts: Post[];
 

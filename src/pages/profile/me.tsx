@@ -9,6 +9,18 @@ import {
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { BoostModal } from '../../client/components/Boost/BoostModal';
 import { api, ApiError, getToken, getStoredUser, clearSession } from '../../shared/api/http';
+import type { CapsuleCondition, CapsuleCategory } from '../../shared/types/api';
+import {
+  CAPSULE_CATEGORY_VALUES,
+  CAPSULE_CONDITION_VALUES,
+  CAPSULE_COLOR_PALETTE,
+  categoryLabel,
+  conditionLabel,
+  colorLabel,
+  getSizeOptions,
+  getSizeFieldLabel,
+} from '../../client/constants/capsule';
+import { useLanguage } from '../../client/i18n/LanguageContext';
 
 type PlanKey = 'free' | 'premium' | 'ultra';
 
@@ -35,12 +47,12 @@ const LANGUAGES = [
   { code: 'en', label: 'English' },
   { code: 'es', label: 'Español' },
   { code: 'ar', label: 'العربية' },
-];
+] as const;
 
-const PLANS: { key: PlanKey; price: string; perks: string[] }[] = [
-  { key: 'free', price: '0€/mois', perks: ['2 capsules par post', 'Fonctionnalités de base'] },
-  { key: 'premium', price: '9,90€/mois', perks: ['15 capsules par post', 'Badge Premium', 'Support prioritaire'] },
-  { key: 'ultra', price: '29,90€/mois', perks: ['Capsules illimitées', 'Badge Ultra', 'Mise en avant boostée'] },
+const PLANS: { key: PlanKey; price: string }[] = [
+  { key: 'free', price: '0€' },
+  { key: 'premium', price: '9,90€' },
+  { key: 'ultra', price: '29,90€' },
 ];
 
 interface CapsuleData {
@@ -51,6 +63,10 @@ interface CapsuleData {
   stock: number;
   soldCount: number;
   imageUrl?: string;
+  condition?: CapsuleCondition;
+  category?: CapsuleCategory;
+  size?: string;
+  colors?: string[];
 }
 
 interface PostData {
@@ -82,6 +98,7 @@ type Tab = 'posts' | 'capsules' | 'favoris' | 'wallet' | 'stats';
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { language, setLanguage, t, dict } = useLanguage();
   const [user, setUser] = useState<MeUser | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [tab, setTab] = useState<Tab>('posts');
@@ -100,10 +117,26 @@ export default function ProfilePage() {
   const [capsuleModalOpen, setCapsuleModalOpen] = useState(false);
   const [newCapsulePostId, setNewCapsulePostId] = useState('');
   const [newCapsuleName, setNewCapsuleName] = useState('');
+  const [newCapsuleDescription, setNewCapsuleDescription] = useState('');
+  const [newCapsuleCategory, setNewCapsuleCategory] = useState<CapsuleCategory | ''>('');
+  const [newCapsuleSize, setNewCapsuleSize] = useState('');
+  const [newCapsuleCondition, setNewCapsuleCondition] = useState<CapsuleCondition | ''>('');
+  const [newCapsuleColors, setNewCapsuleColors] = useState<string[]>([]);
   const [newCapsulePrice, setNewCapsulePrice] = useState('');
   const [newCapsuleStock, setNewCapsuleStock] = useState('');
   const [newCapsuleError, setNewCapsuleError] = useState('');
   const [newCapsuleSaving, setNewCapsuleSaving] = useState(false);
+
+  function toggleNewCapsuleColor(name: string) {
+    setNewCapsuleColors((prev) =>
+      prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name],
+    );
+  }
+
+  function selectNewCapsuleCategory(cat: CapsuleCategory) {
+    setNewCapsuleCategory(cat);
+    setNewCapsuleSize('');
+  }
 
   const [likedPosts, setLikedPosts] = useState<LikedPost[]>([]);
   const [planSaving, setPlanSaving] = useState(false);
@@ -122,11 +155,10 @@ export default function ProfilePage() {
   const [withdrawLoading, setWithdrawLoading] = useState(false);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [language, setLanguage] = useState('fr');
   const [notice, setNotice] = useState('');
 
   function showComingSoon(label: string) {
-    setNotice(`${label} — bientôt disponible 🚧`);
+    setNotice(t('profile.comingSoon', { label }));
     setTimeout(() => setNotice(''), 3000);
   }
 
@@ -150,7 +182,7 @@ export default function ProfilePage() {
         setAnalytics(stats);
         setLikedPosts(liked);
       } catch (err) {
-        setError(err instanceof ApiError ? err.message : 'Impossible de charger le profil.');
+        setError(err instanceof ApiError ? err.message : t('common.genericError'));
       } finally {
         setLoading(false);
       }
@@ -165,7 +197,7 @@ export default function ProfilePage() {
       const updated = await api.patch<MeUser>('/users/me', { plan });
       setUser((prev) => (prev ? { ...prev, ...updated } : updated));
     } catch (err) {
-      setPlanError(err instanceof ApiError ? err.message : 'Une erreur est survenue.');
+      setPlanError(err instanceof ApiError ? err.message : t('common.genericError'));
     } finally {
       setPlanSaving(false);
     }
@@ -176,7 +208,7 @@ export default function ProfilePage() {
     setTopupError('');
     const amount = parseFloat(topupAmount);
     if (!amount || amount <= 0) {
-      setTopupError('Montant invalide.');
+      setTopupError(t('profile.invalidAmount'));
       return;
     }
     setTopupLoading(true);
@@ -184,7 +216,7 @@ export default function ProfilePage() {
       const { clientSecret } = await api.post<{ clientSecret: string }>('/payments/wallet/topup', { amount });
       router.push(`/checkout/wallet?client_secret=${clientSecret}`);
     } catch (err) {
-      setTopupError(err instanceof ApiError ? err.message : 'Une erreur est survenue.');
+      setTopupError(err instanceof ApiError ? err.message : t('common.genericError'));
       setTopupLoading(false);
     }
   }
@@ -194,7 +226,7 @@ export default function ProfilePage() {
     setWithdrawError('');
     const amount = parseFloat(withdrawAmount);
     if (!amount || amount <= 0) {
-      setWithdrawError('Montant invalide.');
+      setWithdrawError(t('profile.invalidAmount'));
       return;
     }
     setWithdrawLoading(true);
@@ -204,7 +236,7 @@ export default function ProfilePage() {
       setWithdrawOpen(false);
       setWithdrawAmount('');
     } catch (err) {
-      setWithdrawError(err instanceof ApiError ? err.message : 'Une erreur est survenue.');
+      setWithdrawError(err instanceof ApiError ? err.message : t('common.genericError'));
     } finally {
       setWithdrawLoading(false);
     }
@@ -230,7 +262,7 @@ export default function ProfilePage() {
   }
 
   async function handleDeletePost(postId: string) {
-    if (!window.confirm('Supprimer ce post ? Cette action est irréversible.')) return;
+    if (!window.confirm(t('profile.confirmDeletePost'))) return;
     try {
       await api.delete(`/posts/${postId}`);
       setAnalytics((prev) => (prev ? { ...prev, posts: prev.posts.filter((p) => p.id !== postId) } : prev));
@@ -280,7 +312,7 @@ export default function ProfilePage() {
           headers: { 'Content-Type': editAvatarFile.type },
           body: editAvatarFile,
         });
-        if (!putRes.ok) throw new Error("Échec de l'upload de la photo.");
+        if (!putRes.ok) throw new Error(t('profile.photoUploadFailed'));
         avatarUrl = fileUrl;
       }
 
@@ -292,7 +324,7 @@ export default function ProfilePage() {
       setUser((prev) => (prev ? { ...prev, ...updated } : updated));
       setEditOpen(false);
     } catch (err) {
-      setEditError(err instanceof ApiError || err instanceof Error ? err.message : 'Une erreur est survenue.');
+      setEditError(err instanceof ApiError || err instanceof Error ? err.message : t('common.genericError'));
     } finally {
       setEditSaving(false);
     }
@@ -301,6 +333,11 @@ export default function ProfilePage() {
   function openCapsuleModal() {
     setNewCapsulePostId(analytics?.posts[0]?.id || '');
     setNewCapsuleName('');
+    setNewCapsuleDescription('');
+    setNewCapsuleCategory('');
+    setNewCapsuleSize('');
+    setNewCapsuleCondition('');
+    setNewCapsuleColors([]);
     setNewCapsulePrice('');
     setNewCapsuleStock('');
     setNewCapsuleError('');
@@ -314,15 +351,27 @@ export default function ProfilePage() {
     const price = parseFloat(newCapsulePrice);
     const stock = parseInt(newCapsuleStock, 10);
     if (!newCapsulePostId) {
-      setNewCapsuleError('Créez d\'abord un post pour pouvoir y attacher une capsule.');
+      setNewCapsuleError(t('profile.createCapsuleNeedsPost'));
       return;
     }
     if (!newCapsuleName.trim() || !price || !stock) {
-      setNewCapsuleError('Nom, prix et stock sont requis.');
+      setNewCapsuleError(t('studio.nameeAndPriceRequired'));
       return;
     }
     if (price < 1) {
-      setNewCapsuleError('Le prix minimum est de 1€.');
+      setNewCapsuleError(t('studio.minPriceError'));
+      return;
+    }
+    if (!newCapsuleCategory) {
+      setNewCapsuleError(t('studio.chooseCategory'));
+      return;
+    }
+    if (!newCapsuleCondition) {
+      setNewCapsuleError(t('studio.chooseCondition'));
+      return;
+    }
+    if (getSizeOptions(newCapsuleCategory) && !newCapsuleSize) {
+      setNewCapsuleError(t('studio.chooseSize', { field: getSizeFieldLabel(t, newCapsuleCategory).toLowerCase() }));
       return;
     }
 
@@ -331,6 +380,11 @@ export default function ProfilePage() {
       const created = await api.post<CapsuleData>('/capsules', {
         postId: newCapsulePostId,
         name: newCapsuleName.trim(),
+        description: newCapsuleDescription.trim() || undefined,
+        category: newCapsuleCategory,
+        size: newCapsuleSize || undefined,
+        condition: newCapsuleCondition,
+        colors: newCapsuleColors,
         price,
         stock,
       });
@@ -346,7 +400,7 @@ export default function ProfilePage() {
       );
       setCapsuleModalOpen(false);
     } catch (err) {
-      setNewCapsuleError(err instanceof ApiError ? err.message : 'Une erreur est survenue.');
+      setNewCapsuleError(err instanceof ApiError ? err.message : t('common.genericError'));
     } finally {
       setNewCapsuleSaving(false);
     }
@@ -374,17 +428,17 @@ export default function ProfilePage() {
   );
 
   const TABS = [
-    { key: 'posts' as Tab, label: 'Posts', icon: Grid3x3 },
-    { key: 'capsules' as Tab, label: 'Capsules', icon: Package },
-    { key: 'favoris' as Tab, label: 'Favoris', icon: Heart },
-    { key: 'wallet' as Tab, label: 'Wallet', icon: Wallet },
-    { key: 'stats' as Tab, label: 'Stats', icon: BarChart2 },
+    { key: 'posts' as Tab, label: t('profile.posts'), icon: Grid3x3 },
+    { key: 'capsules' as Tab, label: t('profile.capsules'), icon: Package },
+    { key: 'favoris' as Tab, label: t('profile.favorites'), icon: Heart },
+    { key: 'wallet' as Tab, label: t('profile.wallet'), icon: Wallet },
+    { key: 'stats' as Tab, label: t('profile.stats'), icon: BarChart2 },
   ];
 
   return (
     <>
-      <Head><title>Mon profil — skoleomLive</title></Head>
-      <div className="flex h-screen bg-black overflow-hidden">
+      <Head><title>{t('profile.myProfile')} — skoleomLive</title></Head>
+      <div className="flex h-screen cosmic-bg overflow-hidden">
         <AppSidebar />
 
         <main className="flex-1 overflow-y-auto scrollbar-hide">
@@ -418,9 +472,9 @@ export default function ProfilePage() {
                 {user.bio && <p className="text-[13px] text-white/45 mb-3">{user.bio}</p>}
                 <div className="flex gap-6">
                   {[
-                    { label: 'Vues', value: analytics.totals.views },
-                    { label: 'Ventes', value: analytics.totals.sold },
-                    { label: 'Revenus', value: `${analytics.totals.revenue.toFixed(2)} €` },
+                    { label: t('profile.views'), value: analytics.totals.views },
+                    { label: t('profile.sales'), value: analytics.totals.sold },
+                    { label: t('profile.revenue'), value: `${analytics.totals.revenue.toFixed(2)} €` },
                   ].map((s) => (
                     <div key={s.label} className="text-center">
                       <p className="text-[16px] font-extrabold text-white">{s.value}</p>
@@ -432,26 +486,26 @@ export default function ProfilePage() {
               <div className="flex flex-col items-end gap-2">
                 <Link href="/studio"
                   className="btn-skoleom flex items-center gap-2 px-4 py-2 rounded-full text-[13px] hover:shadow-glow-lime-sm transition-all">
-                  <Plus size={14} /> Nouveau post
+                  <Plus size={14} /> {t('profile.newPost')}
                 </Link>
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => router.push('/studio/live')}
-                    title="Démarrer un live"
+                    title={t('profile.startLive')}
                     className="w-9 h-9 rounded-full border border-white/10 hover:bg-white/10 flex items-center justify-center transition-all"
                   >
                     <Radio size={15} className="text-red-400" />
                   </button>
                   <button
                     onClick={() => { setBoostPost(null); setBoostOpen(true); }}
-                    title="Booster mon compte"
+                    title={t('profile.boostAccount')}
                     className="w-9 h-9 rounded-full border border-white/10 hover:bg-white/10 flex items-center justify-center transition-all"
                   >
                     <Zap size={15} className="text-[#a8ff35]" />
                   </button>
                   <button
                     onClick={() => setSettingsOpen(true)}
-                    title="Paramètres"
+                    title={t('profile.settings')}
                     className="w-9 h-9 rounded-full border border-white/10 hover:bg-white/10 flex items-center justify-center transition-all"
                   >
                     <Settings size={15} className="text-white/70" />
@@ -468,13 +522,13 @@ export default function ProfilePage() {
 
             {/* Tabs */}
             <div className="flex gap-1 border-b border-white/[0.06] mb-6">
-              {TABS.map((t) => {
-                const Icon = t.icon;
-                const active = tab === t.key;
+              {TABS.map((tabItem) => {
+                const Icon = tabItem.icon;
+                const active = tab === tabItem.key;
                 return (
-                  <button key={t.key} onClick={() => setTab(t.key)}
+                  <button key={tabItem.key} onClick={() => setTab(tabItem.key)}
                     className={`flex items-center gap-2 px-4 py-2.5 text-[13px] font-semibold border-b-2 transition-all -mb-px ${active ? 'border-white text-white' : 'border-transparent text-white/40 hover:text-white/70'}`}>
-                    <Icon size={15} />{t.label}
+                    <Icon size={15} />{tabItem.label}
                   </button>
                 );
               })}
@@ -482,7 +536,7 @@ export default function ProfilePage() {
 
             {tab === 'posts' && (
               analytics.posts.length === 0 ? (
-                <EmptyState text="Aucun post publié pour l'instant." />
+                <EmptyState text={t('profile.noPostsYet')} />
               ) : (
                 <div className="grid grid-cols-3 gap-1">
                   {analytics.posts.map((post) => (
@@ -496,14 +550,14 @@ export default function ProfilePage() {
                       </Link>
                       <button
                         onClick={() => { setBoostPost(post); setBoostOpen(true); }}
-                        title="Mettre en avant"
+                        title={t('profile.boostPost')}
                         className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-black/80 transition-all"
                       >
                         <Zap size={13} className="text-[#a8ff35]" />
                       </button>
                       <button
                         onClick={() => handleDeletePost(post.id)}
-                        title="Supprimer ce post"
+                        title={t('profile.deletePost')}
                         className="absolute top-1.5 left-1.5 w-7 h-7 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500/70 transition-all"
                       >
                         <Trash2 size={13} className="text-white" />
@@ -518,7 +572,7 @@ export default function ProfilePage() {
               <div className="space-y-6">
                 <div>
                   <h3 className="text-[13px] font-semibold text-white/70 uppercase tracking-wider mb-3">
-                    Abonnement — plus de capsules par post
+                    {t('profile.subscriptionTitle')}
                   </h3>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-2">
                     {PLANS.map((p) => {
@@ -541,11 +595,11 @@ export default function ProfilePage() {
                             >
                               {PLAN_BADGE[p.key].label}
                             </span>
-                            {active && <span className="text-[10px] font-bold text-[#a8ff35]">Actuel</span>}
+                            {active && <span className="text-[10px] font-bold text-[#a8ff35]">{t('profile.current')}</span>}
                           </div>
-                          <p className="text-[12px] text-white/40 mb-2">{p.price}</p>
+                          <p className="text-[12px] text-white/40 mb-2">{p.price}{t('profile.perMonth')}</p>
                           <ul className="space-y-1">
-                            {p.perks.map((perk) => (
+                            {dict.profile.planPerks[p.key].map((perk) => (
                               <li key={perk} className="text-[11px] text-white/50">• {perk}</li>
                             ))}
                           </ul>
@@ -555,7 +609,7 @@ export default function ProfilePage() {
                   </div>
                   {planError && <p className="text-red-400 text-xs">{planError}</p>}
                   <p className="text-[11px] text-white/25">
-                    Changement de palier immédiat — aucun paiement réel n&apos;est requis pour l&apos;instant.
+                    {t('profile.planNoPayment')}
                   </p>
                 </div>
 
@@ -563,11 +617,11 @@ export default function ProfilePage() {
                   onClick={openCapsuleModal}
                   className="btn-skoleom flex items-center gap-2 px-4 py-2 rounded-full text-[13px] hover:shadow-glow-lime-sm transition-all"
                 >
-                  <Plus size={14} /> Créer une capsule
+                  <Plus size={14} /> {t('profile.createCapsule')}
                 </button>
 
                 {capsules.length === 0 ? (
-                  <EmptyState text="Aucune capsule créée pour l'instant." />
+                  <EmptyState text={t('profile.noCapsulesYet')} />
                 ) : (
                   <div className="space-y-3">
                     {capsules.map((c) => (
@@ -582,7 +636,10 @@ export default function ProfilePage() {
                       <div className="flex-1 min-w-0">
                         <p className="text-[13px] font-semibold text-white truncate">{c.name}</p>
                         <p className="text-[12px] text-white/40">
-                          {c.price.toFixed(2)} {c.currency} · {c.soldCount} vendues · {c.stock} en stock
+                          {c.price.toFixed(2)} {c.currency} · {c.soldCount} {t('profile.sold')} · {c.stock} {t('profile.inStock')}
+                          {c.category && ` · ${categoryLabel(t, c.category)}`}
+                          {c.size && ` · ${c.size}`}
+                          {c.condition && ` · ${conditionLabel(t, c.condition)}`}
                         </p>
                       </div>
                       <button onClick={() => handleRemoveCapsule(c.id)}
@@ -598,7 +655,7 @@ export default function ProfilePage() {
 
             {tab === 'favoris' && (
               likedPosts.length === 0 ? (
-                <EmptyState text="Aucun post mis en favori pour l'instant." />
+                <EmptyState text={t('profile.noFavoritesYet')} />
               ) : (
                 <div className="grid grid-cols-3 gap-1">
                   {likedPosts.map((post) => (
@@ -624,7 +681,7 @@ export default function ProfilePage() {
             {tab === 'wallet' && (
               <div className="space-y-5 max-w-sm">
                 <div className="bg-white/[0.03] border border-white/[0.07] rounded-[20px] p-5">
-                  <p className="text-[11px] text-white/40 uppercase tracking-wider mb-1">Solde disponible</p>
+                  <p className="text-[11px] text-white/40 uppercase tracking-wider mb-1">{t('profile.walletBalance')}</p>
                   <p className="text-[32px] font-extrabold text-white mb-4">
                     {(user.walletBalance ?? 0).toFixed(2)} €
                   </p>
@@ -633,18 +690,18 @@ export default function ProfilePage() {
                       onClick={() => { setTopupOpen(true); setTopupError(''); }}
                       className="btn-skoleom flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full text-[13px] hover:shadow-glow-lime-sm transition-all"
                     >
-                      <ArrowDownToLine size={14} /> Ajouter des fonds
+                      <ArrowDownToLine size={14} /> {t('profile.addFunds')}
                     </button>
                     <button
                       onClick={() => { setWithdrawOpen(true); setWithdrawError(''); }}
                       className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full border border-white/10 text-white/70 text-[13px] font-semibold hover:text-white hover:border-white/25 transition-all"
                     >
-                      <ArrowUpFromLine size={14} /> Retirer
+                      <ArrowUpFromLine size={14} /> {t('profile.withdraw')}
                     </button>
                   </div>
                 </div>
                 <div className="bg-white/[0.03] border border-white/[0.07] rounded-[16px] p-4">
-                  <p className="text-[12px] text-white/40">Revenus totaux (ventes de capsules)</p>
+                  <p className="text-[12px] text-white/40">{t('profile.totalRevenue')}</p>
                   <p className="text-[18px] font-bold text-white">{(user.totalEarnings ?? 0).toFixed(2)} €</p>
                 </div>
               </div>
@@ -653,10 +710,10 @@ export default function ProfilePage() {
             {tab === 'stats' && (
               <div className="grid grid-cols-2 gap-3">
                 {[
-                  { label: 'Vues totales', value: analytics.totals.views },
-                  { label: 'Likes totaux', value: analytics.totals.likes },
-                  { label: 'Capsules vendues', value: analytics.totals.sold },
-                  { label: 'Revenu net', value: `${analytics.totals.revenue.toFixed(2)} €` },
+                  { label: t('profile.totalViews'), value: analytics.totals.views },
+                  { label: t('profile.totalLikes'), value: analytics.totals.likes },
+                  { label: t('profile.capsulesSold'), value: analytics.totals.sold },
+                  { label: t('profile.netRevenue'), value: `${analytics.totals.revenue.toFixed(2)} €` },
                 ].map((s) => (
                   <div key={s.label} className="bg-white/[0.03] border border-white/[0.07] rounded-[16px] p-4">
                     <p className="text-[20px] font-extrabold text-white">{s.value}</p>
@@ -672,9 +729,9 @@ export default function ProfilePage() {
 
       {editOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
-          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5">
+          <div className="cosmic-modal w-full max-w-sm overflow-hidden border border-white/[0.08] rounded-[20px] p-5">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-white font-bold text-base">Modifier le profil</h2>
+              <h2 className="text-white font-bold text-base">{t('profile.editProfile')}</h2>
               <button onClick={() => setEditOpen(false)}
                 className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
                 <X size={16} className="text-white" />
@@ -712,13 +769,13 @@ export default function ProfilePage() {
                   onClick={() => avatarInputRef.current?.click()}
                   className="text-xs text-[#a8ff35] font-semibold hover:underline"
                 >
-                  Changer la photo
+                  {t('profile.changePhoto')}
                 </button>
               </div>
 
               <div>
                 <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
-                  Nom affiché
+                  {t('profile.displayName')}
                 </label>
                 <input
                   type="text"
@@ -731,12 +788,12 @@ export default function ProfilePage() {
 
               <div>
                 <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
-                  Bio
+                  {t('profile.bio')}
                 </label>
                 <textarea
                   value={editBio}
                   onChange={(e) => setEditBio(e.target.value)}
-                  placeholder="Parle de toi en quelques mots..."
+                  placeholder={t('profile.bioPlaceholder')}
                   rows={3}
                   className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all resize-none"
                 />
@@ -753,7 +810,7 @@ export default function ProfilePage() {
                 disabled={editSaving}
                 className="btn-skoleom w-full py-3.5 rounded-full text-sm shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.98] disabled:opacity-60 gap-2"
               >
-                {editSaving ? <Loader2 size={16} className="animate-spin" /> : 'Enregistrer'}
+                {editSaving ? <Loader2 size={16} className="animate-spin" /> : t('common.save')}
               </button>
             </form>
           </div>
@@ -762,9 +819,9 @@ export default function ProfilePage() {
 
       {capsuleModalOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
-          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5">
+          <div className="cosmic-modal w-full max-w-sm overflow-hidden border border-white/[0.08] rounded-[20px] p-5">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-white font-bold text-base">Créer une capsule</h2>
+              <h2 className="text-white font-bold text-base">{t('profile.createCapsule')}</h2>
               <button onClick={() => setCapsuleModalOpen(false)}
                 className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
                 <X size={16} className="text-white" />
@@ -773,13 +830,13 @@ export default function ProfilePage() {
 
             {analytics.posts.length === 0 ? (
               <p className="text-white/40 text-sm text-center py-6">
-                Créez d'abord un post — une capsule doit toujours être rattachée à un post.
+                {t('profile.createCapsuleNeedsPost')}
               </p>
             ) : (
               <form onSubmit={handleCreateCapsule} className="space-y-4">
                 <div>
                   <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
-                    Rattacher au post
+                    {t('profile.attachToPost')}
                   </label>
                   <select
                     value={newCapsulePostId}
@@ -788,7 +845,7 @@ export default function ProfilePage() {
                   >
                     {analytics.posts.map((p) => (
                       <option key={p.id} value={p.id} className="bg-[#0d0d0f]">
-                        {p.caption || `Post du ${p.id.slice(0, 8)}`}
+                        {p.caption || `Post ${p.id.slice(0, 8)}`}
                       </option>
                     ))}
                   </select>
@@ -798,25 +855,144 @@ export default function ProfilePage() {
                   type="text"
                   value={newCapsuleName}
                   onChange={(e) => setNewCapsuleName(e.target.value)}
-                  placeholder="Nom du produit"
+                  placeholder={t('capsuleForm.productName')}
                   className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
                 />
-                <input
-                  type="number"
-                  step="0.01"
-                  min="1"
-                  value={newCapsulePrice}
-                  onChange={(e) => setNewCapsulePrice(e.target.value)}
-                  placeholder="Prix (€)"
-                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+
+                <textarea
+                  value={newCapsuleDescription}
+                  onChange={(e) => setNewCapsuleDescription(e.target.value)}
+                  placeholder={t('capsuleForm.description')}
+                  rows={3}
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all resize-none"
                 />
-                <input
-                  type="number"
-                  value={newCapsuleStock}
-                  onChange={(e) => setNewCapsuleStock(e.target.value)}
-                  placeholder="Stock"
-                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
-                />
+
+                {/* Catégorie */}
+                <div>
+                  <label className="block text-[11px] text-white/40 mb-2 font-medium uppercase tracking-wider">
+                    {t('capsuleForm.category')}
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {CAPSULE_CATEGORY_VALUES.map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => selectNewCapsuleCategory(value)}
+                        className={`px-3.5 py-2 rounded-[10px] text-xs font-medium transition-all duration-150 border ${
+                          newCapsuleCategory === value
+                            ? 'bg-[#a8ff35] text-black border-[#a8ff35]'
+                            : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08] hover:border-white/20'
+                        }`}
+                      >
+                        {categoryLabel(t, value)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Taille / Pointure — uniquement pour vêtements et chaussures */}
+                {getSizeOptions(newCapsuleCategory) && (
+                  <div>
+                    <label className="block text-[11px] text-white/40 mb-2 font-medium uppercase tracking-wider">
+                      {getSizeFieldLabel(t, newCapsuleCategory)}
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {getSizeOptions(newCapsuleCategory)!.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setNewCapsuleSize(s)}
+                          className={`min-w-[42px] px-3 py-2 rounded-[10px] text-xs font-medium transition-all duration-150 border ${
+                            newCapsuleSize === s
+                              ? 'bg-[#a8ff35] text-black border-[#a8ff35]'
+                              : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08] hover:border-white/20'
+                          }`}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* État */}
+                <div>
+                  <label className="block text-[11px] text-white/40 mb-2 font-medium uppercase tracking-wider">
+                    {t('capsuleForm.condition')}
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {CAPSULE_CONDITION_VALUES.map((value) => (
+                      <button
+                        key={value}
+                        type="button"
+                        onClick={() => setNewCapsuleCondition(value)}
+                        className={`px-3.5 py-2 rounded-[10px] text-xs font-medium transition-all duration-150 border ${
+                          newCapsuleCondition === value
+                            ? 'bg-[#a8ff35] text-black border-[#a8ff35]'
+                            : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08] hover:border-white/20'
+                        }`}
+                      >
+                        {conditionLabel(t, value)}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Couleurs */}
+                <div>
+                  <label className="block text-[11px] text-white/40 mb-2 font-medium uppercase tracking-wider">
+                    {t('capsuleForm.colors')}
+                  </label>
+                  <div className="flex flex-wrap gap-2.5">
+                    {CAPSULE_COLOR_PALETTE.map((c) => {
+                      const isSelected = newCapsuleColors.includes(c.name);
+                      return (
+                        <button
+                          key={c.name}
+                          type="button"
+                          onClick={() => toggleNewCapsuleColor(c.name)}
+                          title={colorLabel(t, c.name)}
+                          className={`relative w-9 h-9 rounded-full transition-all duration-150 ${
+                            isSelected ? 'ring-2 ring-[#a8ff35] ring-offset-2 ring-offset-[#0d0d0f]' : 'ring-1 ring-white/15 hover:ring-white/35'
+                          }`}
+                          style={{ background: c.swatch }}
+                        >
+                          {isSelected && (
+                            <span className="absolute inset-0 flex items-center justify-center">
+                              <Check
+                                size={14}
+                                strokeWidth={3}
+                                className={c.name === 'Blanc' || c.name === 'Jaune' ? 'text-black' : 'text-white'}
+                              />
+                            </span>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {newCapsuleColors.length > 0 && (
+                    <p className="text-xs text-white/35 mt-2">{newCapsuleColors.map((c) => colorLabel(t, c)).join(', ')}</p>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="1"
+                    value={newCapsulePrice}
+                    onChange={(e) => setNewCapsulePrice(e.target.value)}
+                    placeholder={t('capsuleForm.price')}
+                    className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                  />
+                  <input
+                    type="number"
+                    value={newCapsuleStock}
+                    onChange={(e) => setNewCapsuleStock(e.target.value)}
+                    placeholder={t('capsuleForm.stock')}
+                    className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                  />
+                </div>
 
                 {newCapsuleError && (
                   <p className="text-red-400 text-sm bg-red-400/10 px-4 py-2.5 rounded-xl border border-red-400/20">
@@ -829,7 +1005,7 @@ export default function ProfilePage() {
                   disabled={newCapsuleSaving}
                   className="btn-skoleom w-full py-3.5 rounded-full text-sm shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.98] disabled:opacity-60 gap-2"
                 >
-                  {newCapsuleSaving ? <Loader2 size={16} className="animate-spin" /> : 'Créer la capsule'}
+                  {newCapsuleSaving ? <Loader2 size={16} className="animate-spin" /> : t('studio.addCapsule')}
                 </button>
               </form>
             )}
@@ -847,9 +1023,9 @@ export default function ProfilePage() {
 
       {topupOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
-          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5">
+          <div className="cosmic-modal w-full max-w-sm overflow-hidden border border-white/[0.08] rounded-[20px] p-5">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-white font-bold text-base">Ajouter des fonds</h2>
+              <h2 className="text-white font-bold text-base">{t('profile.addFundsTitle')}</h2>
               <button onClick={() => setTopupOpen(false)}
                 className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
                 <X size={16} className="text-white" />
@@ -858,7 +1034,7 @@ export default function ProfilePage() {
             <form onSubmit={handleTopup} className="space-y-4">
               <div>
                 <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
-                  Montant (€)
+                  {t('profile.amount')}
                 </label>
                 <input
                   type="number"
@@ -879,7 +1055,7 @@ export default function ProfilePage() {
                 disabled={topupLoading}
                 className="btn-skoleom w-full py-3.5 rounded-full text-sm shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.98] disabled:opacity-60 gap-2"
               >
-                {topupLoading ? <Loader2 size={16} className="animate-spin" /> : 'Continuer vers le paiement'}
+                {topupLoading ? <Loader2 size={16} className="animate-spin" /> : t('profile.continueToPayment')}
               </button>
             </form>
           </div>
@@ -888,9 +1064,9 @@ export default function ProfilePage() {
 
       {withdrawOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
-          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5">
+          <div className="cosmic-modal w-full max-w-sm overflow-hidden border border-white/[0.08] rounded-[20px] p-5">
             <div className="flex items-center justify-between mb-5">
-              <h2 className="text-white font-bold text-base">Retirer vers mon compte bancaire</h2>
+              <h2 className="text-white font-bold text-base">{t('profile.withdrawTitle')}</h2>
               <button onClick={() => setWithdrawOpen(false)}
                 className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
                 <X size={16} className="text-white" />
@@ -898,11 +1074,11 @@ export default function ProfilePage() {
             </div>
             <form onSubmit={handleWithdraw} className="space-y-4">
               <p className="text-[12px] text-white/40">
-                Solde disponible : {(user.walletBalance ?? 0).toFixed(2)} €
+                {t('profile.availableBalance', { amount: (user.walletBalance ?? 0).toFixed(2) })}
               </p>
               <div>
                 <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
-                  Montant (€)
+                  {t('profile.amount')}
                 </label>
                 <input
                   type="number"
@@ -923,7 +1099,7 @@ export default function ProfilePage() {
                 disabled={withdrawLoading}
                 className="btn-skoleom w-full py-3.5 rounded-full text-sm shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.98] disabled:opacity-60 gap-2"
               >
-                {withdrawLoading ? <Loader2 size={16} className="animate-spin" /> : 'Demander le retrait'}
+                {withdrawLoading ? <Loader2 size={16} className="animate-spin" /> : t('profile.requestWithdraw')}
               </button>
             </form>
           </div>
@@ -932,9 +1108,9 @@ export default function ProfilePage() {
 
       {settingsOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
-          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5">
+          <div className="cosmic-modal w-full max-w-sm overflow-hidden border border-white/[0.08] rounded-[20px] p-5">
             <div className="flex items-center justify-between mb-4">
-              <h2 className="text-white font-bold text-base">Paramètres</h2>
+              <h2 className="text-white font-bold text-base">{t('profile.settings')}</h2>
               <button onClick={() => setSettingsOpen(false)}
                 className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
                 <X size={16} className="text-white" />
@@ -945,18 +1121,18 @@ export default function ProfilePage() {
               onClick={() => { setSettingsOpen(false); openEdit(); }}
               className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-white/[0.05] text-white/80 hover:text-white text-[13px] font-medium transition-all mb-4"
             >
-              <Pencil size={15} /> Modifier le profil
+              <Pencil size={15} /> {t('profile.editProfile')}
             </button>
 
             <div className="mb-5">
               <label className="block text-[11px] text-white/40 mb-2 font-medium uppercase tracking-wider">
-                Langue
+                {t('profile.language')}
               </label>
               <div className="space-y-1">
                 {LANGUAGES.map((l) => (
                   <button
                     key={l.code}
-                    onClick={() => (l.code === 'fr' ? setLanguage('fr') : showComingSoon(`Langue ${l.label}`))}
+                    onClick={() => (l.code === 'fr' || l.code === 'en' ? setLanguage(l.code) : showComingSoon(l.label))}
                     className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all ${
                       l.code === language
                         ? 'bg-[#a8ff35]/10 text-[#a8ff35]'
@@ -977,7 +1153,7 @@ export default function ProfilePage() {
               onClick={handleLogout}
               className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-full border border-red-500/20 text-red-400 text-[13px] font-semibold hover:bg-red-500/10 transition-all"
             >
-              <LogOut size={14} /> Déconnexion
+              <LogOut size={14} /> {t('profile.logout')}
             </button>
           </div>
         </div>

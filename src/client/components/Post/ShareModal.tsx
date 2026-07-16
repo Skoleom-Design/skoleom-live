@@ -105,7 +105,7 @@ export function ShareModal({ postId, caption, open, onClose }: Props) {
       <div className="fixed inset-0 z-[9998] bg-black/70 backdrop-blur-sm" onClick={onClose} />
       <div className="fixed inset-0 z-[9999] flex items-end justify-center pointer-events-none">
         <div className="pointer-events-auto w-full max-w-lg">
-          <div className="relative bg-[#0d0d0f]/97 backdrop-blur-2xl rounded-t-[24px] border-t border-x border-white/[0.06] overflow-hidden">
+          <div className="cosmic-modal-glass backdrop-blur-2xl rounded-t-[24px] border-t border-x border-white/[0.06] overflow-hidden">
             <div className="flex justify-center pt-3 pb-0">
               <div className="w-10 h-1 rounded-full bg-white/20" />
             </div>

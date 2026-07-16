@@ -2,7 +2,7 @@ import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
   UpdateDateColumn, ManyToMany, OneToMany,
 } from 'typeorm';
-import { CapsuleStatus } from '../../../shared/types/entities';
+import { CapsuleStatus, CapsuleCondition, CapsuleCategory } from '../../../shared/types/entities';
 import { Post } from '../posts/post.entity';
 import { Order } from '../orders/order.entity';
 
@@ -31,6 +31,18 @@ export class Capsule {
 
   @Column({ type: 'json', nullable: true })
   images: string[];
+
+  @Column({ type: 'simple-enum', enum: CapsuleCondition, nullable: true })
+  condition: CapsuleCondition;
+
+  @Column({ type: 'simple-enum', enum: CapsuleCategory, nullable: true })
+  category: CapsuleCategory;
+
+  @Column({ nullable: true })
+  size: string;
+
+  @Column({ type: 'json', nullable: true })
+  colors: string[];
 
   @Column({ nullable: true, type: 'json' })
   variants: {

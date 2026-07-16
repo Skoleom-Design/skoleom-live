@@ -66,7 +66,7 @@ export function BoostModal({ post, open, onClose }: Props) {
     <div className="fixed inset-0 z-50 flex items-end md:items-center justify-center">
       <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
 
-      <div className="relative w-full max-w-md bg-surface-card rounded-t-3xl md:rounded-3xl p-6 animate-slide-up">
+      <div className="cosmic-modal w-full max-w-md overflow-hidden rounded-t-3xl md:rounded-3xl p-6 animate-slide-up">
         <h2 className="text-lg font-bold mb-1 flex items-center gap-2">
           <Zap size={18} className="text-brand" />
           Booster

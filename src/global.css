@@ -22,6 +22,57 @@
 }
 
 /* ── Direction artistique Skoleom Universe ──────────────────────── */
+
+/* Fond "univers cosmique" — degrade radial tres subtil (vert/cyan/jaune) sur le noir de base,
+   au lieu d'un noir plat façon sidebar Instagram/TikTok.
+   Rayons en px (pas en %) : sur un conteneur tres large (desktop), un rayon en % s'etire
+   jusqu'a devenir invisible entre les taches — un rayon fixe garde une taille de glow constante
+   et on multiplie les points d'ancrage pour couvrir toute la largeur, pas juste un coin. */
+.cosmic-bg {
+  background-color: #070907;
+  background-image:
+    radial-gradient(circle 480px at 0% 0%, rgba(168, 255, 53, 0.12), transparent 70%),
+    radial-gradient(circle 420px at 100% 8%, rgba(0, 255, 255, 0.09), transparent 70%),
+    radial-gradient(circle 460px at 0% 100%, rgba(250, 238, 33, 0.07), transparent 70%),
+    radial-gradient(circle 460px at 100% 95%, rgba(168, 255, 53, 0.08), transparent 70%),
+    radial-gradient(circle 520px at 50% 50%, rgba(0, 255, 255, 0.04), transparent 75%);
+}
+
+.cosmic-orb {
+  position: absolute;
+  border-radius: 9999px;
+  filter: blur(24px);
+  pointer-events: none;
+}
+
+/* Meme esprit "univers" applique aux cartes/modals — glow discret au lieu du plat #0d0d0f. */
+.cosmic-modal {
+  position: relative;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(168, 255, 53, 0.07), transparent 55%),
+    radial-gradient(circle at 100% 100%, rgba(0, 255, 255, 0.05), transparent 55%),
+    #0d0d0f;
+}
+/* Variante translucide pour les drawers/bottom-sheets qui gardent leur flou d'arriere-plan. */
+.cosmic-modal-glass {
+  position: relative;
+  background:
+    radial-gradient(circle at 0% 0%, rgba(168, 255, 53, 0.07), transparent 55%),
+    radial-gradient(circle at 100% 0%, rgba(0, 255, 255, 0.05), transparent 55%),
+    rgba(13, 13, 15, 0.97);
+}
+
+.cosmic-modal::before,
+.cosmic-modal-glass::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(168, 255, 53, 0.6), transparent);
+}
+
 .glass {
   @apply bg-white/5 backdrop-blur-xl border border-white/10;
 }

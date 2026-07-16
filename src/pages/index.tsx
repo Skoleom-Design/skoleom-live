@@ -4,6 +4,7 @@ import { InstaPostCard } from '../client/components/Post/InstaPostCard';
 import { AppSidebar } from '../client/components/Layout/Sidebar';
 import type { Post } from '../shared/types/api';
 import { api, getToken } from '../shared/api/http';
+import { useLanguage } from '../client/i18n/LanguageContext';
 
 const DEMO_POSTS: Post[] = [
   {
@@ -372,6 +373,7 @@ const DEMO_POSTS: Post[] = [
 
 /* ── Feed page ──────────────────────────────────────────────── */
 export default function FeedPage() {
+  const { t } = useLanguage();
   const [posts, setPosts] = useState<Post[]>(DEMO_POSTS);
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -417,7 +419,7 @@ export default function FeedPage() {
         <meta name="description" content="Shoppable social feed" />
       </Head>
 
-      <div className="flex h-screen bg-black overflow-hidden">
+      <div className="flex h-screen cosmic-bg overflow-hidden">
         <AppSidebar />
 
         {/* Center feed */}
@@ -432,7 +434,7 @@ export default function FeedPage() {
           <div className="max-w-[470px] mx-auto">
             {apiError && (
               <div className="mx-3 mt-3 px-4 py-2.5 rounded-xl bg-amber-400/10 border border-amber-400/20 text-amber-300 text-xs text-center">
-                Backend indisponible — affichage de contenu de démonstration.
+                {t('feed.backendUnavailable')}
               </div>
             )}
             {posts.map((post) => (
@@ -441,7 +443,7 @@ export default function FeedPage() {
 
             {loading && (
               <div className="flex items-center justify-center h-16 text-white/30 text-sm">
-                Chargement…
+                {t('common.loading')}
               </div>
             )}
           </div>

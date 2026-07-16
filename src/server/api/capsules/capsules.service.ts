@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Capsule } from './capsule.entity';
 import { Post } from '../posts/post.entity';
-import { CapsuleStatus } from '../../../shared/types/entities';
+import { CapsuleStatus, CapsuleCondition, CapsuleCategory } from '../../../shared/types/entities';
 
 export interface CreateCapsuleDto {
   postId: string;
@@ -13,6 +13,10 @@ export interface CreateCapsuleDto {
   currency?: string;
   imageUrl?: string;
   images?: string[];
+  condition?: CapsuleCondition;
+  category?: CapsuleCategory;
+  size?: string;
+  colors?: string[];
   stock: number;
   variants?: { name: string; options: string[]; price?: number }[];
 }

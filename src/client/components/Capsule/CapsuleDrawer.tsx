@@ -5,6 +5,8 @@ import {
   Heart, Truck, Package,
 } from 'lucide-react';
 import type { Capsule } from '../../../shared/types/api';
+import { categoryLabel, conditionLabel, colorLabel, CAPSULE_COLOR_SWATCHES } from '../../constants/capsule';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface Props {
   capsules: Capsule[];
@@ -24,6 +26,7 @@ function ProductView({
   showBack: boolean;
   onClose: () => void;
 }) {
+  const { t } = useLanguage();
   const images = [
     ...(capsule.imageUrl ? [capsule.imageUrl] : []),
     ...(capsule.images || []),
@@ -100,7 +103,7 @@ function ProductView({
           {isSoldOut && (
             <div className="absolute inset-0 bg-black/60 flex items-center justify-center">
               <span className="text-white text-sm font-semibold bg-red-500/80 px-4 py-1.5 rounded-full">
-                Épuisé
+                {t('capsuleDrawer.soldOut')}
               </span>
             </div>
           )}
@@ -142,19 +145,57 @@ function ProductView({
 
         {/* Badges */}
         <div className="flex flex-wrap gap-2">
+          {capsule.category && (
+            <div className="flex items-center gap-1.5 text-xs text-white/60 bg-white/5 border border-white/10 rounded-full px-3 py-1">
+              {categoryLabel(t, capsule.category)}
+            </div>
+          )}
+          {capsule.size && (
+            <div className="flex items-center gap-1.5 text-xs text-white/60 bg-white/5 border border-white/10 rounded-full px-3 py-1">
+              {capsule.category === 'chaussures' ? t('capsuleForm.shoeSize') : t('capsuleForm.size')} {capsule.size}
+            </div>
+          )}
+          {capsule.condition && (
+            <div className="flex items-center gap-1.5 text-xs text-[#a8ff35] bg-[#a8ff35]/10 border border-[#a8ff35]/20 rounded-full px-3 py-1">
+              {conditionLabel(t, capsule.condition)}
+            </div>
+          )}
           {capsule.stock > 0 && !isSoldOut && (
             <div className="flex items-center gap-1.5 text-xs text-green-400 bg-green-400/10 border border-green-400/20 rounded-full px-3 py-1">
               <Truck size={12} />
-              Livraison GRATUITE
+              {t('capsuleDrawer.freeShipping')}
             </div>
           )}
           {capsule.soldCount > 0 && (
             <div className="flex items-center gap-1.5 text-xs text-white/50 bg-white/5 border border-white/10 rounded-full px-3 py-1">
               <Heart size={12} />
-              {capsule.soldCount} ont acheté
+              {t('capsuleDrawer.boughtCount', { count: capsule.soldCount })}
             </div>
           )}
         </div>
+
+        {/* Couleurs */}
+        {capsule.colors && capsule.colors.length > 0 && (
+          <div>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2 block">
+              {t('capsuleDrawer.colorsLabel')}
+            </span>
+            <div className="flex flex-wrap gap-2">
+              {capsule.colors.map((color) => (
+                <div
+                  key={color}
+                  className="flex items-center gap-1.5 bg-white/[0.04] border border-white/10 rounded-full pl-1.5 pr-3 py-1"
+                >
+                  <span
+                    className="w-4 h-4 rounded-full ring-1 ring-white/20 shrink-0"
+                    style={{ background: CAPSULE_COLOR_SWATCHES[color] || '#888' }}
+                  />
+                  <span className="text-xs text-white/70">{colorLabel(t, color)}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Description */}
         {capsule.description && (
@@ -166,7 +207,7 @@ function ProductView({
         {/* Stock info */}
         {!isSoldOut && capsule.stock > 0 && capsule.stock <= 10 && (
           <p className="text-xs text-amber-400">
-            ⚡ Plus que {capsule.stock} en stock
+            {t('capsuleDrawer.lowStock', { count: capsule.stock })}
           </p>
         )}
 
@@ -227,15 +268,15 @@ function ProductView({
           }`}
         >
           {addedToCart ? (
-            <><Check size={19} strokeWidth={3} />Ajouté au panier</>
+            <><Check size={19} strokeWidth={3} />{t('capsuleDrawer.addedToCart')}</>
           ) : isAdding ? (
             <div className="w-5 h-5 border-2 border-black/30 border-t-black rounded-full animate-spin" />
           ) : isSoldOut ? (
-            'Épuisé'
+            t('capsuleDrawer.soldOut')
           ) : allSelected ? (
-            <><ShoppingCart size={18} />Acheter</>
+            <><ShoppingCart size={18} />{t('capsuleDrawer.buy')}</>
           ) : (
-            'Choisissez une option'
+            t('capsuleDrawer.chooseOption')
           )}
         </button>
       </div>
@@ -245,6 +286,7 @@ function ProductView({
 
 /* ── Main Drawer ────────────────────────────────────────────── */
 export function CapsuleDrawer({ capsules, open, onClose }: Props) {
+  const { t } = useLanguage();
   const [mounted, setMounted] = useState(false);
   const [shouldRender, setShouldRender] = useState(false);
   const [animateIn, setAnimateIn] = useState(false);
@@ -263,11 +305,11 @@ export function CapsuleDrawer({ capsules, open, onClose }: Props) {
       else setSelectedCapsule(null);
     } else {
       setAnimateIn(false);
-      const t = setTimeout(() => {
+      const timeoutId = setTimeout(() => {
         setShouldRender(false);
         setSelectedCapsule(null);
       }, 350);
-      return () => clearTimeout(t);
+      return () => clearTimeout(timeoutId);
     }
   }, [open, capsules]);
 
@@ -321,7 +363,7 @@ export function CapsuleDrawer({ capsules, open, onClose }: Props) {
                   <img src="/skoleom-mark.png" alt="" className="w-5 h-5 object-contain" />
                 )}
                 <span className="text-white font-semibold text-sm">
-                  {showingProduct ? selectedCapsule!.name : `Capsule · ${capsules.length} article${capsules.length > 1 ? 's' : ''}`}
+                  {showingProduct ? selectedCapsule!.name : t('capsuleDrawer.capsuleCount', { count: capsules.length, plural: capsules.length > 1 ? 's' : '' })}
                 </span>
               </div>
               <button
@@ -361,9 +403,12 @@ export function CapsuleDrawer({ capsules, open, onClose }: Props) {
                         <div className="flex items-center gap-2 mt-1.5">
                           <span className="text-[#a8ff35] font-bold text-sm">€{capsule.price.toFixed(2)}</span>
                           {capsule.status === 'sold_out' ? (
-                            <span className="text-xs text-red-400">Épuisé</span>
+                            <span className="text-xs text-red-400">{t('capsuleDrawer.soldOut')}</span>
                           ) : (
-                            <span className="text-xs text-white/25">{capsule.stock} restant(s)</span>
+                            <span className="text-xs text-white/25">{t('capsuleDrawer.remaining', { count: capsule.stock })}</span>
+                          )}
+                          {capsule.condition && (
+                            <span className="text-xs text-white/25">· {conditionLabel(t, capsule.condition)}</span>
                           )}
                         </div>
                       </div>

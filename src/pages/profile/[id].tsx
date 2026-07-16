@@ -52,7 +52,7 @@ export default function ProfilePage() {
     <>
       <Head><title>@{user.username} — skoleomLive</title></Head>
 
-      <div className="min-h-screen bg-surface text-white">
+      <div className="min-h-screen cosmic-bg text-white">
         {/* ── Header ──────────────────────────────────────────────── */}
         <div className="sticky top-0 z-10 bg-surface/80 backdrop-blur-md border-b border-white/5 flex items-center gap-4 px-4 py-3">
           <button onClick={() => router.back()} className="w-9 h-9 rounded-full bg-white/5 flex items-center justify-center">

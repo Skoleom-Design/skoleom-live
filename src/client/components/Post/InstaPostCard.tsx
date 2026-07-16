@@ -5,7 +5,6 @@ import {
   Heart,
   MessageCircle,
   Send,
-  Bookmark,
   MoreHorizontal,
   VolumeX,
   Volume2,
@@ -16,6 +15,7 @@ import { BoostBadge } from '../Boost/BoostBadge';
 import { CommentsDrawer } from './CommentsDrawer';
 import { ShareModal } from './ShareModal';
 import { api, ApiError, getToken } from '../../../shared/api/http';
+import { useLanguage } from '../../i18n/LanguageContext';
 
 interface Props {
   post: Post;
@@ -30,13 +30,13 @@ function fmt(n: number) {
 
 export function InstaPostCard({ post, liked: likedProp = false }: Props) {
   const router = useRouter();
+  const { t } = useLanguage();
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRef = useRef<HTMLDivElement>(null);
   const [isMuted, setIsMuted] = useState(true);
   const [liked, setLiked] = useState(likedProp);
   const [likeCount, setLikeCount] = useState(post.likeCount);
   const [likePending, setLikePending] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [capsuleOpen, setCapsuleOpen] = useState(false);
   const [commentsOpen, setCommentsOpen] = useState(false);
   const [shareOpen, setShareOpen] = useState(false);
@@ -76,7 +76,7 @@ export function InstaPostCard({ post, liked: likedProp = false }: Props) {
   }, []);
 
   return (
-    <article className="border-b border-white/[0.06] mb-1">
+    <article className="cosmic-modal mx-3 my-4 rounded-2xl overflow-hidden border border-white/[0.08]">
       {/* ── Header ── */}
       <div className="flex items-center justify-between px-3 py-3">
         <Link href={`/profile/${post.creator.id}`} className="flex items-center gap-2.5 min-w-0">
@@ -102,7 +102,7 @@ export function InstaPostCard({ post, liked: likedProp = false }: Props) {
               {post.creator.username}
             </p>
             {post.isBoosted && (
-              <p className="text-[10px] text-white/40 leading-tight">Sponsorisé</p>
+              <p className="text-[10px] text-white/40 leading-tight">{t('post.sponsored')}</p>
             )}
           </div>
         </Link>
@@ -175,21 +175,21 @@ export function InstaPostCard({ post, liked: likedProp = false }: Props) {
               alt="Skoleom"
               className="skoleom-capsule-btn-logo"
             />
-            <span>Capsule</span>
+            <span>{t('post.capsule')}</span>
           </button>
         )}
       </div>
 
       {/* ── Actions ── */}
-      <div className="flex items-center px-3 pt-3 pb-1 gap-1">
-        <div className="flex items-center gap-3 flex-1">
+      <div className="px-3 pt-3 pb-1">
+        <div className="inline-flex items-center gap-4 bg-black/30 backdrop-blur-md border border-white/10 rounded-full px-4 py-2">
           <button
             onClick={handleLike}
-            className="group p-0.5"
-            aria-label="J'aime"
+            className="group"
+            aria-label={t('post.likeAria')}
           >
             <Heart
-              size={26}
+              size={22}
               className={`transition-all duration-150 ${
                 liked
                   ? 'text-red-500 fill-red-500 scale-110'
@@ -197,37 +197,27 @@ export function InstaPostCard({ post, liked: likedProp = false }: Props) {
               }`}
             />
           </button>
-          <button onClick={() => setCommentsOpen(true)} className="group p-0.5" aria-label="Commenter">
+          <span className="w-px h-4 bg-white/15" />
+          <button onClick={() => setCommentsOpen(true)} className="group" aria-label={t('post.commentAria')}>
             <MessageCircle
-              size={25}
+              size={21}
               className="text-white group-hover:text-white/70 transition-colors"
             />
           </button>
-          <button onClick={() => setShareOpen(true)} className="group p-0.5" aria-label="Partager">
+          <span className="w-px h-4 bg-white/15" />
+          <button onClick={() => setShareOpen(true)} className="group" aria-label={t('post.shareAria')}>
             <Send
-              size={23}
+              size={19}
               className="text-white group-hover:text-white/70 transition-colors -rotate-12"
             />
           </button>
         </div>
-        <button
-          onClick={() => setSaved((s) => !s)}
-          className="p-0.5"
-          aria-label="Enregistrer"
-        >
-          <Bookmark
-            size={24}
-            className={`transition-all ${
-              saved ? 'text-white fill-white' : 'text-white/80 hover:text-white'
-            }`}
-          />
-        </button>
       </div>
 
       {/* ── Likes ── */}
       <div className="px-3 py-0.5">
         <p className="text-[13px] font-semibold text-white">
-          {fmt(likeCount)} j&apos;aime
+          {t('post.likesCount', { count: fmt(likeCount) })}
         </p>
       </div>
 
@@ -250,7 +240,7 @@ export function InstaPostCard({ post, liked: likedProp = false }: Props) {
       {commentCount > 0 && (
         <button onClick={() => setCommentsOpen(true)} className="px-3 py-0.5 block">
           <p className="text-[13px] text-white/40 hover:text-white/60 transition-colors">
-            Voir les {fmt(commentCount)} commentaire{commentCount > 1 ? 's' : ''}
+            {t('post.viewComments', { count: fmt(commentCount), plural: commentCount > 1 ? 's' : '' })}
           </p>
         </button>
       )}
@@ -259,9 +249,13 @@ export function InstaPostCard({ post, liked: likedProp = false }: Props) {
       {post.tags && post.tags.length > 0 && (
         <div className="px-3 py-0.5 flex gap-1.5 flex-wrap">
           {post.tags.map((tag) => (
-            <span key={tag} className="text-[12px] text-[#a8ff35]/80 font-medium">
+            <Link
+              key={tag}
+              href={`/explore?q=${encodeURIComponent(tag)}`}
+              className="text-[12px] text-[#a8ff35]/80 font-medium hover:text-[#a8ff35] hover:underline"
+            >
               #{tag}
-            </span>
+            </Link>
           ))}
         </div>
       )}

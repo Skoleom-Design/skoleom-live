@@ -72,7 +72,7 @@ export function CommentsDrawer({ postId, open, onClose, onCommentAdded }: Props)
       <div className="fixed inset-0 z-[9999] flex items-end justify-center pointer-events-none">
         <div className="pointer-events-auto w-full max-w-lg">
           <div
-            className="relative bg-[#0d0d0f]/97 backdrop-blur-2xl rounded-t-[24px] border-t border-x border-white/[0.06] overflow-hidden flex flex-col"
+            className="cosmic-modal-glass backdrop-blur-2xl rounded-t-[24px] border-t border-x border-white/[0.06] overflow-hidden flex flex-col"
             style={{ maxHeight: '80vh' }}
           >
             <div className="flex justify-center pt-3 pb-0 shrink-0">

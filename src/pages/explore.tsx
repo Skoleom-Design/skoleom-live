@@ -1,15 +1,23 @@
 import { useState, useEffect, useMemo } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
+import { useRouter } from 'next/router';
 import { Search, Loader2 } from 'lucide-react';
 import { AppSidebar } from '../client/components/Layout/Sidebar';
 import type { Post } from '../shared/types/api';
 import { api } from '../shared/api/http';
 
 export default function ExplorePage() {
+  const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
+
+  useEffect(() => {
+    if (!router.isReady) return;
+    const q = router.query.q;
+    if (typeof q === 'string') setQuery(q);
+  }, [router.isReady, router.query.q]);
 
   useEffect(() => {
     api
@@ -37,7 +45,7 @@ export default function ExplorePage() {
         <title>Rechercher — skoleomLive</title>
       </Head>
 
-      <div className="flex h-screen bg-black overflow-hidden">
+      <div className="flex h-screen cosmic-bg overflow-hidden">
         <AppSidebar />
 
         <main className="flex-1 overflow-y-auto scrollbar-hide">

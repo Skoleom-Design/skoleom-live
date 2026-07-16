@@ -22,6 +22,7 @@ import { AuthModule } from './api/auth/auth.module';
 import { UsersModule } from './api/users/users.module';
 import { FilesModule } from './api/files/files.module';
 import { LivesModule } from './api/lives/lives.module';
+import { InstagramModule } from './api/instagram/instagram.module';
 
 @Module({
   imports: [
@@ -55,6 +56,7 @@ import { LivesModule } from './api/lives/lives.module';
     AdminModule,
     FilesModule,
     LivesModule,
+    InstagramModule,
   ],
 })
 export class AppModule {}

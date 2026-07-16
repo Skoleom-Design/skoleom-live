@@ -116,8 +116,10 @@ export default function AdminPosts() {
                     className="flex items-center gap-4 p-4 bg-surface-card rounded-2xl border border-white/5"
                   >
                     <div className="w-14 h-14 rounded-xl bg-black/40 overflow-hidden flex-shrink-0">
-                      {post.thumbnailUrl && (
-                        <img src={post.thumbnailUrl} alt="" className="w-full h-full object-cover" />
+                      {post.type === 'video' ? (
+                        <video src={post.mediaUrl} className="w-full h-full object-cover" muted preload="metadata" />
+                      ) : (
+                        <img src={post.thumbnailUrl || post.mediaUrl} alt="" className="w-full h-full object-cover" />
                       )}
                     </div>
                     <div className="flex-1 min-w-0">

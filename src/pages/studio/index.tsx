@@ -2,11 +2,23 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
-import { ArrowLeft, Camera, Image as ImageIcon, Loader2, Package, Radio, Import, Plus, X } from 'lucide-react';
+import { ArrowLeft, Camera, Image as ImageIcon, Loader2, Package, Radio, Import, Plus, X, Check } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CameraCaptureModal } from '../../client/components/Post/CameraCaptureModal';
+import { InstagramImportModal } from '../../client/components/Post/InstagramImportModal';
 import { api, ApiError, getToken, getStoredUser } from '../../shared/api/http';
-import type { Capsule } from '../../shared/types/api';
+import type { Capsule, CapsuleCondition, CapsuleCategory } from '../../shared/types/api';
+import {
+  CAPSULE_CATEGORY_VALUES,
+  CAPSULE_CONDITION_VALUES,
+  CAPSULE_COLOR_PALETTE,
+  categoryLabel,
+  conditionLabel,
+  colorLabel,
+  getSizeOptions,
+  getSizeFieldLabel,
+} from '../../client/constants/capsule';
+import { useLanguage } from '../../client/i18n/LanguageContext';
 
 type Step = 'form' | 'capsule' | 'done';
 type CapsuleMode = 'existing' | 'new';
@@ -19,6 +31,7 @@ interface StudioUser {
 
 export default function StudioPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const importInputRef = useRef<HTMLInputElement>(null);
 
   const [me, setMe] = useState<StudioUser | null>(null);
@@ -32,12 +45,18 @@ export default function StudioPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState('');
+  const [instagramModalOpen, setInstagramModalOpen] = useState(false);
 
   const [postId, setPostId] = useState<string>('');
   const [capsuleMode, setCapsuleMode] = useState<CapsuleMode>('new');
   const [myCapsules, setMyCapsules] = useState<Capsule[] | null>(null);
   const [selectedCapsuleId, setSelectedCapsuleId] = useState<string>('');
   const [capsuleName, setCapsuleName] = useState('');
+  const [capsuleDescription, setCapsuleDescription] = useState('');
+  const [capsuleCategory, setCapsuleCategory] = useState<CapsuleCategory | ''>('');
+  const [capsuleSize, setCapsuleSize] = useState('');
+  const [capsuleCondition, setCapsuleCondition] = useState<CapsuleCondition | ''>('');
+  const [capsuleColors, setCapsuleColors] = useState<string[]>([]);
   const [capsulePrice, setCapsulePrice] = useState('');
   const [capsuleStock, setCapsuleStock] = useState('');
   const [capsuleError, setCapsuleError] = useState('');
@@ -55,10 +74,20 @@ export default function StudioPage() {
     api.get<StudioUser>('/auth/me').then(setMe).catch(() => {});
   }, []);
 
-  function showComingSoon(label: string) {
-    setNotice(`${label} — bientôt disponible 🚧`);
-    setTimeout(() => setNotice(''), 3000);
-  }
+  useEffect(() => {
+    if (!router.isReady) return;
+    const { instagram, ...rest } = router.query;
+    if (instagram === 'connected') {
+      setNotice(t('studio.instagramConnected'));
+      setInstagramModalOpen(true);
+      setTimeout(() => setNotice(''), 3000);
+      router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+    } else if (instagram === 'error') {
+      setNotice(t('studio.instagramError'));
+      setTimeout(() => setNotice(''), 4000);
+      router.replace({ pathname: router.pathname, query: rest }, undefined, { shallow: true });
+    }
+  }, [router.isReady]);
 
   function applyFile(f: File) {
     setFile(f);
@@ -85,12 +114,23 @@ export default function StudioPage() {
     setTags((prev) => prev.filter((x) => x !== t));
   }
 
+  function toggleColor(name: string) {
+    setCapsuleColors((prev) =>
+      prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name],
+    );
+  }
+
+  function selectCapsuleCategory(cat: CapsuleCategory) {
+    setCapsuleCategory(cat);
+    setCapsuleSize('');
+  }
+
   async function handlePublish(e: React.FormEvent) {
     e.preventDefault();
     setError('');
 
     if (!file) {
-      setError('Choisissez une photo ou une vidéo.');
+      setError(t('studio.choosePhotoOrVideo'));
       return;
     }
 
@@ -108,7 +148,7 @@ export default function StudioPage() {
         headers: { 'Content-Type': file.type },
         body: file,
       });
-      if (!putRes.ok) throw new Error("Échec de l'upload vers le stockage.");
+      if (!putRes.ok) throw new Error(t('studio.uploadFailed'));
 
       const type = file.type.startsWith('image/') ? 'photo' : 'video';
       const post = await api.post('/posts', {
@@ -130,7 +170,7 @@ export default function StudioPage() {
         setCapsuleMode('new');
       }
     } catch (err) {
-      setError(err instanceof ApiError || err instanceof Error ? err.message : 'Une erreur est survenue.');
+      setError(err instanceof ApiError || err instanceof Error ? err.message : t('common.genericError'));
     } finally {
       setLoading(false);
     }
@@ -141,7 +181,7 @@ export default function StudioPage() {
     setCapsuleError('');
 
     if (!selectedCapsuleId) {
-      setCapsuleError('Choisissez une capsule.');
+      setCapsuleError(t('studio.chooseCapsule'));
       return;
     }
 
@@ -150,7 +190,7 @@ export default function StudioPage() {
       await api.post(`/capsules/${selectedCapsuleId}/attach`, { postId });
       setStep('done');
     } catch (err) {
-      setCapsuleError(err instanceof ApiError ? err.message : 'Une erreur est survenue.');
+      setCapsuleError(err instanceof ApiError ? err.message : t('common.genericError'));
     } finally {
       setCapsuleLoading(false);
     }
@@ -163,20 +203,42 @@ export default function StudioPage() {
     const price = parseFloat(capsulePrice);
     const stock = parseInt(capsuleStock, 10);
     if (!capsuleName.trim() || !price || !stock) {
-      setCapsuleError('Nom, prix et stock sont requis.');
+      setCapsuleError(t('studio.nameeAndPriceRequired'));
       return;
     }
     if (price < 1) {
-      setCapsuleError('Le prix minimum est de 1€.');
+      setCapsuleError(t('studio.minPriceError'));
+      return;
+    }
+    if (!capsuleCategory) {
+      setCapsuleError(t('studio.chooseCategory'));
+      return;
+    }
+    if (!capsuleCondition) {
+      setCapsuleError(t('studio.chooseCondition'));
+      return;
+    }
+    if (getSizeOptions(capsuleCategory) && !capsuleSize) {
+      setCapsuleError(t('studio.chooseSize', { field: getSizeFieldLabel(t, capsuleCategory).toLowerCase() }));
       return;
     }
 
     setCapsuleLoading(true);
     try {
-      await api.post('/capsules', { postId, name: capsuleName.trim(), price, stock });
+      await api.post('/capsules', {
+        postId,
+        name: capsuleName.trim(),
+        description: capsuleDescription.trim() || undefined,
+        category: capsuleCategory,
+        size: capsuleSize || undefined,
+        condition: capsuleCondition,
+        colors: capsuleColors,
+        price,
+        stock,
+      });
       setStep('done');
     } catch (err) {
-      setCapsuleError(err instanceof ApiError ? err.message : 'Une erreur est survenue.');
+      setCapsuleError(err instanceof ApiError ? err.message : t('common.genericError'));
     } finally {
       setCapsuleLoading(false);
     }
@@ -188,7 +250,7 @@ export default function StudioPage() {
         <title>Studio — skoleomLive</title>
       </Head>
 
-      <div className="flex h-screen bg-[#050505] overflow-hidden">
+      <div className="flex h-screen cosmic-bg overflow-hidden">
         <AppSidebar />
 
         <main className="flex-1 flex flex-col overflow-y-auto scrollbar-hide">
@@ -199,7 +261,7 @@ export default function StudioPage() {
             >
               <ArrowLeft size={16} className="text-white/70" />
             </Link>
-            <span className="text-white font-bold text-sm">Nouveau post</span>
+            <span className="text-white font-bold text-sm">{t('studio.newPost')}</span>
 
             {me && (
               <div className="ml-auto flex items-center gap-2">
@@ -232,15 +294,15 @@ export default function StudioPage() {
                     className="flex items-center justify-center gap-2 py-3 rounded-xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] text-white/80 text-sm font-semibold transition-all"
                   >
                     <Radio size={15} className="text-red-400" />
-                    Commencer un live
+                    {t('studio.startLive')}
                   </button>
                   <button
                     type="button"
-                    onClick={() => showComingSoon('Import réseaux sociaux')}
+                    onClick={() => setInstagramModalOpen(true)}
                     className="flex items-center justify-center gap-1.5 py-3 px-2 rounded-xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] text-white/80 text-[11px] font-semibold leading-tight text-center transition-all"
                   >
                     <Import size={15} className="text-[#a8ff35] shrink-0" />
-                    Importer depuis d&apos;autres réseaux sociaux
+                    {t('studio.importSocial')}
                   </button>
                 </div>
 
@@ -276,7 +338,7 @@ export default function StudioPage() {
                       className="aspect-square rounded-2xl border border-dashed border-white/15 bg-white/[0.03] hover:bg-white/[0.06] flex flex-col items-center justify-center gap-2 transition-colors"
                     >
                       <Camera size={22} className="text-white/40" />
-                      <span className="text-white/40 text-sm">Créer un poste</span>
+                      <span className="text-white/40 text-sm">{t('studio.createPost')}</span>
                     </button>
                     <button
                       type="button"
@@ -284,7 +346,7 @@ export default function StudioPage() {
                       className="aspect-square rounded-2xl border border-dashed border-white/15 bg-white/[0.03] hover:bg-white/[0.06] flex flex-col items-center justify-center gap-2 transition-colors"
                     >
                       <ImageIcon size={22} className="text-white/40" />
-                      <span className="text-white/40 text-sm">Importer</span>
+                      <span className="text-white/40 text-sm">{t('studio.import')}</span>
                     </button>
                   </div>
                 )}
@@ -292,7 +354,7 @@ export default function StudioPage() {
                 <textarea
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
-                  placeholder="Légende..."
+                  placeholder={t('studio.captionPlaceholder')}
                   rows={3}
                   className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all resize-none"
                 />
@@ -309,7 +371,7 @@ export default function StudioPage() {
                           addTag();
                         }
                       }}
-                      placeholder="Ajouter un tag"
+                      placeholder={t('studio.addTagPlaceholder')}
                       className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
                     />
                     <button
@@ -324,15 +386,15 @@ export default function StudioPage() {
 
                   {tags.length > 0 && (
                     <div className="flex flex-wrap gap-1.5 mt-2.5">
-                      {tags.map((t) => (
+                      {tags.map((tag) => (
                         <span
-                          key={t}
+                          key={tag}
                           className="flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full bg-[#a8ff35]/10 border border-[#a8ff35]/25 text-[#a8ff35] text-xs font-medium"
                         >
-                          #{t}
+                          #{tag}
                           <button
                             type="button"
-                            onClick={() => removeTag(t)}
+                            onClick={() => removeTag(tag)}
                             className="w-4 h-4 rounded-full hover:bg-[#a8ff35]/20 flex items-center justify-center transition-colors"
                           >
                             <X size={11} />
@@ -354,7 +416,7 @@ export default function StudioPage() {
                   disabled={loading}
                   className="btn-skoleom w-full py-3.5 rounded-full text-sm shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.98] disabled:opacity-60 gap-2"
                 >
-                  {loading ? <Loader2 size={16} className="animate-spin" /> : 'Publier'}
+                  {loading ? <Loader2 size={16} className="animate-spin" /> : t('studio.publish')}
                 </button>
                 </form>
               </>
@@ -363,8 +425,8 @@ export default function StudioPage() {
             {step === 'capsule' && (
               <div className="space-y-4">
                 <div className="text-center mb-2">
-                  <h2 className="text-white font-bold text-lg">Post publié 🎉</h2>
-                  <p className="text-white/45 text-sm">Ajoutez une capsule achetable (optionnel)</p>
+                  <h2 className="text-white font-bold text-lg">{t('studio.postPublished')}</h2>
+                  <p className="text-white/45 text-sm">{t('studio.addOptionalCapsule')}</p>
                 </div>
 
                 {myCapsules === null ? (
@@ -385,7 +447,7 @@ export default function StudioPage() {
                               : 'text-white/45 hover:text-white/70'
                           }`}
                         >
-                          {m === 'existing' ? `Capsule existante${myCapsules.length ? ` (${myCapsules.length})` : ''}` : 'Nouvelle capsule'}
+                          {m === 'existing' ? `${t('studio.existingCapsule')}${myCapsules.length ? ` (${myCapsules.length})` : ''}` : t('studio.newCapsuleTab')}
                         </button>
                       ))}
                     </div>
@@ -393,7 +455,7 @@ export default function StudioPage() {
                     {capsuleMode === 'existing' ? (
                       myCapsules.length === 0 ? (
                         <p className="text-center text-white/30 text-sm py-6">
-                          Vous n'avez pas encore de capsule. Créez-en une pour pouvoir la réutiliser sur vos prochains posts.
+                          {t('studio.noCapsuleYet')}
                         </p>
                       ) : (
                       <form onSubmit={handleAttachCapsule} className="space-y-4">
@@ -418,7 +480,7 @@ export default function StudioPage() {
                               </div>
                               <div className="flex-1 min-w-0">
                                 <p className="text-sm font-semibold text-white truncate">{c.name}</p>
-                                <p className="text-xs text-white/40">{c.price.toFixed(2)} {c.currency} · {c.stock} en stock</p>
+                                <p className="text-xs text-white/40">{c.price.toFixed(2)} {c.currency} · {t('studio.inStock', { count: c.stock })}</p>
                               </div>
                             </button>
                           ))}
@@ -435,7 +497,7 @@ export default function StudioPage() {
                           disabled={capsuleLoading}
                           className="btn-skoleom w-full py-3.5 rounded-full text-sm shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.98] disabled:opacity-60 gap-2"
                         >
-                          {capsuleLoading ? <Loader2 size={16} className="animate-spin" /> : 'Utiliser cette capsule'}
+                          {capsuleLoading ? <Loader2 size={16} className="animate-spin" /> : t('studio.useThisCapsule')}
                         </button>
                       </form>
                       )
@@ -445,25 +507,144 @@ export default function StudioPage() {
                           type="text"
                           value={capsuleName}
                           onChange={(e) => setCapsuleName(e.target.value)}
-                          placeholder="Nom du produit"
+                          placeholder={t('capsuleForm.productName')}
                           className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
                         />
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="1"
-                          value={capsulePrice}
-                          onChange={(e) => setCapsulePrice(e.target.value)}
-                          placeholder="Prix (€)"
-                          className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+
+                        <textarea
+                          value={capsuleDescription}
+                          onChange={(e) => setCapsuleDescription(e.target.value)}
+                          placeholder={t('capsuleForm.description')}
+                          rows={3}
+                          className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all resize-none"
                         />
-                        <input
-                          type="number"
-                          value={capsuleStock}
-                          onChange={(e) => setCapsuleStock(e.target.value)}
-                          placeholder="Stock"
-                          className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
-                        />
+
+                        {/* Catégorie */}
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2">
+                            {t('capsuleForm.category')}
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {CAPSULE_CATEGORY_VALUES.map((value) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => selectCapsuleCategory(value)}
+                                className={`px-3.5 py-2 rounded-[10px] text-xs font-medium transition-all duration-150 border ${
+                                  capsuleCategory === value
+                                    ? 'bg-[#a8ff35] text-black border-[#a8ff35]'
+                                    : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08] hover:border-white/20'
+                                }`}
+                              >
+                                {categoryLabel(t, value)}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Taille / Pointure — uniquement pour vêtements et chaussures */}
+                        {getSizeOptions(capsuleCategory) && (
+                          <div>
+                            <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2">
+                              {getSizeFieldLabel(t, capsuleCategory)}
+                            </p>
+                            <div className="flex flex-wrap gap-2">
+                              {getSizeOptions(capsuleCategory)!.map((s) => (
+                                <button
+                                  key={s}
+                                  type="button"
+                                  onClick={() => setCapsuleSize(s)}
+                                  className={`min-w-[42px] px-3 py-2 rounded-[10px] text-xs font-medium transition-all duration-150 border ${
+                                    capsuleSize === s
+                                      ? 'bg-[#a8ff35] text-black border-[#a8ff35]'
+                                      : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08] hover:border-white/20'
+                                  }`}
+                                >
+                                  {s}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* État */}
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2">
+                            {t('capsuleForm.condition')}
+                          </p>
+                          <div className="flex flex-wrap gap-2">
+                            {CAPSULE_CONDITION_VALUES.map((value) => (
+                              <button
+                                key={value}
+                                type="button"
+                                onClick={() => setCapsuleCondition(value)}
+                                className={`px-3.5 py-2 rounded-[10px] text-xs font-medium transition-all duration-150 border ${
+                                  capsuleCondition === value
+                                    ? 'bg-[#a8ff35] text-black border-[#a8ff35]'
+                                    : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08] hover:border-white/20'
+                                }`}
+                              >
+                                {conditionLabel(t, value)}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Couleurs */}
+                        <div>
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2">
+                            {t('capsuleForm.colors')}
+                          </p>
+                          <div className="flex flex-wrap gap-2.5">
+                            {CAPSULE_COLOR_PALETTE.map((c) => {
+                              const isSelected = capsuleColors.includes(c.name);
+                              return (
+                                <button
+                                  key={c.name}
+                                  type="button"
+                                  onClick={() => toggleColor(c.name)}
+                                  title={colorLabel(t, c.name)}
+                                  className={`relative w-9 h-9 rounded-full transition-all duration-150 ${
+                                    isSelected ? 'ring-2 ring-[#a8ff35] ring-offset-2 ring-offset-[#050505]' : 'ring-1 ring-white/15 hover:ring-white/35'
+                                  }`}
+                                  style={{ background: c.swatch }}
+                                >
+                                  {isSelected && (
+                                    <span className="absolute inset-0 flex items-center justify-center">
+                                      <Check
+                                        size={14}
+                                        strokeWidth={3}
+                                        className={c.name === 'Blanc' || c.name === 'Jaune' ? 'text-black' : 'text-white'}
+                                      />
+                                    </span>
+                                  )}
+                                </button>
+                              );
+                            })}
+                          </div>
+                          {capsuleColors.length > 0 && (
+                            <p className="text-xs text-white/35 mt-2">{capsuleColors.map((c) => colorLabel(t, c)).join(', ')}</p>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-3">
+                          <input
+                            type="number"
+                            step="0.01"
+                            min="1"
+                            value={capsulePrice}
+                            onChange={(e) => setCapsulePrice(e.target.value)}
+                            placeholder={t('capsuleForm.price')}
+                            className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                          />
+                          <input
+                            type="number"
+                            value={capsuleStock}
+                            onChange={(e) => setCapsuleStock(e.target.value)}
+                            placeholder={t('capsuleForm.stock')}
+                            className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                          />
+                        </div>
 
                         {capsuleError && (
                           <p className="text-red-400 text-sm bg-red-400/10 px-4 py-2.5 rounded-xl border border-red-400/20">
@@ -476,7 +657,7 @@ export default function StudioPage() {
                           disabled={capsuleLoading}
                           className="btn-skoleom w-full py-3.5 rounded-full text-sm shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.98] disabled:opacity-60 gap-2"
                         >
-                          {capsuleLoading ? <Loader2 size={16} className="animate-spin" /> : 'Ajouter la capsule'}
+                          {capsuleLoading ? <Loader2 size={16} className="animate-spin" /> : t('studio.addCapsule')}
                         </button>
                       </form>
                     )}
@@ -487,19 +668,19 @@ export default function StudioPage() {
                   onClick={() => router.push(`/post/${postId}`)}
                   className="w-full py-3 text-white/45 text-sm hover:text-white/70 transition-colors"
                 >
-                  Passer cette étape
+                  {t('studio.skipStep')}
                 </button>
               </div>
             )}
 
             {step === 'done' && (
               <div className="text-center space-y-4">
-                <h2 className="text-white font-bold text-lg">Capsule ajoutée 🎉</h2>
+                <h2 className="text-white font-bold text-lg">{t('studio.capsuleAdded')}</h2>
                 <button
                   onClick={() => router.push(`/post/${postId}`)}
                   className="btn-skoleom w-full py-3.5 rounded-full text-sm shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.98]"
                 >
-                  Voir le post
+                  {t('studio.viewPost')}
                 </button>
               </div>
             )}
@@ -512,6 +693,15 @@ export default function StudioPage() {
         open={cameraOpen}
         onClose={() => setCameraOpen(false)}
         onCapture={applyFile}
+      />
+
+      <InstagramImportModal
+        open={instagramModalOpen}
+        onClose={() => setInstagramModalOpen(false)}
+        onImported={(count) => {
+          setNotice(t('studio.importedCount', { count, plural: count > 1 ? 's' : '' }));
+          setTimeout(() => setNotice(''), 3000);
+        }}
       />
     </>
   );

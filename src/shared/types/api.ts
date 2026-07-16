@@ -32,6 +32,15 @@ export interface Comment {
   createdAt: string;
 }
 
+export type CapsuleCondition =
+  | 'neuf_avec_etiquette'
+  | 'neuf_sans_etiquette'
+  | 'tres_bon_etat'
+  | 'bon_etat'
+  | 'satisfaisant';
+
+export type CapsuleCategory = 'vetement' | 'chaussures' | 'accessoire' | 'objet';
+
 export interface Capsule {
   id: string;
   name: string;
@@ -43,8 +52,22 @@ export interface Capsule {
   stock: number;
   soldCount: number;
   commissionRate: number;
+  condition?: CapsuleCondition;
+  category?: CapsuleCategory;
+  size?: string;
+  colors?: string[];
   variants?: { name: string; options: string[]; price?: number }[];
   status: 'available' | 'sold_out' | 'archived';
+}
+
+export interface InstagramMedia {
+  id: string;
+  caption?: string;
+  mediaType: 'IMAGE' | 'VIDEO' | 'CAROUSEL_ALBUM';
+  mediaUrl: string;
+  thumbnailUrl?: string;
+  permalink: string;
+  timestamp: string;
 }
 
 export interface Order {

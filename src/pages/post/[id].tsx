@@ -5,8 +5,10 @@ import Link from 'next/link';
 import { ArrowLeft, Heart, MessageCircle, Share2, VolumeX, Volume2, Music } from 'lucide-react';
 import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
 import { BoostBadge } from '../../client/components/Boost/BoostBadge';
+import { CommentsDrawer } from '../../client/components/Post/CommentsDrawer';
+import { ShareModal } from '../../client/components/Post/ShareModal';
 import type { Post } from '../../shared/types/api';
-import { api } from '../../shared/api/http';
+import { api, ApiError, getToken } from '../../shared/api/http';
 
 // Demo posts repris du feed pour la démo
 const DEMO_POSTS: Record<string, Post> = {
@@ -72,6 +74,11 @@ export default function PostDetailPage() {
   const [loading, setLoading] = useState(true);
   const [muted, setMuted] = useState(false);
   const [liked, setLiked] = useState(false);
+  const [likePending, setLikePending] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
+  const [commentCount, setCommentCount] = useState(0);
+  const [commentsOpen, setCommentsOpen] = useState(false);
+  const [shareOpen, setShareOpen] = useState(false);
   const [capsuleOpen, setCapsuleOpen] = useState(false);
   const [playing, setPlaying] = useState(true);
 
@@ -84,6 +91,36 @@ export default function PostDetailPage() {
       .catch(() => setPost(DEMO_POSTS[id] || null))
       .finally(() => setLoading(false));
   }, [id]);
+
+  useEffect(() => {
+    if (!post) return;
+    setLikeCount(post.likeCount);
+    setCommentCount(post.commentCount ?? 0);
+    if (!getToken()) return;
+    api
+      .get<Post[]>('/posts/liked/me')
+      .then((liked) => setLiked(liked.some((p) => p.id === post.id)))
+      .catch(() => {});
+  }, [post]);
+
+  async function handleLike() {
+    if (!post) return;
+    if (!getToken()) {
+      router.push('/auth/login');
+      return;
+    }
+    if (likePending) return;
+    setLikePending(true);
+    try {
+      const res = await api.post<{ liked: boolean; likeCount: number }>(`/posts/${post.id}/like`);
+      setLiked(res.liked);
+      setLikeCount(res.likeCount);
+    } catch (err) {
+      if (err instanceof ApiError && err.status === 401) router.push('/auth/login');
+    } finally {
+      setLikePending(false);
+    }
+  }
 
   function togglePlay() {
     if (!videoRef.current) return;
@@ -222,7 +259,7 @@ export default function PostDetailPage() {
             {/* Stats row */}
             <div className="flex items-center gap-4 mt-3 pt-3 border-t border-white/10">
               <span className="text-xs text-white/50">{formatCount(post.viewCount)} vues</span>
-              <span className="text-xs text-white/50">{formatCount(post.likeCount)} likes</span>
+              <span className="text-xs text-white/50">{formatCount(likeCount)} likes</span>
               {totalSold > 0 && (
                 <span className="text-xs text-green-400 font-medium">{totalSold} vendu{totalSold > 1 ? 's' : ''}</span>
               )}
@@ -233,22 +270,22 @@ export default function PostDetailPage() {
         {/* ── Right sidebar actions ──────────────────────────────── */}
         <div className="hidden md:flex flex-col items-center justify-end gap-6 w-20 pb-8 bg-black/20">
           <button
-            onClick={() => setLiked((l) => !l)}
+            onClick={handleLike}
             className="flex flex-col items-center gap-1.5 group"
           >
             <Heart
               size={30}
               className={`transition-all ${liked ? 'text-brand fill-brand' : 'text-white group-hover:text-brand/70'}`}
             />
-            <span className="text-xs text-white/70">{formatCount(post.likeCount + (liked ? 1 : 0))}</span>
+            <span className="text-xs text-white/70">{formatCount(likeCount)}</span>
           </button>
 
-          <button className="flex flex-col items-center gap-1.5 group">
+          <button onClick={() => setCommentsOpen(true)} className="flex flex-col items-center gap-1.5 group">
             <MessageCircle size={30} className="text-white group-hover:text-white/70" />
-            <span className="text-xs text-white/70">0</span>
+            <span className="text-xs text-white/70">{formatCount(commentCount)}</span>
           </button>
 
-          <button className="flex flex-col items-center gap-1.5 group">
+          <button onClick={() => setShareOpen(true)} className="flex flex-col items-center gap-1.5 group">
             <Share2 size={28} className="text-white group-hover:text-white/70" />
             <span className="text-xs text-white/70">Partager</span>
           </button>
@@ -256,19 +293,33 @@ export default function PostDetailPage() {
 
         {/* ── Mobile bottom actions ──────────────────────────────── */}
         <div className="absolute bottom-0 right-4 flex md:hidden flex-col items-center gap-5 pb-32 z-20">
-          <button onClick={() => setLiked((l) => !l)} className="flex flex-col items-center gap-1">
+          <button onClick={handleLike} className="flex flex-col items-center gap-1">
             <Heart size={28} className={liked ? 'text-brand fill-brand' : 'text-white'} />
-            <span className="text-xs text-white/70">{formatCount(post.likeCount + (liked ? 1 : 0))}</span>
+            <span className="text-xs text-white/70">{formatCount(likeCount)}</span>
           </button>
-          <button className="flex flex-col items-center gap-1">
+          <button onClick={() => setCommentsOpen(true)} className="flex flex-col items-center gap-1">
             <MessageCircle size={28} className="text-white" />
-            <span className="text-xs text-white/70">0</span>
+            <span className="text-xs text-white/70">{formatCount(commentCount)}</span>
           </button>
-          <button className="flex flex-col items-center gap-1">
+          <button onClick={() => setShareOpen(true)} className="flex flex-col items-center gap-1">
             <Share2 size={26} className="text-white" />
             <span className="text-xs text-white/70">Partager</span>
           </button>
         </div>
+
+        <CommentsDrawer
+          postId={post.id}
+          open={commentsOpen}
+          onClose={() => setCommentsOpen(false)}
+          onCommentAdded={() => setCommentCount((c) => c + 1)}
+        />
+
+        <ShareModal
+          postId={post.id}
+          caption={post.caption}
+          open={shareOpen}
+          onClose={() => setShareOpen(false)}
+        />
 
         {/* ── Capsule panel ──────────────────────────────────────── */}
         {hasCapsules && (

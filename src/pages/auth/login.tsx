@@ -4,6 +4,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { api, ApiError, getToken, setSession, getStoredUser } from '../../shared/api/http';
+import { useLanguage } from '../../client/i18n/LanguageContext';
 
 type Tab = 'login' | 'register';
 
@@ -17,6 +18,7 @@ const DEMO_ACCOUNTS = [
 
 export default function LoginPage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const [tab, setTab] = useState<Tab>('login');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -32,7 +34,7 @@ export default function LoginPage() {
       return;
     }
     if (router.query.suspended === '1') {
-      setError('Ta session a été interrompue par un administrateur — reconnecte-toi.');
+      setError(t('auth.suspended'));
     }
   }, [router.query.suspended]);
 
@@ -41,11 +43,11 @@ export default function LoginPage() {
     setError('');
 
     if (!email || !password) {
-      setError('Veuillez remplir tous les champs.');
+      setError(t('auth.fillAllFields'));
       return;
     }
     if (tab === 'register' && !username.trim()) {
-      setError("Veuillez entrer un nom d'utilisateur.");
+      setError(t('auth.enterUsername'));
       return;
     }
 
@@ -59,7 +61,7 @@ export default function LoginPage() {
       setSession(token, user);
       router.push(user.role === 'admin' ? '/admin' : tab === 'login' ? '/' : '/studio');
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Une erreur est survenue.');
+      setError(err instanceof ApiError ? err.message : t('common.genericError'));
     } finally {
       setLoading(false);
     }
@@ -87,7 +89,7 @@ export default function LoginPage() {
       setSession(session.token, session.user);
       router.push('/');
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Une erreur est survenue.');
+      setError(err instanceof ApiError ? err.message : t('common.genericError'));
     } finally {
       setDemoLoading(null);
     }
@@ -97,11 +99,11 @@ export default function LoginPage() {
     <>
       <Head>
         <title>
-          {tab === 'login' ? 'Connexion' : 'Inscription'} — skoleomLive
+          {tab === 'login' ? t('auth.login') : t('auth.register')} — skoleomLive
         </title>
       </Head>
 
-      <div className="min-h-screen bg-[#050505] flex flex-col">
+      <div className="cosmic-bg min-h-screen flex flex-col">
         {/* Top bar */}
         <div className="flex items-center gap-3 px-4 py-4">
           <Link
@@ -125,27 +127,26 @@ export default function LoginPage() {
                 <img src="/skoleom-mark.png" alt="" className="w-8 h-8 object-contain" />
               </div>
               <h1 className="text-2xl font-bold text-white mb-2">
-                {tab === 'login' ? 'Bienvenue' : 'Créer un compte'}
+                {tab === 'login' ? t('auth.welcome') : t('auth.createAccount')}
               </h1>
               <p className="text-white/45 text-sm">
-                Veuillez vous{' '}
-                {tab === 'login' ? 'connecter' : 'inscrire'} pour continuer
+                {tab === 'login' ? t('auth.pleaseLogin') : t('auth.pleaseRegister')}
               </p>
             </div>
 
             {/* Tab toggle */}
             <div className="flex bg-white/[0.05] rounded-full p-1 mb-7">
-              {(['login', 'register'] as Tab[]).map((t) => (
+              {(['login', 'register'] as Tab[]).map((tabOption) => (
                 <button
-                  key={t}
-                  onClick={() => { setTab(t); setError(''); }}
+                  key={tabOption}
+                  onClick={() => { setTab(tabOption); setError(''); }}
                   className={`flex-1 py-2 rounded-full text-sm font-medium transition-all ${
-                    tab === t
+                    tab === tabOption
                       ? 'bg-white text-black shadow-sm'
                       : 'text-white/45 hover:text-white/70'
                   }`}
                 >
-                  {t === 'login' ? 'Connexion' : 'Inscription'}
+                  {tabOption === 'login' ? t('auth.login') : t('auth.register')}
                 </button>
               ))}
             </div>
@@ -155,13 +156,13 @@ export default function LoginPage() {
               {tab === 'register' && (
                 <div>
                   <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
-                    Nom d'utilisateur
+                    {t('auth.username')}
                   </label>
                   <input
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder="@pseudo"
+                    placeholder={t('auth.usernamePlaceholder')}
                     autoComplete="username"
                     className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
                   />
@@ -170,13 +171,13 @@ export default function LoginPage() {
 
               <div>
                 <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
-                  {tab === 'login' ? 'Email ou identifiant' : 'Email'}
+                  {tab === 'login' ? t('auth.emailOrUsername') : t('auth.email')}
                 </label>
                 <input
                   type={tab === 'login' ? 'text' : 'email'}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder={tab === 'login' ? 'email ou identifiant' : 'votre@email.com'}
+                  placeholder={tab === 'login' ? t('auth.emailOrUsernamePlaceholder') : t('auth.emailPlaceholder')}
                   autoComplete="email"
                   className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
                 />
@@ -184,7 +185,7 @@ export default function LoginPage() {
 
               <div>
                 <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
-                  Mot de passe
+                  {t('auth.password')}
                 </label>
                 <input
                   type="password"
@@ -210,7 +211,7 @@ export default function LoginPage() {
                 {loading ? (
                   <div className="w-4 h-4 border-2 border-black/30 border-t-black rounded-full animate-spin" />
                 ) : (
-                  tab === 'login' ? 'Se connecter' : 'Créer mon compte'
+                  tab === 'login' ? t('auth.loginButton') : t('auth.registerButton')
                 )}
               </button>
             </form>
@@ -219,7 +220,7 @@ export default function LoginPage() {
             <div className="mt-7">
               <div className="flex items-center gap-3 mb-4">
                 <div className="h-px flex-1 bg-white/[0.08]" />
-                <span className="text-[11px] text-white/30 uppercase tracking-wider">Comptes de démo</span>
+                <span className="text-[11px] text-white/30 uppercase tracking-wider">{t('auth.demoAccounts')}</span>
                 <div className="h-px flex-1 bg-white/[0.08]" />
               </div>
               <div className="grid grid-cols-3 gap-2">
@@ -245,7 +246,7 @@ export default function LoginPage() {
                         {account.label}
                       </span>
                     )}
-                    <span className="text-[10px] text-white/30">Essayer</span>
+                    <span className="text-[10px] text-white/30">{t('auth.try')}</span>
                   </button>
                 ))}
               </div>
@@ -253,9 +254,9 @@ export default function LoginPage() {
 
             {/* Footer note */}
             <p className="text-center text-xs text-white/25 mt-6">
-              En continuant, vous acceptez les{' '}
-              <span className="text-white/40 underline cursor-pointer">conditions d'utilisation</span>
-              {' '}de skoleomLive.
+              {t('auth.termsPrefix')}{' '}
+              <span className="text-white/40 underline cursor-pointer">{t('auth.termsLink')}</span>
+              {' '}{t('auth.termsSuffix')}
             </p>
           </div>
         </div>

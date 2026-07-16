@@ -59,6 +59,30 @@ export class FilesService {
     fs.writeFileSync(dest, data);
   }
 
+  // Pour les fichiers recuperes cote serveur (ex: import Instagram) — pas de flow presigned-URL ici,
+  // on ecrit directement le buffer telecharge.
+  async saveBuffer(
+    folder: 'posts' | 'capsules' | 'avatars',
+    data: Buffer,
+    extension: string,
+    mimeType: string,
+  ): Promise<{ fileUrl: string; key: string }> {
+    const key = `${folder}/${uuidv4()}.${extension}`;
+
+    if (!this.s3) {
+      this.saveLocalFile(key, data);
+      return { fileUrl: `${LOCAL_BASE_URL}/uploads/${key}`, key };
+    }
+
+    await this.s3.send(new PutObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+      Body: data,
+      ContentType: mimeType,
+    }));
+    return { fileUrl: `https://${process.env.S3_BUCKET_DOMAIN}/${key}`, key };
+  }
+
   async deleteFile(key: string): Promise<void> {
     if (!this.s3) {
       const dest = path.join(UPLOADS_DIR, key);

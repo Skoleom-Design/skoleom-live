@@ -441,7 +441,7 @@ export default function LivePage() {
   return (
     <>
       <Head><title>skoleomLive — Live</title></Head>
-      <div className="flex h-screen bg-black overflow-hidden">
+      <div className="flex h-screen cosmic-bg overflow-hidden">
         <AppSidebar />
 
         <main className="flex flex-1 overflow-hidden">
