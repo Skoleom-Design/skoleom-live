@@ -2,22 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
-import { ArrowLeft, Camera, Image as ImageIcon, Loader2, Package, Radio, Import, Plus, X, Check } from 'lucide-react';
+import { ArrowLeft, Camera, Image as ImageIcon, Loader2, Package, Radio, Import, Plus, X } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CameraCaptureModal } from '../../client/components/Post/CameraCaptureModal';
 import { InstagramImportModal } from '../../client/components/Post/InstagramImportModal';
+import { CapsuleProductForm, CapsuleProductFormHandle } from '../../client/components/Capsule/CapsuleProductForm';
 import { api, ApiError, getToken, getStoredUser } from '../../shared/api/http';
-import type { Capsule, CapsuleCondition, CapsuleCategory } from '../../shared/types/api';
-import {
-  CAPSULE_CATEGORY_VALUES,
-  CAPSULE_CONDITION_VALUES,
-  CAPSULE_COLOR_PALETTE,
-  categoryLabel,
-  conditionLabel,
-  colorLabel,
-  getSizeOptions,
-  getSizeFieldLabel,
-} from '../../client/constants/capsule';
+import type { Capsule } from '../../shared/types/api';
 import { useLanguage } from '../../client/i18n/LanguageContext';
 
 type Step = 'form' | 'capsule' | 'done';
@@ -51,16 +42,9 @@ export default function StudioPage() {
   const [capsuleMode, setCapsuleMode] = useState<CapsuleMode>('new');
   const [myCapsules, setMyCapsules] = useState<Capsule[] | null>(null);
   const [selectedCapsuleId, setSelectedCapsuleId] = useState<string>('');
-  const [capsuleName, setCapsuleName] = useState('');
-  const [capsuleDescription, setCapsuleDescription] = useState('');
-  const [capsuleCategory, setCapsuleCategory] = useState<CapsuleCategory | ''>('');
-  const [capsuleSize, setCapsuleSize] = useState('');
-  const [capsuleCondition, setCapsuleCondition] = useState<CapsuleCondition | ''>('');
-  const [capsuleColors, setCapsuleColors] = useState<string[]>([]);
-  const [capsulePrice, setCapsulePrice] = useState('');
-  const [capsuleStock, setCapsuleStock] = useState('');
   const [capsuleError, setCapsuleError] = useState('');
   const [capsuleLoading, setCapsuleLoading] = useState(false);
+  const productFormRef = useRef<CapsuleProductFormHandle>(null);
 
   useEffect(() => {
     if (!getToken()) {
@@ -112,17 +96,6 @@ export default function StudioPage() {
 
   function removeTag(t: string) {
     setTags((prev) => prev.filter((x) => x !== t));
-  }
-
-  function toggleColor(name: string) {
-    setCapsuleColors((prev) =>
-      prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name],
-    );
-  }
-
-  function selectCapsuleCategory(cat: CapsuleCategory) {
-    setCapsuleCategory(cat);
-    setCapsuleSize('');
   }
 
   async function handlePublish(e: React.FormEvent) {
@@ -200,42 +173,14 @@ export default function StudioPage() {
     e.preventDefault();
     setCapsuleError('');
 
-    const price = parseFloat(capsulePrice);
-    const stock = parseInt(capsuleStock, 10);
-    if (!capsuleName.trim() || !price || !stock) {
-      setCapsuleError(t('studio.nameeAndPriceRequired'));
-      return;
-    }
-    if (price < 1) {
-      setCapsuleError(t('studio.minPriceError'));
-      return;
-    }
-    if (!capsuleCategory) {
-      setCapsuleError(t('studio.chooseCategory'));
-      return;
-    }
-    if (!capsuleCondition) {
-      setCapsuleError(t('studio.chooseCondition'));
-      return;
-    }
-    if (getSizeOptions(capsuleCategory) && !capsuleSize) {
-      setCapsuleError(t('studio.chooseSize', { field: getSizeFieldLabel(t, capsuleCategory).toLowerCase() }));
-      return;
-    }
+    const products = productFormRef.current?.getProducts();
+    if (!products) return;
 
     setCapsuleLoading(true);
     try {
-      await api.post('/capsules', {
-        postId,
-        name: capsuleName.trim(),
-        description: capsuleDescription.trim() || undefined,
-        category: capsuleCategory,
-        size: capsuleSize || undefined,
-        condition: capsuleCondition,
-        colors: capsuleColors,
-        price,
-        stock,
-      });
+      for (const product of products) {
+        await api.post('/capsules', { postId, ...product });
+      }
       setStep('done');
     } catch (err) {
       setCapsuleError(err instanceof ApiError ? err.message : t('common.genericError'));
@@ -503,148 +448,7 @@ export default function StudioPage() {
                       )
                     ) : (
                       <form onSubmit={handleAddCapsule} className="space-y-4">
-                        <input
-                          type="text"
-                          value={capsuleName}
-                          onChange={(e) => setCapsuleName(e.target.value)}
-                          placeholder={t('capsuleForm.productName')}
-                          className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
-                        />
-
-                        <textarea
-                          value={capsuleDescription}
-                          onChange={(e) => setCapsuleDescription(e.target.value)}
-                          placeholder={t('capsuleForm.description')}
-                          rows={3}
-                          className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all resize-none"
-                        />
-
-                        {/* Catégorie */}
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2">
-                            {t('capsuleForm.category')}
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            {CAPSULE_CATEGORY_VALUES.map((value) => (
-                              <button
-                                key={value}
-                                type="button"
-                                onClick={() => selectCapsuleCategory(value)}
-                                className={`px-3.5 py-2 rounded-[10px] text-xs font-medium transition-all duration-150 border ${
-                                  capsuleCategory === value
-                                    ? 'bg-[#a8ff35] text-black border-[#a8ff35]'
-                                    : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08] hover:border-white/20'
-                                }`}
-                              >
-                                {categoryLabel(t, value)}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Taille / Pointure — uniquement pour vêtements et chaussures */}
-                        {getSizeOptions(capsuleCategory) && (
-                          <div>
-                            <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2">
-                              {getSizeFieldLabel(t, capsuleCategory)}
-                            </p>
-                            <div className="flex flex-wrap gap-2">
-                              {getSizeOptions(capsuleCategory)!.map((s) => (
-                                <button
-                                  key={s}
-                                  type="button"
-                                  onClick={() => setCapsuleSize(s)}
-                                  className={`min-w-[42px] px-3 py-2 rounded-[10px] text-xs font-medium transition-all duration-150 border ${
-                                    capsuleSize === s
-                                      ? 'bg-[#a8ff35] text-black border-[#a8ff35]'
-                                      : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08] hover:border-white/20'
-                                  }`}
-                                >
-                                  {s}
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* État */}
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2">
-                            {t('capsuleForm.condition')}
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            {CAPSULE_CONDITION_VALUES.map((value) => (
-                              <button
-                                key={value}
-                                type="button"
-                                onClick={() => setCapsuleCondition(value)}
-                                className={`px-3.5 py-2 rounded-[10px] text-xs font-medium transition-all duration-150 border ${
-                                  capsuleCondition === value
-                                    ? 'bg-[#a8ff35] text-black border-[#a8ff35]'
-                                    : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08] hover:border-white/20'
-                                }`}
-                              >
-                                {conditionLabel(t, value)}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-
-                        {/* Couleurs */}
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2">
-                            {t('capsuleForm.colors')}
-                          </p>
-                          <div className="flex flex-wrap gap-2.5">
-                            {CAPSULE_COLOR_PALETTE.map((c) => {
-                              const isSelected = capsuleColors.includes(c.name);
-                              return (
-                                <button
-                                  key={c.name}
-                                  type="button"
-                                  onClick={() => toggleColor(c.name)}
-                                  title={colorLabel(t, c.name)}
-                                  className={`relative w-9 h-9 rounded-full transition-all duration-150 ${
-                                    isSelected ? 'ring-2 ring-[#a8ff35] ring-offset-2 ring-offset-[#050505]' : 'ring-1 ring-white/15 hover:ring-white/35'
-                                  }`}
-                                  style={{ background: c.swatch }}
-                                >
-                                  {isSelected && (
-                                    <span className="absolute inset-0 flex items-center justify-center">
-                                      <Check
-                                        size={14}
-                                        strokeWidth={3}
-                                        className={c.name === 'Blanc' || c.name === 'Jaune' ? 'text-black' : 'text-white'}
-                                      />
-                                    </span>
-                                  )}
-                                </button>
-                              );
-                            })}
-                          </div>
-                          {capsuleColors.length > 0 && (
-                            <p className="text-xs text-white/35 mt-2">{capsuleColors.map((c) => colorLabel(t, c)).join(', ')}</p>
-                          )}
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3">
-                          <input
-                            type="number"
-                            step="0.01"
-                            min="1"
-                            value={capsulePrice}
-                            onChange={(e) => setCapsulePrice(e.target.value)}
-                            placeholder={t('capsuleForm.price')}
-                            className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
-                          />
-                          <input
-                            type="number"
-                            value={capsuleStock}
-                            onChange={(e) => setCapsuleStock(e.target.value)}
-                            placeholder={t('capsuleForm.stock')}
-                            className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
-                          />
-                        </div>
+                        <CapsuleProductForm ref={productFormRef} />
 
                         {capsuleError && (
                           <p className="text-red-400 text-sm bg-red-400/10 px-4 py-2.5 rounded-xl border border-red-400/20">

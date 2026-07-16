@@ -6,7 +6,7 @@ import { Post } from '../posts/post.entity';
 import { CapsuleStatus, CapsuleCondition, CapsuleCategory } from '../../../shared/types/entities';
 
 export interface CreateCapsuleDto {
-  postId: string;
+  postId?: string;
   name: string;
   description?: string;
   price: number;
@@ -15,6 +15,7 @@ export interface CreateCapsuleDto {
   images?: string[];
   condition?: CapsuleCondition;
   category?: CapsuleCategory;
+  subcategory?: string;
   size?: string;
   colors?: string[];
   stock: number;
@@ -62,7 +63,7 @@ export class CapsulesService {
       images: dto.images || [],
       creatorId,
       commissionRate,
-      posts: [{ id: postId } as Post],
+      posts: postId ? [{ id: postId } as Post] : [],
     });
     return this.capsulesRepo.save(capsule);
   }

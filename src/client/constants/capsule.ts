@@ -15,6 +15,26 @@ export function categoryLabel(t: TFunc, value: CapsuleCategory): string {
   return t(`capsuleForm.categories.${value}`);
 }
 
+// Sous-types par categorie — "vetement" seul ne dit rien de precis, un T-shirt et un manteau
+// n'interessent pas le meme acheteur. Pas de sous-type pour "objet" (catch-all trop varie).
+const SUBCATEGORY_VALUES: Partial<Record<CapsuleCategory, string[]>> = {
+  vetement: ['tshirt', 'chemise', 'pull', 'veste', 'jean', 'pantalon', 'short', 'robe', 'jupe', 'survetement', 'maillot_de_bain', 'sous_vetement', 'autre'],
+  chaussures: ['baskets', 'bottes', 'sandales', 'talons', 'mocassins', 'chaussons', 'autre'],
+  accessoire: ['sac', 'bijou', 'montre', 'ceinture', 'lunettes', 'echarpe_bonnet', 'casquette_chapeau', 'autre'],
+};
+
+export function getSubcategoryOptions(category: CapsuleCategory | ''): string[] | null {
+  if (!category) return null;
+  return SUBCATEGORY_VALUES[category] ?? null;
+}
+
+export function subcategoryLabel(t: TFunc, category: CapsuleCategory, value: string): string {
+  // "objet" n'a pas de sous-types predefinis — la valeur est du texte libre saisi par le
+  // vendeur, pas une cle de traduction.
+  if (category === 'objet') return value;
+  return t(`capsuleForm.subcategories.${category}.${value}`);
+}
+
 export function conditionLabel(t: TFunc, value: CapsuleCondition): string {
   return t(`capsuleForm.conditions.${value}`);
 }

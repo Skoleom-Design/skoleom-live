@@ -54,6 +54,7 @@ export interface Capsule {
   commissionRate: number;
   condition?: CapsuleCondition;
   category?: CapsuleCategory;
+  subcategory?: string;
   size?: string;
   colors?: string[];
   variants?: { name: string; options: string[]; price?: number }[];

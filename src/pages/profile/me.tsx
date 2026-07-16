@@ -8,18 +8,10 @@ import {
 } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { BoostModal } from '../../client/components/Boost/BoostModal';
+import { CapsuleProductForm, CapsuleProductFormHandle } from '../../client/components/Capsule/CapsuleProductForm';
 import { api, ApiError, getToken, getStoredUser, clearSession } from '../../shared/api/http';
 import type { CapsuleCondition, CapsuleCategory } from '../../shared/types/api';
-import {
-  CAPSULE_CATEGORY_VALUES,
-  CAPSULE_CONDITION_VALUES,
-  CAPSULE_COLOR_PALETTE,
-  categoryLabel,
-  conditionLabel,
-  colorLabel,
-  getSizeOptions,
-  getSizeFieldLabel,
-} from '../../client/constants/capsule';
+import { categoryLabel, conditionLabel, subcategoryLabel } from '../../client/constants/capsule';
 import { useLanguage } from '../../client/i18n/LanguageContext';
 
 type PlanKey = 'free' | 'premium' | 'ultra';
@@ -65,6 +57,7 @@ interface CapsuleData {
   imageUrl?: string;
   condition?: CapsuleCondition;
   category?: CapsuleCategory;
+  subcategory?: string;
   size?: string;
   colors?: string[];
 }
@@ -101,6 +94,7 @@ export default function ProfilePage() {
   const { language, setLanguage, t, dict } = useLanguage();
   const [user, setUser] = useState<MeUser | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [myCapsules, setMyCapsules] = useState<CapsuleData[]>([]);
   const [tab, setTab] = useState<Tab>('posts');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -116,27 +110,9 @@ export default function ProfilePage() {
 
   const [capsuleModalOpen, setCapsuleModalOpen] = useState(false);
   const [newCapsulePostId, setNewCapsulePostId] = useState('');
-  const [newCapsuleName, setNewCapsuleName] = useState('');
-  const [newCapsuleDescription, setNewCapsuleDescription] = useState('');
-  const [newCapsuleCategory, setNewCapsuleCategory] = useState<CapsuleCategory | ''>('');
-  const [newCapsuleSize, setNewCapsuleSize] = useState('');
-  const [newCapsuleCondition, setNewCapsuleCondition] = useState<CapsuleCondition | ''>('');
-  const [newCapsuleColors, setNewCapsuleColors] = useState<string[]>([]);
-  const [newCapsulePrice, setNewCapsulePrice] = useState('');
-  const [newCapsuleStock, setNewCapsuleStock] = useState('');
   const [newCapsuleError, setNewCapsuleError] = useState('');
   const [newCapsuleSaving, setNewCapsuleSaving] = useState(false);
-
-  function toggleNewCapsuleColor(name: string) {
-    setNewCapsuleColors((prev) =>
-      prev.includes(name) ? prev.filter((c) => c !== name) : [...prev, name],
-    );
-  }
-
-  function selectNewCapsuleCategory(cat: CapsuleCategory) {
-    setNewCapsuleCategory(cat);
-    setNewCapsuleSize('');
-  }
+  const newCapsuleFormRef = useRef<CapsuleProductFormHandle>(null);
 
   const [likedPosts, setLikedPosts] = useState<LikedPost[]>([]);
   const [planSaving, setPlanSaving] = useState(false);
@@ -173,14 +149,16 @@ export default function ProfilePage() {
     }
     (async () => {
       try {
-        const [me, stats, liked] = await Promise.all([
+        const [me, stats, liked, capsules] = await Promise.all([
           api.get<MeUser>('/auth/me'),
           api.get<Analytics>('/posts/analytics/me'),
           api.get<LikedPost[]>('/posts/liked/me').catch(() => []),
+          api.get<CapsuleData[]>('/capsules/mine').catch(() => []),
         ]);
         setUser(me);
         setAnalytics(stats);
         setLikedPosts(liked);
+        setMyCapsules(capsules);
       } catch (err) {
         setError(err instanceof ApiError ? err.message : t('common.genericError'));
       } finally {
@@ -245,17 +223,7 @@ export default function ProfilePage() {
   async function handleRemoveCapsule(capsuleId: string) {
     try {
       await api.delete(`/capsules/${capsuleId}`);
-      setAnalytics((prev) =>
-        prev
-          ? {
-              ...prev,
-              posts: prev.posts.map((p) => ({
-                ...p,
-                capsules: p.capsules.filter((c) => c.id !== capsuleId),
-              })),
-            }
-          : prev,
-      );
+      setMyCapsules((prev) => prev.filter((c) => c.id !== capsuleId));
     } catch {
       // silent — la liste reflète toujours l'état serveur au prochain rechargement
     }
@@ -331,15 +299,7 @@ export default function ProfilePage() {
   }
 
   function openCapsuleModal() {
-    setNewCapsulePostId(analytics?.posts[0]?.id || '');
-    setNewCapsuleName('');
-    setNewCapsuleDescription('');
-    setNewCapsuleCategory('');
-    setNewCapsuleSize('');
-    setNewCapsuleCondition('');
-    setNewCapsuleColors([]);
-    setNewCapsulePrice('');
-    setNewCapsuleStock('');
+    setNewCapsulePostId('');
     setNewCapsuleError('');
     setCapsuleModalOpen(true);
   }
@@ -348,56 +308,19 @@ export default function ProfilePage() {
     e.preventDefault();
     setNewCapsuleError('');
 
-    const price = parseFloat(newCapsulePrice);
-    const stock = parseInt(newCapsuleStock, 10);
-    if (!newCapsulePostId) {
-      setNewCapsuleError(t('profile.createCapsuleNeedsPost'));
-      return;
-    }
-    if (!newCapsuleName.trim() || !price || !stock) {
-      setNewCapsuleError(t('studio.nameeAndPriceRequired'));
-      return;
-    }
-    if (price < 1) {
-      setNewCapsuleError(t('studio.minPriceError'));
-      return;
-    }
-    if (!newCapsuleCategory) {
-      setNewCapsuleError(t('studio.chooseCategory'));
-      return;
-    }
-    if (!newCapsuleCondition) {
-      setNewCapsuleError(t('studio.chooseCondition'));
-      return;
-    }
-    if (getSizeOptions(newCapsuleCategory) && !newCapsuleSize) {
-      setNewCapsuleError(t('studio.chooseSize', { field: getSizeFieldLabel(t, newCapsuleCategory).toLowerCase() }));
-      return;
-    }
+    const products = newCapsuleFormRef.current?.getProducts();
+    if (!products) return;
 
     setNewCapsuleSaving(true);
     try {
-      const created = await api.post<CapsuleData>('/capsules', {
-        postId: newCapsulePostId,
-        name: newCapsuleName.trim(),
-        description: newCapsuleDescription.trim() || undefined,
-        category: newCapsuleCategory,
-        size: newCapsuleSize || undefined,
-        condition: newCapsuleCondition,
-        colors: newCapsuleColors,
-        price,
-        stock,
-      });
-      setAnalytics((prev) =>
-        prev
-          ? {
-              ...prev,
-              posts: prev.posts.map((p) =>
-                p.id === newCapsulePostId ? { ...p, capsules: [...p.capsules, created] } : p,
-              ),
-            }
-          : prev,
-      );
+      for (const product of products) {
+        await api.post<CapsuleData>('/capsules', {
+          postId: newCapsulePostId || undefined,
+          ...product,
+        });
+      }
+      const refreshed = await api.get<CapsuleData[]>('/capsules/mine');
+      setMyCapsules(refreshed);
       setCapsuleModalOpen(false);
     } catch (err) {
       setNewCapsuleError(err instanceof ApiError ? err.message : t('common.genericError'));
@@ -422,10 +345,6 @@ export default function ProfilePage() {
       </div>
     );
   }
-
-  const capsules = analytics.posts.flatMap((post) =>
-    post.capsules.map((c) => ({ ...c, post })),
-  );
 
   const TABS = [
     { key: 'posts' as Tab, label: t('profile.posts'), icon: Grid3x3 },
@@ -620,11 +539,11 @@ export default function ProfilePage() {
                   <Plus size={14} /> {t('profile.createCapsule')}
                 </button>
 
-                {capsules.length === 0 ? (
+                {myCapsules.length === 0 ? (
                   <EmptyState text={t('profile.noCapsulesYet')} />
                 ) : (
                   <div className="space-y-3">
-                    {capsules.map((c) => (
+                    {myCapsules.map((c) => (
                     <div key={c.id} className="flex items-center gap-3 bg-white/[0.03] border border-white/[0.07] rounded-[16px] p-3">
                       <div className="w-12 h-12 rounded-lg bg-white/[0.05] overflow-hidden shrink-0 flex items-center justify-center">
                         {c.imageUrl ? (
@@ -637,7 +556,8 @@ export default function ProfilePage() {
                         <p className="text-[13px] font-semibold text-white truncate">{c.name}</p>
                         <p className="text-[12px] text-white/40">
                           {c.price.toFixed(2)} {c.currency} · {c.soldCount} {t('profile.sold')} · {c.stock} {t('profile.inStock')}
-                          {c.category && ` · ${categoryLabel(t, c.category)}`}
+                          {c.category && c.subcategory && ` · ${subcategoryLabel(t, c.category, c.subcategory)}`}
+                          {c.category && !c.subcategory && ` · ${categoryLabel(t, c.category)}`}
                           {c.size && ` · ${c.size}`}
                           {c.condition && ` · ${conditionLabel(t, c.condition)}`}
                         </p>
@@ -819,8 +739,8 @@ export default function ProfilePage() {
 
       {capsuleModalOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
-          <div className="cosmic-modal w-full max-w-sm overflow-hidden border border-white/[0.08] rounded-[20px] p-5">
-            <div className="flex items-center justify-between mb-5">
+          <div className="cosmic-modal w-full max-w-sm max-h-[85vh] flex flex-col overflow-hidden border border-white/[0.08] rounded-[20px] p-5">
+            <div className="flex items-center justify-between mb-5 shrink-0">
               <h2 className="text-white font-bold text-base">{t('profile.createCapsule')}</h2>
               <button onClick={() => setCapsuleModalOpen(false)}
                 className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
@@ -828,12 +748,8 @@ export default function ProfilePage() {
               </button>
             </div>
 
-            {analytics.posts.length === 0 ? (
-              <p className="text-white/40 text-sm text-center py-6">
-                {t('profile.createCapsuleNeedsPost')}
-              </p>
-            ) : (
-              <form onSubmit={handleCreateCapsule} className="space-y-4">
+            <form onSubmit={handleCreateCapsule} className="flex-1 flex flex-col min-h-0">
+              <div className="flex-1 overflow-y-auto scrollbar-hide space-y-4 pb-1">
                 <div>
                   <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
                     {t('profile.attachToPost')}
@@ -843,6 +759,7 @@ export default function ProfilePage() {
                     onChange={(e) => setNewCapsulePostId(e.target.value)}
                     className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
                   >
+                    <option value="" className="bg-[#0d0d0f]">{t('studio.noPost')}</option>
                     {analytics.posts.map((p) => (
                       <option key={p.id} value={p.id} className="bg-[#0d0d0f]">
                         {p.caption || `Post ${p.id.slice(0, 8)}`}
@@ -851,164 +768,23 @@ export default function ProfilePage() {
                   </select>
                 </div>
 
-                <input
-                  type="text"
-                  value={newCapsuleName}
-                  onChange={(e) => setNewCapsuleName(e.target.value)}
-                  placeholder={t('capsuleForm.productName')}
-                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
-                />
-
-                <textarea
-                  value={newCapsuleDescription}
-                  onChange={(e) => setNewCapsuleDescription(e.target.value)}
-                  placeholder={t('capsuleForm.description')}
-                  rows={3}
-                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all resize-none"
-                />
-
-                {/* Catégorie */}
-                <div>
-                  <label className="block text-[11px] text-white/40 mb-2 font-medium uppercase tracking-wider">
-                    {t('capsuleForm.category')}
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {CAPSULE_CATEGORY_VALUES.map((value) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => selectNewCapsuleCategory(value)}
-                        className={`px-3.5 py-2 rounded-[10px] text-xs font-medium transition-all duration-150 border ${
-                          newCapsuleCategory === value
-                            ? 'bg-[#a8ff35] text-black border-[#a8ff35]'
-                            : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08] hover:border-white/20'
-                        }`}
-                      >
-                        {categoryLabel(t, value)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Taille / Pointure — uniquement pour vêtements et chaussures */}
-                {getSizeOptions(newCapsuleCategory) && (
-                  <div>
-                    <label className="block text-[11px] text-white/40 mb-2 font-medium uppercase tracking-wider">
-                      {getSizeFieldLabel(t, newCapsuleCategory)}
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      {getSizeOptions(newCapsuleCategory)!.map((s) => (
-                        <button
-                          key={s}
-                          type="button"
-                          onClick={() => setNewCapsuleSize(s)}
-                          className={`min-w-[42px] px-3 py-2 rounded-[10px] text-xs font-medium transition-all duration-150 border ${
-                            newCapsuleSize === s
-                              ? 'bg-[#a8ff35] text-black border-[#a8ff35]'
-                              : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08] hover:border-white/20'
-                          }`}
-                        >
-                          {s}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* État */}
-                <div>
-                  <label className="block text-[11px] text-white/40 mb-2 font-medium uppercase tracking-wider">
-                    {t('capsuleForm.condition')}
-                  </label>
-                  <div className="flex flex-wrap gap-2">
-                    {CAPSULE_CONDITION_VALUES.map((value) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setNewCapsuleCondition(value)}
-                        className={`px-3.5 py-2 rounded-[10px] text-xs font-medium transition-all duration-150 border ${
-                          newCapsuleCondition === value
-                            ? 'bg-[#a8ff35] text-black border-[#a8ff35]'
-                            : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08] hover:border-white/20'
-                        }`}
-                      >
-                        {conditionLabel(t, value)}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Couleurs */}
-                <div>
-                  <label className="block text-[11px] text-white/40 mb-2 font-medium uppercase tracking-wider">
-                    {t('capsuleForm.colors')}
-                  </label>
-                  <div className="flex flex-wrap gap-2.5">
-                    {CAPSULE_COLOR_PALETTE.map((c) => {
-                      const isSelected = newCapsuleColors.includes(c.name);
-                      return (
-                        <button
-                          key={c.name}
-                          type="button"
-                          onClick={() => toggleNewCapsuleColor(c.name)}
-                          title={colorLabel(t, c.name)}
-                          className={`relative w-9 h-9 rounded-full transition-all duration-150 ${
-                            isSelected ? 'ring-2 ring-[#a8ff35] ring-offset-2 ring-offset-[#0d0d0f]' : 'ring-1 ring-white/15 hover:ring-white/35'
-                          }`}
-                          style={{ background: c.swatch }}
-                        >
-                          {isSelected && (
-                            <span className="absolute inset-0 flex items-center justify-center">
-                              <Check
-                                size={14}
-                                strokeWidth={3}
-                                className={c.name === 'Blanc' || c.name === 'Jaune' ? 'text-black' : 'text-white'}
-                              />
-                            </span>
-                          )}
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {newCapsuleColors.length > 0 && (
-                    <p className="text-xs text-white/35 mt-2">{newCapsuleColors.map((c) => colorLabel(t, c)).join(', ')}</p>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="1"
-                    value={newCapsulePrice}
-                    onChange={(e) => setNewCapsulePrice(e.target.value)}
-                    placeholder={t('capsuleForm.price')}
-                    className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
-                  />
-                  <input
-                    type="number"
-                    value={newCapsuleStock}
-                    onChange={(e) => setNewCapsuleStock(e.target.value)}
-                    placeholder={t('capsuleForm.stock')}
-                    className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
-                  />
-                </div>
+                <CapsuleProductForm ref={newCapsuleFormRef} />
 
                 {newCapsuleError && (
                   <p className="text-red-400 text-sm bg-red-400/10 px-4 py-2.5 rounded-xl border border-red-400/20">
                     {newCapsuleError}
                   </p>
                 )}
+              </div>
 
-                <button
-                  type="submit"
-                  disabled={newCapsuleSaving}
-                  className="btn-skoleom w-full py-3.5 rounded-full text-sm shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.98] disabled:opacity-60 gap-2"
-                >
-                  {newCapsuleSaving ? <Loader2 size={16} className="animate-spin" /> : t('studio.addCapsule')}
-                </button>
-              </form>
-            )}
+              <button
+                type="submit"
+                disabled={newCapsuleSaving}
+                className="btn-skoleom w-full py-3.5 rounded-full text-sm shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.98] disabled:opacity-60 gap-2 mt-4 shrink-0"
+              >
+                {newCapsuleSaving ? <Loader2 size={16} className="animate-spin" /> : t('studio.addCapsule')}
+              </button>
+            </form>
           </div>
         </div>
       )}

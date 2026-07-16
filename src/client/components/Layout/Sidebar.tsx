@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Compass, Search, Video, User, Settings2, PlusCircle, ShieldAlert } from 'lucide-react';
+import { Orbit, Search, Video, User, Settings2, PlusCircle, ShieldAlert } from 'lucide-react';
 import { GuideButton } from '../Guide/GuideModal';
 import { getStoredUser } from '../../../shared/api/http';
 import { useLanguage } from '../../i18n/LanguageContext';
@@ -18,11 +18,11 @@ export function AppSidebar() {
     setAvatarUrl(user?.avatarUrl);
   }, []);
 
-  // Home/loupe/carre+ sont les pictogrammes exacts d'Instagram — Compass colle en plus au sens
-  // du label "Explorer", et un rond+ (au lieu d'un carre+) suffit a rompre la ressemblance.
+  // Home/loupe/carre+ sont les pictogrammes exacts d'Instagram — Orbit rattache "Explorer" au
+  // theme Univers cosmique de la DA, et un rond+ (au lieu d'un carre+) suffit a rompre la ressemblance.
   const NAV = [
     { href: '/live', icon: Video, label: t('sidebar.live') },
-    { href: '/', icon: Compass, label: t('sidebar.explore') },
+    { href: '/', icon: Orbit, label: t('sidebar.explore') },
     { href: '/explore', icon: Search, label: t('sidebar.search') },
     ...(isAdmin ? [] : [{ href: '/studio', icon: PlusCircle, label: t('sidebar.studio') }]),
     isAdmin
@@ -55,24 +55,32 @@ export function AppSidebar() {
             <Link
               key={item.label}
               href={item.href}
-              className={`flex items-center gap-4 px-3 py-2.5 rounded-xl text-[15px] transition-all ${
+              className={`flex items-center gap-3 pl-1.5 pr-4 py-1.5 rounded-full text-[15px] transition-all ${
                 isActive
                   ? 'font-bold text-black bg-skoleom-gradient-warm shadow-glow-lime-sm'
                   : 'font-normal text-white/80 hover:bg-white/[0.05] hover:text-white'
               }`}
             >
-              {avatar ? (
-                <div className={`w-6 h-6 rounded-full overflow-hidden shrink-0 ${isActive ? 'ring-2 ring-black/30' : 'ring-1 ring-white/20'}`}>
-                  <img src={avatar} alt="" className="w-full h-full object-cover" />
-                </div>
-              ) : (
-                <Icon
-                  size={24}
-                  strokeWidth={isActive ? 2.5 : 1.75}
-                  fill={isActive ? 'currentColor' : 'none'}
-                  fillOpacity={isActive ? 0.18 : undefined}
-                />
-              )}
+              {/* Chaque icone vit dans sa propre pastille — pas un glyphe nu flottant a cote
+                  du libelle comme sur Insta/X/LinkedIn. */}
+              <span
+                className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all ${
+                  isActive ? 'bg-black/15' : 'bg-white/[0.06] border border-white/10'
+                }`}
+              >
+                {avatar ? (
+                  <span className={`w-full h-full rounded-full overflow-hidden ${isActive ? 'ring-2 ring-black/30' : 'ring-1 ring-white/20'}`}>
+                    <img src={avatar} alt="" className="w-full h-full object-cover" />
+                  </span>
+                ) : (
+                  <Icon
+                    size={17}
+                    strokeWidth={isActive ? 2.5 : 1.75}
+                    fill={isActive ? 'currentColor' : 'none'}
+                    fillOpacity={isActive ? 0.18 : undefined}
+                  />
+                )}
+              </span>
               {item.label}
             </Link>
           );
@@ -84,9 +92,11 @@ export function AppSidebar() {
         <div className="relative border-t border-white/[0.06] pt-3 mt-2">
           <Link
             href="/admin"
-            className="flex items-center gap-4 px-3 py-2.5 rounded-xl text-[15px] text-white/40 hover:text-white hover:bg-white/[0.05] transition-colors"
+            className="flex items-center gap-3 pl-1.5 pr-4 py-1.5 rounded-full text-[15px] text-white/40 hover:text-white hover:bg-white/[0.05] transition-colors"
           >
-            <Settings2 size={22} strokeWidth={1.75} />
+            <span className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-white/[0.06] border border-white/10">
+              <Settings2 size={16} strokeWidth={1.75} />
+            </span>
             {t('sidebar.admin')}
           </Link>
         </div>

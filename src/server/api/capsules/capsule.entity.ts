@@ -41,6 +41,11 @@ export class Capsule {
   @Column({ nullable: true })
   size: string;
 
+  // Sous-type libre (ex: "tshirt", "jean" pour la categorie vetement) — pas d'enum strict cote
+  // base, les valeurs valides par categorie sont gerees cote client (constants/capsule.ts).
+  @Column({ nullable: true })
+  subcategory: string;
+
   @Column({ type: 'json', nullable: true })
   colors: string[];
 
