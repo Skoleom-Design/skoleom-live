@@ -2,12 +2,15 @@ import { Injectable, NotFoundException, ForbiddenException, BadRequestException 
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Capsule } from './capsule.entity';
+import { CapsuleGroup } from './capsule-group.entity';
 import { Post } from '../posts/post.entity';
-import { CapsuleStatus, CapsuleCondition, CapsuleCategory } from '../../../shared/types/entities';
+import { User } from '../users/user.entity';
+import { CapsuleStatus, CapsuleCondition, CapsuleCategory, UserPlan } from '../../../shared/types/entities';
 
 export interface CreateCapsuleDto {
   postId?: string;
   name: string;
+  brand?: string;
   description?: string;
   price: number;
   currency?: string;
@@ -22,11 +25,35 @@ export interface CreateCapsuleDto {
   variants?: { name: string; options: string[]; price?: number }[];
 }
 
+export interface CreateCapsuleGroupDto {
+  name: string;
+  postId?: string;
+  products: Omit<CreateCapsuleDto, 'postId'>[];
+}
+
+// Nombre de capsules (au total) et de produits par capsule autorisés selon l'offre —
+// reprend les valeurs affichées dans la section abonnement du profil.
+const CAPSULE_GROUP_COUNT_LIMITS: Record<UserPlan, number | null> = {
+  [UserPlan.FREE]: 2,
+  [UserPlan.PREMIUM]: 15,
+  [UserPlan.ULTRA]: null,
+};
+
+const CAPSULE_GROUP_PRODUCT_LIMITS: Record<UserPlan, number | null> = {
+  [UserPlan.FREE]: 2,
+  [UserPlan.PREMIUM]: 5,
+  [UserPlan.ULTRA]: 8,
+};
+
 @Injectable()
 export class CapsulesService {
   constructor(
     @InjectRepository(Capsule)
     private capsulesRepo: Repository<Capsule>,
+    @InjectRepository(CapsuleGroup)
+    private capsuleGroupsRepo: Repository<CapsuleGroup>,
+    @InjectRepository(User)
+    private usersRepo: Repository<User>,
   ) {}
 
   async getByPost(postId: string): Promise<Capsule[]> {
@@ -40,6 +67,7 @@ export class CapsulesService {
   async getMine(creatorId: string): Promise<Capsule[]> {
     return this.capsulesRepo.find({
       where: { creatorId, status: CapsuleStatus.AVAILABLE },
+      relations: ['group'],
       order: { createdAt: 'DESC' },
     });
   }
@@ -47,7 +75,7 @@ export class CapsulesService {
   async getById(id: string): Promise<Capsule> {
     const capsule = await this.capsulesRepo.findOne({
       where: { id },
-      relations: ['post'],
+      relations: ['posts', 'group'],
     });
     if (!capsule) throw new NotFoundException('Capsule not found');
     return capsule;
@@ -66,6 +94,59 @@ export class CapsulesService {
       posts: postId ? [{ id: postId } as Post] : [],
     });
     return this.capsulesRepo.save(capsule);
+  }
+
+  async createGroup(creatorId: string, dto: CreateCapsuleGroupDto): Promise<CapsuleGroup> {
+    if (!dto.name?.trim()) throw new BadRequestException('Le nom de la capsule est requis.');
+    if (!dto.products || dto.products.length === 0) {
+      throw new BadRequestException('Ajoute au moins un produit à la capsule.');
+    }
+    if (dto.products.some((p) => p.price < 1)) {
+      throw new BadRequestException('Le prix minimum est de 1€.');
+    }
+
+    const creator = await this.usersRepo.findOne({ where: { id: creatorId } });
+    if (!creator) throw new NotFoundException('User not found');
+
+    const productLimit = CAPSULE_GROUP_PRODUCT_LIMITS[creator.plan];
+    if (productLimit !== null && dto.products.length > productLimit) {
+      throw new BadRequestException(
+        `Ton offre actuelle autorise jusqu'à ${productLimit} produit${productLimit > 1 ? 's' : ''} par capsule.`,
+      );
+    }
+
+    const groupLimit = CAPSULE_GROUP_COUNT_LIMITS[creator.plan];
+    if (groupLimit !== null) {
+      const existingGroups = await this.capsuleGroupsRepo.count({ where: { creatorId } });
+      if (existingGroups >= groupLimit) {
+        throw new BadRequestException(
+          `Ton offre actuelle autorise jusqu'à ${groupLimit} capsule${groupLimit > 1 ? 's' : ''}.`,
+        );
+      }
+    }
+
+    const commissionRate = parseFloat(process.env.COMMISSION_RATE || '0.15') * 100;
+
+    return this.capsulesRepo.manager.transaction(async (manager) => {
+      const group = await manager.save(
+        manager.create(CapsuleGroup, { name: dto.name.trim(), creatorId }),
+      );
+
+      const products = dto.products.map((product) =>
+        manager.create(Capsule, {
+          ...product,
+          images: product.images || [],
+          creatorId,
+          commissionRate,
+          groupId: group.id,
+          posts: dto.postId ? [{ id: dto.postId } as Post] : [],
+        }),
+      );
+      await manager.save(products);
+
+      group.products = products;
+      return group;
+    });
   }
 
   async attachToPost(capsuleId: string, postId: string, creatorId: string): Promise<Capsule> {

@@ -6,6 +6,8 @@ interface Props {
   open: boolean;
   onClose: () => void;
   onCapture: (file: File) => void;
+  /** Masque le bascule Photo/Vidéo — utile quand seule une photo a un sens (ex: photo produit). */
+  photoOnly?: boolean;
 }
 
 const VIDEO_MIME_CANDIDATES = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'];
@@ -14,7 +16,7 @@ function pickSupportedMimeType(): string {
   return VIDEO_MIME_CANDIDATES.find((t) => MediaRecorder.isTypeSupported(t)) || '';
 }
 
-export function CameraCaptureModal({ open, onClose, onCapture }: Props) {
+export function CameraCaptureModal({ open, onClose, onCapture, photoOnly }: Props) {
   const [mounted, setMounted] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -34,20 +36,47 @@ export function CameraCaptureModal({ open, onClose, onCapture }: Props) {
     if (!open) return;
     let cancelled = false;
     setError('');
-    navigator.mediaDevices
-      ?.getUserMedia({ video: { facingMode: facing }, audio: true })
-      .then((stream) => {
-        if (cancelled) {
-          stream.getTracks().forEach((t) => t.stop());
-          return;
-        }
-        streamRef.current = stream;
-        if (videoRef.current) videoRef.current.srcObject = stream;
-      })
-      .catch(() => setError("Impossible d'accéder à la caméra et au micro — vérifie les autorisations du navigateur."));
+
+    function requestStream(retriesLeft = 2) {
+      navigator.mediaDevices
+        ?.getUserMedia({ video: { facingMode: facing }, audio: true })
+        .then((stream) => {
+          if (cancelled) {
+            stream.getTracks().forEach((t) => t.stop());
+            return;
+          }
+          streamRef.current = stream;
+          if (videoRef.current) videoRef.current.srcObject = stream;
+        })
+        .catch((err) => {
+          if (cancelled) return;
+          const name = err instanceof DOMException ? err.name : '';
+          // NotReadableError/TrackStartError sont très souvent transitoires (double-montage
+          // StrictMode, ou libération tardive du handle caméra côté OS après un autre onglet/app)
+          // — un court retry silencieux résout la grande majorité des cas.
+          if ((name === 'NotReadableError' || name === 'TrackStartError') && retriesLeft > 0) {
+            setTimeout(() => { if (!cancelled) requestStream(retriesLeft - 1); }, 500);
+            return;
+          }
+          const messages: Record<string, string> = {
+            NotAllowedError: "Accès à la caméra/micro refusé — autorise-les pour ce site puis réessaie.",
+            NotFoundError: "Aucune caméra ou aucun micro détecté sur cet appareil.",
+            NotReadableError: "Ta caméra ou ton micro est déjà utilisé par une autre application (Zoom, Teams, un autre onglet...). Ferme-la puis réessaie.",
+            TrackStartError: "Ta caméra ou ton micro est déjà utilisé par une autre application (Zoom, Teams, un autre onglet...). Ferme-la puis réessaie.",
+          };
+          setError(messages[name] || "Impossible d'accéder à la caméra et au micro — vérifie les autorisations du navigateur.");
+        });
+    }
+
+    // Reporte l'appel getUserMedia d'un tick : le double-montage StrictMode (mount -> cleanup ->
+    // remount) est entierement synchrone, donc le cleanup du premier montage "jetable" annule ce
+    // timeout avant qu'il ne se declenche — une seule requete camera part reellement par ouverture,
+    // au lieu de deux requetes concurrentes qui se disputent le meme peripherique (NotReadableError).
+    const kickoffId = setTimeout(() => { if (!cancelled) requestStream(); }, 0);
 
     return () => {
       cancelled = true;
+      clearTimeout(kickoffId);
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     };
@@ -160,20 +189,26 @@ export function CameraCaptureModal({ open, onClose, onCapture }: Props) {
 
       {/* Bottom controls */}
       <div className="shrink-0 pb-8 pt-4 flex flex-col items-center gap-4">
-        <div className="flex bg-white/10 rounded-full p-1">
-          {(['photo', 'video'] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => !recording && setMode(m)}
-              className={`px-4 py-1.5 rounded-full text-xs font-semibold transition-all ${
-                mode === m ? 'bg-white text-black' : 'text-white/60'
-              }`}
-            >
-              {m === 'photo' ? 'Photo' : 'Vidéo'}
-            </button>
-          ))}
-        </div>
+        {!photoOnly && (
+          <div className="relative flex bg-white/10 rounded-full p-1 w-40">
+            <div
+              className="absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-full bg-white shadow-sm transition-transform duration-300 ease-out"
+              style={{ transform: mode === 'video' ? 'translateX(calc(100% + 4px))' : 'translateX(0)' }}
+            />
+            {(['photo', 'video'] as const).map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => !recording && setMode(m)}
+                className={`relative z-10 flex-1 py-1.5 rounded-full text-xs font-semibold transition-colors duration-300 ${
+                  mode === m ? 'text-black' : 'text-white/60'
+                }`}
+              >
+                {m === 'photo' ? 'Photo' : 'Vidéo'}
+              </button>
+            ))}
+          </div>
+        )}
 
         <button
           type="button"

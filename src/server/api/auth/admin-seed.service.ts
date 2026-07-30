@@ -22,7 +22,7 @@ export class AdminSeedService implements OnModuleInit {
 
     const hashed = await bcrypt.hash('admin', 12);
     const admin = this.usersRepo.create({
-      email: 'admin@skoleom.live',
+      email: 'admin@gmail.com',
       username: 'admin',
       password: hashed,
       role: UserRole.ADMIN,

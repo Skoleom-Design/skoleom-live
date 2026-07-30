@@ -5,6 +5,7 @@ import {
 import { BoostStatus, BoostObjective, BoostScope } from '../../../shared/types/entities';
 import { User } from '../users/user.entity';
 import { Post } from '../posts/post.entity';
+import { DecimalColumnTransformer } from '../../common/decimal.transformer';
 
 @Entity('boosts')
 export class Boost {
@@ -20,10 +21,10 @@ export class Boost {
   @Column({ type: 'simple-enum', enum: BoostScope, default: BoostScope.POST })
   scope: BoostScope;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: 'decimal', precision: 10, scale: 2, transformer: DecimalColumnTransformer })
   budget: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0, transformer: DecimalColumnTransformer })
   spent: number;
 
   @Column({ default: 'EUR' })

@@ -1,5 +1,5 @@
-import { useState, forwardRef, useImperativeHandle } from 'react';
-import { Check, X, Package } from 'lucide-react';
+import { useState, useRef, forwardRef, useImperativeHandle } from 'react';
+import { Check, X, Package, Camera, Image as ImageIcon, Loader2 } from 'lucide-react';
 import type { CapsuleCondition, CapsuleCategory } from '../../../shared/types/api';
 import {
   CAPSULE_CATEGORY_VALUES,
@@ -12,12 +12,17 @@ import {
   getSizeFieldLabel,
   getSubcategoryOptions,
   subcategoryLabel,
+  getCapsuleGroupLimit,
 } from '../../constants/capsule';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { getStoredUser, uploadFile } from '../../../shared/api/http';
+import { CameraCaptureModal } from '../Post/CameraCaptureModal';
 
 export interface CapsuleProductInput {
   name: string;
+  brand?: string;
   description?: string;
+  imageUrl?: string;
   category: CapsuleCategory;
   subcategory?: string;
   size?: string;
@@ -29,7 +34,9 @@ export interface CapsuleProductInput {
 
 interface Draft {
   name: string;
+  brand: string;
   description: string;
+  imageUrl: string;
   category: CapsuleCategory | '';
   subcategory: string;
   size: string;
@@ -40,14 +47,17 @@ interface Draft {
 }
 
 function emptyDraft(): Draft {
-  return { name: '', description: '', category: '', subcategory: '', size: '', condition: '', colors: [], price: '', stock: '' };
+  return { name: '', brand: '', description: '', imageUrl: '', category: '', subcategory: '', size: '', condition: '', colors: [], price: '', stock: '' };
 }
 
 function isDraftEmpty(d: Draft): boolean {
-  return !d.name.trim() && !d.description.trim() && !d.category && !d.price && !d.stock;
+  return !d.name.trim() && !d.brand.trim() && !d.description.trim() && !d.category && !d.price && !d.stock;
 }
 
 export interface CapsuleProductFormHandle {
+  /** Retourne le nom de la capsule (obligatoire). Retourne null (avec message d'erreur affiche)
+   *  si le champ est vide. */
+  getGroupName: () => string | null;
   /** Retourne la liste complete (produits deja ajoutes + brouillon courant s'il est valide).
    *  Retourne null si rien n'est pret — un message d'erreur est alors deja affiche dans le formulaire. */
   getProducts: () => CapsuleProductInput[] | null;
@@ -61,9 +71,36 @@ const chipClass = (active: boolean) =>
 
 export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle>(function CapsuleProductForm(_props, ref) {
   const { t } = useLanguage();
+  const [groupName, setGroupName] = useState('');
   const [products, setProducts] = useState<CapsuleProductInput[]>([]);
   const [draft, setDraft] = useState<Draft>(emptyDraft());
   const [error, setError] = useState('');
+  const [cameraOpen, setCameraOpen] = useState(false);
+  const [imageUploading, setImageUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const plan = getStoredUser()?.plan;
+  const limit = getCapsuleGroupLimit(plan);
+  const limitReached = limit !== null && products.length >= limit;
+
+  async function applyImageFile(file: File) {
+    setImageUploading(true);
+    setError('');
+    try {
+      const url = await uploadFile(file, 'capsules');
+      setDraft((d) => ({ ...d, imageUrl: url }));
+    } catch {
+      setError(t('studio.uploadFailed'));
+    } finally {
+      setImageUploading(false);
+    }
+  }
+
+  function onFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (f) applyImageFile(f);
+  }
 
   function toggleColor(name: string) {
     setDraft((d) => ({ ...d, colors: d.colors.includes(name) ? d.colors.filter((c) => c !== name) : [...d.colors, name] }));
@@ -86,7 +123,9 @@ export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle>(function 
     }
     return {
       name: d.name.trim(),
+      brand: d.brand.trim() || undefined,
       description: d.description.trim() || undefined,
+      imageUrl: d.imageUrl || undefined,
       category: d.category,
       subcategory: d.subcategory || undefined,
       size: d.size || undefined,
@@ -98,6 +137,10 @@ export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle>(function 
   }
 
   function addProduct() {
+    if (limitReached) {
+      setError(t('studio.capsuleLimitReached', { limit: limit as number }));
+      return;
+    }
     const result = validateDraft(draft);
     if (typeof result === 'string') {
       setError(result);
@@ -113,27 +156,59 @@ export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle>(function 
   }
 
   useImperativeHandle(ref, () => ({
+    getGroupName() {
+      if (!groupName.trim()) {
+        setError(t('studio.capsuleNameRequired'));
+        return null;
+      }
+      setError('');
+      return groupName.trim();
+    },
     getProducts() {
+      let result: CapsuleProductInput[];
       if (isDraftEmpty(draft)) {
         if (products.length === 0) {
           setError(t('studio.fillProductFirst'));
           return null;
         }
-        setError('');
-        return products;
+        result = products;
+      } else {
+        const validated = validateDraft(draft);
+        if (typeof validated === 'string') {
+          setError(validated);
+          return null;
+        }
+        result = [...products, validated];
       }
-      const result = validateDraft(draft);
-      if (typeof result === 'string') {
-        setError(result);
+      if (limit !== null && result.length > limit) {
+        setError(t('studio.capsuleLimitReached', { limit }));
         return null;
       }
       setError('');
-      return [...products, result];
+      return result;
     },
   }));
 
   return (
     <div className="space-y-4">
+      <div>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2">
+          {t('capsuleForm.capsuleName')} <span className="text-[#a8ff35]">*</span>
+        </p>
+        <input
+          type="text"
+          value={groupName}
+          onChange={(e) => setGroupName(e.target.value)}
+          placeholder={t('capsuleForm.capsuleNamePlaceholder')}
+          className={fieldClass}
+        />
+        <p className="text-xs text-white/35 mt-1.5">
+          {limit === null
+            ? t('studio.capsuleLimitUnlimited')
+            : t('studio.capsuleLimitHint', { limit })}
+        </p>
+      </div>
+
       {products.length > 0 && (
         <div className="space-y-2">
           <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40">
@@ -141,11 +216,15 @@ export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle>(function 
           </p>
           {products.map((p, i) => (
             <div key={i} className="flex items-center gap-3 bg-white/[0.04] border border-white/10 rounded-xl p-2.5">
-              <div className="w-9 h-9 rounded-lg bg-white/[0.05] flex items-center justify-center shrink-0">
-                <Package size={15} className="text-white/30" />
+              <div className="w-9 h-9 rounded-lg bg-white/[0.05] overflow-hidden flex items-center justify-center shrink-0">
+                {p.imageUrl ? (
+                  <img src={p.imageUrl} alt="" className="w-full h-full object-cover" />
+                ) : (
+                  <Package size={15} className="text-white/30" />
+                )}
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white truncate">{p.name}</p>
+                <p className="text-sm font-semibold text-white truncate">{p.name}{p.brand ? ` · ${p.brand}` : ''}</p>
                 <p className="text-xs text-white/40">{p.price.toFixed(2)} € · {p.stock} en stock</p>
               </div>
               <button
@@ -161,11 +240,60 @@ export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle>(function 
         </div>
       )}
 
+      <div className="flex items-center gap-3">
+        <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-white/[0.05] border border-white/[0.08] shrink-0 flex items-center justify-center">
+          {imageUploading ? (
+            <Loader2 size={18} className="animate-spin text-white/40" />
+          ) : draft.imageUrl ? (
+            <>
+              <img src={draft.imageUrl} alt="" className="w-full h-full object-cover" />
+              <button
+                type="button"
+                onClick={() => setDraft((d) => ({ ...d, imageUrl: '' }))}
+                className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center"
+              >
+                <X size={11} className="text-white" />
+              </button>
+            </>
+          ) : (
+            <Package size={20} className="text-white/20" />
+          )}
+        </div>
+        <div className="flex-1 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => setCameraOpen(true)}
+            className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl border border-dashed border-white/15 text-white/50 text-[11px] font-medium hover:bg-white/[0.04] hover:text-white hover:border-white/25 transition-all"
+          >
+            <Camera size={16} />
+            {t('capsuleForm.takePhoto')}
+          </button>
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl border border-dashed border-white/15 text-white/50 text-[11px] font-medium hover:bg-white/[0.04] hover:text-white hover:border-white/25 transition-all"
+          >
+            <ImageIcon size={16} />
+            {t('capsuleForm.importPhoto')}
+          </button>
+        </div>
+        <input ref={fileInputRef} type="file" accept="image/*" onChange={onFileChange} className="hidden" />
+      </div>
+      <CameraCaptureModal open={cameraOpen} onClose={() => setCameraOpen(false)} onCapture={applyImageFile} photoOnly />
+
       <input
         type="text"
         value={draft.name}
         onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
         placeholder={t('capsuleForm.productName')}
+        className={fieldClass}
+      />
+
+      <input
+        type="text"
+        value={draft.brand}
+        onChange={(e) => setDraft((d) => ({ ...d, brand: e.target.value }))}
+        placeholder={t('capsuleForm.brand')}
         className={fieldClass}
       />
 
@@ -325,9 +453,14 @@ export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle>(function 
       <button
         type="button"
         onClick={addProduct}
-        className="w-full py-2.5 rounded-xl border border-dashed border-white/15 text-white/60 text-sm font-medium hover:bg-white/[0.04] hover:text-white hover:border-white/25 transition-all"
+        disabled={limitReached}
+        className={`w-full py-2.5 rounded-xl border border-dashed text-sm font-medium transition-all ${
+          limitReached
+            ? 'border-white/10 text-white/25 cursor-not-allowed'
+            : 'border-white/15 text-white/60 hover:bg-white/[0.04] hover:text-white hover:border-white/25'
+        }`}
       >
-        {t('studio.addAnotherProduct')}
+        {limitReached ? t('studio.capsuleLimitReached', { limit: limit as number }) : t('studio.addAnotherProduct')}
       </button>
     </div>
   );

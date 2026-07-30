@@ -44,6 +44,7 @@ export type CapsuleCategory = 'vetement' | 'chaussures' | 'accessoire' | 'objet'
 export interface Capsule {
   id: string;
   name: string;
+  brand?: string;
   description: string;
   price: number;
   currency: string;
@@ -59,6 +60,8 @@ export interface Capsule {
   colors?: string[];
   variants?: { name: string; options: string[]; price?: number }[];
   status: 'available' | 'sold_out' | 'archived';
+  groupId?: string;
+  group?: { id: string; name: string };
 }
 
 export interface InstagramMedia {

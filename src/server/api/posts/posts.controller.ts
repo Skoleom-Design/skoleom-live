@@ -1,8 +1,9 @@
 import {
-  Controller, Get, Post, Delete, Body, Param, Query, Request, UseGuards,
+  Controller, Get, Post, Patch, Delete, Body, Param, Query, Request, UseGuards,
 } from '@nestjs/common';
 import { PostsService, CreatePostDto } from './posts.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { UserRole } from '../../../shared/types/entities';
 
 @Controller('posts')
@@ -20,9 +21,10 @@ export class PostsController {
     return this.postsService.getLikedByUser(req.user.id);
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
-  getById(@Param('id') id: string) {
-    return this.postsService.getById(id);
+  getById(@Param('id') id: string, @Request() req) {
+    return this.postsService.getById(id, req.user?.id);
   }
 
   @Get('creator/:creatorId')
@@ -51,6 +53,12 @@ export class PostsController {
   @Delete(':id')
   delete(@Param('id') id: string, @Request() req) {
     return this.postsService.delete(id, req.user.id, req.user.role === UserRole.ADMIN);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id')
+  update(@Param('id') id: string, @Request() req, @Body() body: { caption?: string; tags?: string[] }) {
+    return this.postsService.update(id, req.user.id, body);
   }
 
   @UseGuards(JwtAuthGuard)

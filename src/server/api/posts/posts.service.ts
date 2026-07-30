@@ -4,7 +4,8 @@ import { Repository } from 'typeorm';
 import { Post } from './post.entity';
 import { Comment } from './comment.entity';
 import { User } from '../users/user.entity';
-import { PostStatus, PostType } from '../../../shared/types/entities';
+import { NotificationsService } from '../notifications/notifications.service';
+import { PostStatus, PostType, NotificationType } from '../../../shared/types/entities';
 
 export interface CreatePostDto {
   caption?: string;
@@ -29,6 +30,7 @@ export class PostsService {
     private postsRepo: Repository<Post>,
     @InjectRepository(Comment)
     private commentsRepo: Repository<Comment>,
+    private notificationsService: NotificationsService,
   ) {}
 
   async getFeed(query: FeedQuery): Promise<{ posts: Post[]; total: number }> {
@@ -48,14 +50,19 @@ export class PostsService {
     return { posts, total };
   }
 
-  async getById(id: string): Promise<Post> {
+  async getById(id: string, viewerId?: string): Promise<Post> {
     const post = await this.postsRepo.findOne({
       where: { id },
       relations: ['creator', 'capsules', 'boosts'],
     });
     if (!post) throw new NotFoundException('Post not found');
 
-    await this.postsRepo.increment({ id }, 'viewCount', 1);
+    // Ne compte que les vues des AUTRES utilisateurs — un créateur qui consulte son propre post
+    // (ex: depuis son profil) ne doit pas gonfler ses propres statistiques.
+    if (viewerId !== post.creatorId) {
+      await this.postsRepo.increment({ id }, 'viewCount', 1);
+      post.viewCount += 1;
+    }
     return post;
   }
 
@@ -70,6 +77,13 @@ export class PostsService {
     });
     if (!post) throw new NotFoundException('Post not found');
     await this.postsRepo.update(id, { status: PostStatus.ARCHIVED });
+  }
+
+  async update(id: string, creatorId: string, updates: { caption?: string; tags?: string[] }): Promise<Post> {
+    const post = await this.postsRepo.findOne({ where: { id, creatorId } });
+    if (!post) throw new NotFoundException('Post not found');
+    await this.postsRepo.update(id, updates);
+    return this.postsRepo.findOne({ where: { id } }) as Promise<Post>;
   }
 
   async incrementBoostScore(postId: string, score: number): Promise<void> {
@@ -111,6 +125,7 @@ export class PostsService {
     } else {
       await relation.add(userId);
       post.likeCount += 1;
+      await this.notificationsService.notify(post.creatorId, userId, NotificationType.LIKE, postId);
     }
     await this.postsRepo.update(postId, { likeCount: post.likeCount });
     return { liked: !alreadyLiked, likeCount: post.likeCount };
@@ -127,6 +142,7 @@ export class PostsService {
       this.commentsRepo.create({ postId, userId, text: trimmed.slice(0, 1000) }),
     );
     await this.postsRepo.increment({ id: postId }, 'commentCount', 1);
+    await this.notificationsService.notify(post.creatorId, userId, NotificationType.COMMENT, postId);
 
     // save() ne recharge pas la relation eager "user" sur l'entité retournée — seul un
     // find/findOne le fait — donc on la recharge explicitement pour renvoyer un objet complet.

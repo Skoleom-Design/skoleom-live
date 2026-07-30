@@ -1,122 +1,85 @@
 import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
-import Link from 'next/link';
-import { Heart, Users, Send, Gift, Wallet, Plus, Gavel, Radio } from 'lucide-react';
+import { Heart, Users, Send, Gift, Wallet, Plus, Gavel, Timer } from 'lucide-react';
 import { AppSidebar } from '../client/components/Layout/Sidebar';
-import { CapsuleDrawer } from '../client/components/Capsule/CapsuleDrawer';
 import { api } from '../shared/api/http';
-import type { Capsule } from '../shared/types/api';
 
-interface RealLive {
-  id: string;
-  title?: string;
-  mode: 'live' | 'auction';
-  creator: { username: string };
+/* ── Auctions config ────────────────────────────────────────── */
+interface AuctionItem {
+  name: string;
+  description: string;
+  imageUrl: string;
 }
 
-/* ── Lives config ───────────────────────────────────────────── */
-interface LiveConfig {
+interface AuctionConfig {
   videoId: string;
   creator: string;
   avatar: string;
   title: string;
   viewers: number;
-  capsules: Capsule[];
+  item: AuctionItem;
+  startingBid: number;
+  endsInSeconds: number;
   pool: { user: string; text: string }[];
 }
 
-const LIVES: LiveConfig[] = [
+const AUCTIONS: AuctionConfig[] = [
   {
     videoId: 'yZO80uBK45w',
     creator: 'skoleom_official',
     avatar: 'S',
-    title: 'Drop exclusif — collection capsule',
-    viewers: 3247,
-    capsules: [
-      {
-        id: 'lc1',
-        name: 'Hoodie Skoleom Premium',
-        description: 'Hoodie oversize, coton bio 300g, logo brodé.',
-        price: 69.90,
-        currency: 'EUR',
-        imageUrl: 'https://images.unsplash.com/photo-1556821840-3a63f15732ce?w=300&h=300&fit=crop',
-        images: [],
-        stock: 15,
-        soldCount: 23,
-        commissionRate: 0.15,
-        status: 'available',
-        variants: [{ name: 'Taille', options: ['XS', 'S', 'M', 'L', 'XL', 'XXL'] }],
-      },
-      {
-        id: 'lc2',
-        name: 'Tee-shirt Logo Brodé',
-        description: 'Coton peigné, coupe droite.',
-        price: 34.90,
-        currency: 'EUR',
-        imageUrl: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=300&h=300&fit=crop',
-        images: [],
-        stock: 42,
-        soldCount: 67,
-        commissionRate: 0.15,
-        status: 'available',
-        variants: [{ name: 'Taille', options: ['XS', 'S', 'M', 'L', 'XL'] }],
-      },
-    ],
+    title: 'Enchère live — pièce unique signée',
+    viewers: 2140,
+    item: {
+      name: 'Hoodie Skoleom Édition Limitée',
+      description: 'Pièce unique signée par le créateur, numérotée 1/1.',
+      imageUrl: 'https://images.unsplash.com/photo-1556821840-3a63f15732ce?w=300&h=300&fit=crop',
+    },
+    startingBid: 40,
+    endsInSeconds: 240,
     pool: [
-      { user: 'marie_92',   text: 'Trop bien ce live !!!' },
-      { user: 'karim.hmd',  text: "La capsule c'est quoi ?" },
-      { user: 'sophiaglow', text: "J'adore 😍" },
-      { user: 'julien_b',   text: 'On peut acheter depuis le live ?' },
-      { user: 'leabylena',  text: 'Clique sur Capsule en bas à droite !' },
-      { user: 'thomas_r',   text: 'Je suis depuis Paris 🗼' },
-      { user: 'amina.s',    text: 'La qualité est ouf 🔥' },
-      { user: 'maxime77',   text: "C'est dispo en quelle taille ?" },
-      { user: 'lola.fit',   text: 'Je veux le même 🙌' },
-      { user: 'rayan.k',    text: 'Prix top !' },
-      { user: 'noemie_l',   text: '❤️❤️❤️' },
-      { user: 'camille.d',  text: "Commandé hier, livré en 3 jours !" },
+      { user: 'marie_92',   text: "J'enchéris !!" },
+      { user: 'karim.hmd',  text: 'Ça monte vite 😅' },
+      { user: 'sophiaglow', text: 'Magnifique pièce 😍' },
+      { user: 'julien_b',   text: 'Combien de temps il reste ?' },
+      { user: 'leabylena',  text: 'Clique sur Enchérir en bas à droite !' },
+      { user: 'thomas_r',   text: 'Je monte à 55€' },
+      { user: 'amina.s',    text: 'Cette qualité 🔥' },
+      { user: 'maxime77',   text: 'Numérotée en plus, ça vaut le coup' },
+      { user: 'lola.fit',   text: 'Je veux la même 🙌' },
+      { user: 'rayan.k',    text: 'Allez encore un effort !' },
     ],
   },
   {
     videoId: 'R6Jm7RrTFBc',
     creator: 'stylebylea',
     avatar: 'L',
-    title: 'Nouvelle collection été ☀️',
-    viewers: 1893,
-    capsules: [
-      {
-        id: 'lc3',
-        name: 'Robe Ibiza Lin',
-        description: 'Légère et colorée, parfaite pour l\'été. Tissu 100% lin.',
-        price: 89.90,
-        currency: 'EUR',
-        imageUrl: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=300&h=300&fit=crop',
-        images: [],
-        stock: 12,
-        soldCount: 5,
-        commissionRate: 0.15,
-        status: 'available',
-        variants: [{ name: 'Taille', options: ['XS', 'S', 'M', 'L'] }],
-      },
-    ],
+    title: 'Enchère flash — collection capsule',
+    viewers: 1320,
+    item: {
+      name: 'Robe Ibiza Lin — prototype',
+      description: 'Prototype exclusif jamais mis en vente, taille M.',
+      imageUrl: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=300&h=300&fit=crop',
+    },
+    startingBid: 60,
+    endsInSeconds: 150,
     pool: [
-      { user: 'ines_b',     text: 'Livraison combien de jours ?' },
-      { user: 'djibril09',  text: 'Skoleom est trop bien' },
-      { user: 'alexis_77',  text: '🔥🔥🔥' },
-      { user: 'yasmine.b',  text: "Trop belle cette robe !" },
-      { user: 'lucas_off',  text: 'Le son est parfait' },
-      { user: 'sarah.mk',   text: "J'arrive juste, c'est quoi le produit ?" },
-      { user: 'benoit_r',   text: "Earn It c'est trop fort comme concept" },
+      { user: 'ines_b',     text: "C'est un prototype unique ?" },
+      { user: 'djibril09',  text: 'Enchère intense là 🔥' },
+      { user: 'alexis_77',  text: 'Je monte !' },
+      { user: 'yasmine.b',  text: 'Trop belle cette robe !' },
+      { user: 'lucas_off',  text: 'Bonne chance à tous 😄' },
+      { user: 'sarah.mk',   text: "J'arrive, combien la mise actuelle ?" },
+      { user: 'benoit_r',   text: 'Le concept enchère est top' },
       { user: 'elodie.c',   text: 'La couleur est magnifique 😍' },
-      { user: 'hugo_r',     text: "Je commande pour ma copine 🎁" },
-      { user: 'clara.b',    text: 'En stock le XS ?' },
     ],
   },
 ];
 
 const COLORS = ['#0066FF', '#22c55e', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f97316'];
+const BID_STEPS = [5, 10, 20];
 
-/* ── Virtual gifts ──────────────────────────────────────────── */
+/* ── Virtual gifts (identique à /live) ─────────────────────── */
 interface GiftDef {
   id: string;
   emoji: string;
@@ -151,23 +114,36 @@ interface Comment {
   color: string;
   isGift?: boolean;
   giftEmoji?: string;
+  isBid?: boolean;
+}
+
+function fmtCountdown(seconds: number): string {
+  const m = Math.floor(seconds / 60).toString().padStart(2, '0');
+  const s = Math.floor(seconds % 60).toString().padStart(2, '0');
+  return `${m}:${s}`;
 }
 
 /* ── Chat panel ─────────────────────────────────────────────── */
 type ChatTab = 'chat' | 'gifts';
 
-function ChatPanel({ live, viewers }: { live: LiveConfig; viewers: number }) {
+function ChatPanel({
+  auction,
+  viewers,
+  comments,
+  setComments,
+}: {
+  auction: AuctionConfig;
+  viewers: number;
+  comments: Comment[];
+  setComments: React.Dispatch<React.SetStateAction<Comment[]>>;
+}) {
   const [tab, setTab] = useState<ChatTab>('chat');
-  const [comments, setComments] = useState<Comment[]>(() =>
-    live.pool.slice(0, 5).map((c, i) => ({ ...c, id: i, color: COLORS[i % COLORS.length] })),
-  );
   const [inputVal, setInputVal] = useState('');
   const [coins, setCoins] = useState(0);
   const [sentGift, setSentGift] = useState<string | null>(null);
   const [showRecharge, setShowRecharge] = useState(false);
   const chatRef = useRef<HTMLDivElement>(null);
-  const idRef = useRef(50);
-  const poolIdx = useRef(5);
+  const idRef = useRef(9000);
 
   // Le solde de coins reflete le vrai wallet (walletBalance, 100 coins = 1€) — on le recharge
   // depuis le backend a l'ouverture pour qu'une recharge faite ailleurs (profil) soit visible ici.
@@ -178,30 +154,12 @@ function ChatPanel({ live, viewers }: { live: LiveConfig; viewers: number }) {
   }, []);
 
   useEffect(() => {
-    setComments(live.pool.slice(0, 5).map((c, i) => ({ ...c, id: i, color: COLORS[i % COLORS.length] })));
-    poolIdx.current = 5;
-    idRef.current = 50;
-  }, [live.videoId]);
-
-  useEffect(() => {
     if (chatRef.current) chatRef.current.scrollTop = chatRef.current.scrollHeight;
   }, [comments]);
 
-  useEffect(() => {
-    const iv = setInterval(() => {
-      const item = live.pool[poolIdx.current % live.pool.length];
-      poolIdx.current++;
-      setComments(prev => [
-        ...prev.slice(-40),
-        { ...item, id: idRef.current++, color: COLORS[idRef.current % COLORS.length] },
-      ]);
-    }, 1800);
-    return () => clearInterval(iv);
-  }, [live.videoId]);
-
   function send() {
     if (!inputVal.trim()) return;
-    setComments(prev => [...prev.slice(-40), { id: idRef.current++, user: 'moi', text: inputVal.trim(), color: '#a8ff35' }]);
+    setComments((prev) => [...prev.slice(-40), { id: idRef.current++, user: 'moi', text: inputVal.trim(), color: '#a8ff35' }]);
     setInputVal('');
   }
 
@@ -231,10 +189,10 @@ function ChatPanel({ live, viewers }: { live: LiveConfig; viewers: number }) {
     }
     setSentGift(gift.id);
     setTimeout(() => setSentGift(null), 1200);
-    setComments(prev => [...prev.slice(-40), {
+    setComments((prev) => [...prev.slice(-40), {
       id: idRef.current++,
       user: 'moi',
-      text: `a envoyé ${gift.emoji} ${gift.name} à ${live.creator}`,
+      text: `a envoyé ${gift.emoji} ${gift.name} à ${auction.creator}`,
       color: gift.color,
       isGift: true,
       giftEmoji: gift.emoji,
@@ -244,16 +202,14 @@ function ChatPanel({ live, viewers }: { live: LiveConfig; viewers: number }) {
 
   return (
     <div className="w-[300px] shrink-0 flex flex-col bg-[#0a0a0c] border-l border-white/[0.06]">
-      {/* Header */}
       <div className="flex items-center justify-between px-4 py-3.5 border-b border-white/[0.06] shrink-0">
         <div className="flex items-center gap-2">
           <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-          <span className="text-white text-[14px] font-bold">Live</span>
+          <span className="text-white text-[14px] font-bold">Enchère</span>
         </div>
         <span className="text-white/40 text-[12px]">{viewers.toLocaleString('fr-FR')} spectateurs</span>
       </div>
 
-      {/* Tabs */}
       <div className="flex shrink-0 border-b border-white/[0.06]">
         <button onClick={() => setTab('chat')}
           className={`flex-1 py-2.5 text-[13px] font-semibold transition-colors border-b-2 ${tab === 'chat' ? 'border-white text-white' : 'border-transparent text-white/35 hover:text-white/60'}`}>
@@ -266,14 +222,17 @@ function ChatPanel({ live, viewers }: { live: LiveConfig; viewers: number }) {
         </button>
       </div>
 
-      {/* ── CHAT TAB ── */}
       {tab === 'chat' && (
         <>
           <div ref={chatRef} className="flex-1 overflow-y-auto scrollbar-hide px-3 py-2 space-y-2.5">
-            {comments.map(c => (
-              <div key={c.id} className={`flex items-start gap-2 animate-fade-in ${c.isGift ? 'bg-white/[0.03] rounded-xl px-2 py-1.5' : ''}`}>
+            {comments.map((c) => (
+              <div key={c.id} className={`flex items-start gap-2 animate-fade-in ${c.isGift || c.isBid ? 'bg-white/[0.03] rounded-xl px-2 py-1.5' : ''}`}>
                 {c.isGift ? (
                   <span className="text-[20px] leading-none shrink-0 mt-0.5">{c.giftEmoji}</span>
+                ) : c.isBid ? (
+                  <span className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 bg-[#a8ff35]/15">
+                    <Gavel size={12} className="text-[#a8ff35]" />
+                  </span>
                 ) : (
                   <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 mt-0.5" style={{ backgroundColor: c.color }}>
                     {c.user[0].toUpperCase()}
@@ -281,7 +240,7 @@ function ChatPanel({ live, viewers }: { live: LiveConfig; viewers: number }) {
                 )}
                 <div className="min-w-0">
                   <span className="text-[12px] font-semibold mr-1" style={{ color: c.color }}>{c.user}</span>
-                  <span className={`text-[13px] leading-snug break-words ${c.isGift ? 'font-semibold' : 'text-white/80'}`} style={c.isGift ? { color: c.color } : undefined}>{c.text}</span>
+                  <span className={`text-[13px] leading-snug break-words ${c.isGift || c.isBid ? 'font-semibold' : 'text-white/80'}`} style={c.isGift || c.isBid ? { color: c.color } : undefined}>{c.text}</span>
                 </div>
               </div>
             ))}
@@ -289,8 +248,8 @@ function ChatPanel({ live, viewers }: { live: LiveConfig; viewers: number }) {
           <div className="px-3 py-3 border-t border-white/[0.06] shrink-0">
             <div className="flex items-center gap-2 bg-white/[0.06] border border-white/[0.08] rounded-full px-3 py-2">
               <input type="text" placeholder="Commenter…" value={inputVal}
-                onChange={e => setInputVal(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && send()}
+                onChange={(e) => setInputVal(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && send()}
                 className="flex-1 bg-transparent text-white text-[13px] placeholder-white/30 outline-none"
               />
               <button onClick={send} className="text-[#a8ff35] hover:text-[#c3ff70] transition-colors shrink-0">
@@ -301,10 +260,8 @@ function ChatPanel({ live, viewers }: { live: LiveConfig; viewers: number }) {
         </>
       )}
 
-      {/* ── GIFTS TAB ── */}
       {tab === 'gifts' && (
         <div className="flex flex-col flex-1 overflow-hidden">
-          {/* Coin balance */}
           <div className="px-4 py-3 border-b border-white/[0.06] shrink-0 flex items-center justify-between">
             <div className="flex items-center gap-2">
               <div className="w-7 h-7 rounded-full bg-[#f59e0b]/20 border border-[#f59e0b]/40 flex items-center justify-center">
@@ -315,19 +272,18 @@ function ChatPanel({ live, viewers }: { live: LiveConfig; viewers: number }) {
                 <p className="text-[10px] text-white/35 mt-0.5">≈ {(coins / 100).toFixed(2).replace('.', ',')} €</p>
               </div>
             </div>
-            <button onClick={() => setShowRecharge(r => !r)}
+            <button onClick={() => setShowRecharge((r) => !r)}
               className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#f59e0b]/15 border border-[#f59e0b]/35 text-[#f59e0b] text-[12px] font-bold hover:bg-[#f59e0b]/25 transition-colors">
               <Plus size={12} />
               Recharger
             </button>
           </div>
 
-          {/* Recharge packs (toggle) */}
           {showRecharge && (
             <div className="px-3 py-3 border-b border-white/[0.06] shrink-0 bg-[#f59e0b]/04">
               <p className="text-[11px] font-bold text-[#f59e0b] uppercase tracking-wide mb-2">Packs de coins</p>
               <div className="grid grid-cols-2 gap-1.5">
-                {COIN_PACKS.map(pack => (
+                {COIN_PACKS.map((pack) => (
                   <button key={pack.coins} onClick={() => buyPack(pack)}
                     className="flex items-center justify-between px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-xl hover:border-[#f59e0b]/50 hover:bg-[#f59e0b]/08 transition-all">
                     <span className="text-[13px] font-bold text-white">{pack.coins} 🪙</span>
@@ -338,15 +294,13 @@ function ChatPanel({ live, viewers }: { live: LiveConfig; viewers: number }) {
             </div>
           )}
 
-          {/* Info */}
           <div className="px-4 py-2 shrink-0">
-            <p className="text-[11px] text-white/35">Envoie un cadeau à <span className="text-white/60 font-semibold">{live.creator}</span> — il recevra 50% de la valeur.</p>
+            <p className="text-[11px] text-white/35">Envoie un cadeau à <span className="text-white/60 font-semibold">{auction.creator}</span> — il recevra 50% de la valeur.</p>
           </div>
 
-          {/* Gift grid */}
           <div className="flex-1 overflow-y-auto scrollbar-hide px-3 pb-3">
             <div className="grid grid-cols-2 gap-2">
-              {GIFTS.map(gift => {
+              {GIFTS.map((gift) => {
                 const canAfford = coins >= gift.coins;
                 const wasSent = sentGift === gift.id;
                 return (
@@ -374,8 +328,7 @@ function ChatPanel({ live, viewers }: { live: LiveConfig; viewers: number }) {
             </div>
           </div>
 
-          {/* Not enough coins */}
-          {coins < Math.min(...GIFTS.map(g => g.coins)) && (
+          {coins < Math.min(...GIFTS.map((g) => g.coins)) && (
             <div className="px-4 py-3 border-t border-white/[0.06] shrink-0 text-center">
               <p className="text-[12px] text-white/40">Solde insuffisant — recharge des coins pour envoyer un cadeau.</p>
             </div>
@@ -386,13 +339,108 @@ function ChatPanel({ live, viewers }: { live: LiveConfig; viewers: number }) {
   );
 }
 
-/* ── Single live card ───────────────────────────────────────── */
-function LiveCard({ live, onVisible }: { live: LiveConfig; onVisible: () => void }) {
+/* ── Bid drawer ─────────────────────────────────────────────── */
+function BidDrawer({
+  auction,
+  currentBid,
+  ended,
+  onClose,
+  onBid,
+}: {
+  auction: AuctionConfig;
+  currentBid: number;
+  ended: boolean;
+  onClose: () => void;
+  onBid: (amount: number) => void;
+}) {
+  const [custom, setCustom] = useState('');
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/70 backdrop-blur-sm">
+      <div className="w-full max-w-md bg-[#0d0d0f] border-t border-x border-white/[0.08] rounded-t-[24px] p-5">
+        <div className="flex justify-center mb-3">
+          <div className="w-10 h-1 rounded-full bg-white/20" />
+        </div>
+        <div className="flex items-center gap-3 mb-4">
+          <div className="w-14 h-14 rounded-xl bg-white/5 overflow-hidden shrink-0">
+            <img src={auction.item.imageUrl} alt={auction.item.name} className="w-full h-full object-cover" />
+          </div>
+          <div className="min-w-0">
+            <p className="text-white font-semibold text-sm truncate">{auction.item.name}</p>
+            <p className="text-white/40 text-xs truncate">{auction.item.description}</p>
+          </div>
+        </div>
+
+        <div className="bg-white/[0.04] border border-white/[0.08] rounded-2xl p-4 mb-4 text-center">
+          <p className="text-[11px] text-white/40 uppercase tracking-wider mb-1">Mise actuelle</p>
+          <p className="text-[32px] font-extrabold text-[#a8ff35]">{currentBid.toFixed(2)} €</p>
+        </div>
+
+        {ended ? (
+          <p className="text-center text-white/50 text-sm py-2 mb-2">Enchère terminée.</p>
+        ) : (
+          <>
+            <div className="grid grid-cols-3 gap-2 mb-3">
+              {BID_STEPS.map((step) => (
+                <button
+                  key={step}
+                  onClick={() => onBid(currentBid + step)}
+                  className="py-3 rounded-xl bg-white/[0.06] border border-white/10 text-white font-semibold text-sm hover:bg-[#a8ff35]/15 hover:border-[#a8ff35]/40 hover:text-[#a8ff35] transition-all"
+                >
+                  +{step}€
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2 mb-4">
+              <input
+                type="number"
+                min={currentBid + 1}
+                placeholder={`Montant libre (min ${(currentBid + 1).toFixed(0)}€)`}
+                value={custom}
+                onChange={(e) => setCustom(e.target.value)}
+                className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/25 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+              />
+              <button
+                onClick={() => {
+                  const amount = parseFloat(custom);
+                  if (amount && amount > currentBid) { onBid(amount); setCustom(''); }
+                }}
+                disabled={!custom || parseFloat(custom) <= currentBid}
+                className="btn-skoleom px-5 rounded-xl text-sm font-bold disabled:opacity-40"
+              >
+                Enchérir
+              </button>
+            </div>
+          </>
+        )}
+
+        <button onClick={onClose} className="w-full py-3 rounded-full border border-white/10 text-white/60 text-sm font-semibold hover:bg-white/10 hover:text-white transition-all">
+          Fermer
+        </button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Single auction card ────────────────────────────────────── */
+function AuctionCard({
+  auction,
+  onVisible,
+  setComments,
+}: {
+  auction: AuctionConfig;
+  onVisible: () => void;
+  setComments: React.Dispatch<React.SetStateAction<Comment[]>>;
+}) {
   const [liked, setLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(Math.floor(live.viewers * 0.56));
-  const [capsuleOpen, setCapsuleOpen] = useState(false);
-  const [viewers, setViewers] = useState(live.viewers);
+  const [likeCount, setLikeCount] = useState(Math.floor(auction.viewers * 0.4));
+  const [bidOpen, setBidOpen] = useState(false);
+  const [viewers, setViewers] = useState(auction.viewers);
+  const [currentBid, setCurrentBid] = useState(auction.startingBid);
+  const [highestBidder, setHighestBidder] = useState<string | null>(null);
+  const [secondsLeft, setSecondsLeft] = useState(auction.endsInSeconds);
   const cardRef = useRef<HTMLDivElement>(null);
+  const idRef = useRef(1);
 
   useEffect(() => {
     const el = cardRef.current;
@@ -403,26 +451,43 @@ function LiveCard({ live, onVisible }: { live: LiveConfig; onVisible: () => void
   }, [onVisible]);
 
   useEffect(() => {
-    const iv = setInterval(() => setViewers(v => v + Math.floor(Math.random() * 6 - 2)), 3000);
+    const iv = setInterval(() => setViewers((v) => v + Math.floor(Math.random() * 6 - 2)), 3000);
     return () => clearInterval(iv);
   }, []);
+
+  useEffect(() => {
+    if (secondsLeft <= 0) return;
+    const iv = setInterval(() => setSecondsLeft((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(iv);
+  }, [secondsLeft > 0]);
+
+  const ended = secondsLeft <= 0;
+
+  function placeBid(amount: number) {
+    setCurrentBid(amount);
+    setHighestBidder('moi');
+    setComments((prev) => [...prev.slice(-40), {
+      id: idRef.current++ + 8000,
+      user: 'moi',
+      text: `a enchéri à ${amount.toFixed(0)}€ sur ${auction.item.name}`,
+      color: '#a8ff35',
+      isBid: true,
+    }]);
+    setBidOpen(false);
+  }
 
   return (
     <div ref={cardRef} className="h-full w-full shrink-0 flex items-center justify-center bg-[#060608] snap-start">
       <div className="relative h-full overflow-hidden" style={{ aspectRatio: '9/16', maxHeight: '100%' }}>
-
-        {/* YouTube iframe */}
         <iframe
-          src={`https://www.youtube.com/embed/${live.videoId}?autoplay=1&mute=1&loop=1&playlist=${live.videoId}&controls=0&playsinline=1&rel=0&modestbranding=1&iv_load_policy=3&fs=0&disablekb=1`}
+          src={`https://www.youtube.com/embed/${auction.videoId}?autoplay=1&mute=1&loop=1&playlist=${auction.videoId}&controls=0&playsinline=1&rel=0&modestbranding=1&iv_load_policy=3&fs=0&disablekb=1`}
           allow="autoplay; encrypted-media"
           className="w-full h-full border-0"
-          title={live.title}
+          title={auction.title}
         />
 
-        {/* Transparent overlay — blocks YouTube hover controls */}
         <div className="absolute inset-0 z-10" style={{ background: 'transparent' }} />
 
-        {/* Top bar */}
         <div className="absolute top-0 left-0 right-0 z-20 flex items-center justify-between px-3 pt-3 pb-10 bg-gradient-to-b from-black/70 to-transparent pointer-events-none">
           <div className="flex items-center gap-2">
             <span className="flex items-center gap-1.5 bg-red-600 text-white text-[11px] font-extrabold px-2.5 py-1 rounded-full tracking-wide shadow-lg">
@@ -431,9 +496,9 @@ function LiveCard({ live, onVisible }: { live: LiveConfig; onVisible: () => void
             </span>
             <div className="flex items-center gap-1.5 bg-black/50 backdrop-blur-sm rounded-full px-2.5 py-1">
               <div className="w-5 h-5 rounded-full bg-[#a8ff35] flex items-center justify-center text-[9px] font-bold text-black shrink-0">
-                {live.avatar}
+                {auction.avatar}
               </div>
-              <span className="text-white text-[12px] font-semibold">{live.creator}</span>
+              <span className="text-white text-[12px] font-semibold">{auction.creator}</span>
             </div>
           </div>
           <div className="flex items-center gap-1 bg-black/50 backdrop-blur-sm rounded-full px-2.5 py-1">
@@ -442,10 +507,21 @@ function LiveCard({ live, onVisible }: { live: LiveConfig; onVisible: () => void
           </div>
         </div>
 
-        {/* Right actions */}
+        {/* Bandeau enchère : mise actuelle + compte à rebours */}
+        <div className="absolute top-16 left-3 right-3 z-20 flex items-center justify-between bg-black/55 backdrop-blur-sm rounded-2xl px-3.5 py-2.5 pointer-events-none">
+          <div>
+            <p className="text-white/50 text-[10px] uppercase tracking-wider">Mise actuelle</p>
+            <p className="text-[#a8ff35] font-extrabold text-[17px] leading-none">{currentBid.toFixed(2)} €</p>
+          </div>
+          <div className={`flex items-center gap-1.5 text-[13px] font-bold ${ended ? 'text-white/40' : secondsLeft < 30 ? 'text-red-400' : 'text-white'}`}>
+            <Timer size={14} />
+            {ended ? 'Terminée' : fmtCountdown(secondsLeft)}
+          </div>
+        </div>
+
         <div className="absolute bottom-6 right-3 z-20 flex flex-col items-center gap-4 pointer-events-auto">
           <button
-            onClick={() => { setLiked(l => !l); setLikeCount(n => n + (liked ? -1 : 1)); }}
+            onClick={() => { setLiked((l) => !l); setLikeCount((n) => n + (liked ? -1 : 1)); }}
             className="flex flex-col items-center gap-1"
           >
             <div className={`w-11 h-11 rounded-full bg-black/50 backdrop-blur-sm flex items-center justify-center transition-all ${liked ? 'scale-110' : ''}`}>
@@ -454,67 +530,98 @@ function LiveCard({ live, onVisible }: { live: LiveConfig; onVisible: () => void
             <span className="text-white text-[11px] font-semibold drop-shadow">{likeCount.toLocaleString('fr-FR')}</span>
           </button>
 
-          <button onClick={() => setCapsuleOpen(true)} className="skoleom-capsule-btn skoleom-capsule-btn--breathe">
-            <img src="/skoleom-mark.png" alt="Skoleom" className="skoleom-capsule-btn-logo" />
-            <span>Capsule</span>
+          <button
+            onClick={() => setBidOpen(true)}
+            disabled={ended}
+            className="skoleom-capsule-btn skoleom-capsule-btn--breathe disabled:opacity-50"
+          >
+            <Gavel size={15} />
+            <span>{ended ? 'Terminée' : 'Enchérir'}</span>
           </button>
         </div>
 
-        {/* Caption */}
         <div className="absolute bottom-6 left-3 right-16 z-20 pointer-events-none">
-          <p className="text-white text-[13px] font-semibold drop-shadow-lg">{live.title}</p>
+          <p className="text-white text-[13px] font-semibold drop-shadow-lg">{auction.title}</p>
+          {highestBidder && (
+            <p className="text-white/50 text-[11px] mt-0.5">Plus offrant : {highestBidder}</p>
+          )}
         </div>
       </div>
 
-      <CapsuleDrawer capsules={live.capsules} open={capsuleOpen} onClose={() => setCapsuleOpen(false)} />
+      {bidOpen && (
+        <BidDrawer
+          auction={auction}
+          currentBid={currentBid}
+          ended={ended}
+          onClose={() => setBidOpen(false)}
+          onBid={placeBid}
+        />
+      )}
     </div>
   );
 }
 
-/* ── Live page ──────────────────────────────────────────────── */
-export default function LivePage() {
+/* ── Auction page ───────────────────────────────────────────── */
+export default function AuctionPage() {
   const [activeIdx, setActiveIdx] = useState(0);
-  const activeLive = LIVES[activeIdx];
-  const [realLives, setRealLives] = useState<RealLive[]>([]);
+  const [commentsByIdx, setCommentsByIdx] = useState<Record<number, Comment[]>>(() =>
+    Object.fromEntries(
+      AUCTIONS.map((a, i) => [i, a.pool.slice(0, 5).map((c, j) => ({ ...c, id: j, color: COLORS[j % COLORS.length] }))]),
+    ),
+  );
+  const activeAuction = AUCTIONS[activeIdx];
 
   useEffect(() => {
-    api.get<RealLive[]>('/lives/active').then(setRealLives).catch(() => {});
-  }, []);
+    const poolIdx: Record<number, number> = Object.fromEntries(AUCTIONS.map((_, i) => [i, 5]));
+    const idCounters: Record<number, number> = Object.fromEntries(AUCTIONS.map((_, i) => [i, 500]));
+    const iv = setInterval(() => {
+      const i = activeIdx;
+      const auction = AUCTIONS[i];
+      const item = auction.pool[poolIdx[i] % auction.pool.length];
+      poolIdx[i]++;
+      setCommentsByIdx((prev) => ({
+        ...prev,
+        [i]: [...(prev[i] || []).slice(-40), { ...item, id: idCounters[i]++, color: COLORS[idCounters[i] % COLORS.length] }],
+      }));
+    }, 1800);
+    return () => clearInterval(iv);
+  }, [activeIdx]);
 
   return (
     <>
-      <Head><title>skoleomLive — Live</title></Head>
+      <Head><title>skoleomLive — Enchère</title></Head>
       <div className="flex h-screen cosmic-bg overflow-hidden">
         <AppSidebar />
 
-        <main className="flex flex-1 overflow-hidden relative">
-          {realLives.length > 0 && (
-            <div className="absolute top-3 left-3 right-3 z-30 flex gap-2 overflow-x-auto scrollbar-hide pointer-events-none">
-              {realLives.map((rl) => (
-                <Link
-                  key={rl.id}
-                  href={`/live/${rl.id}`}
-                  className="pointer-events-auto shrink-0 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm border border-white/15 rounded-full pl-2 pr-3 py-1.5 text-[12px] font-semibold text-white hover:border-[#a8ff35]/50 transition-all"
-                >
-                  <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse shrink-0" />
-                  {rl.mode === 'auction' ? <Gavel size={12} className="text-[#a8ff35]" /> : <Radio size={12} className="text-[#a8ff35]" />}
-                  {rl.title || (rl.mode === 'auction' ? 'Enchère' : 'Live')} · @{rl.creator.username}
-                </Link>
-              ))}
-            </div>
-          )}
-
-          {/* Snap-scroll live videos */}
+        <main className="flex flex-1 overflow-hidden">
           <div className="flex-1 overflow-y-scroll scrollbar-hide snap-y snap-mandatory">
-            {LIVES.map((live, i) => (
-              <div key={live.videoId} className="h-full w-full snap-start">
-                <LiveCard live={live} onVisible={() => setActiveIdx(i)} />
+            {AUCTIONS.map((auction, i) => (
+              <div key={auction.videoId} className="h-full w-full snap-start">
+                <AuctionCard
+                  auction={auction}
+                  onVisible={() => setActiveIdx(i)}
+                  setComments={(update) =>
+                    setCommentsByIdx((prev) => ({
+                      ...prev,
+                      [i]: typeof update === 'function' ? (update as (p: Comment[]) => Comment[])(prev[i] || []) : update,
+                    }))
+                  }
+                />
               </div>
             ))}
           </div>
 
-          {/* Fixed chat — updates with active live */}
-          <ChatPanel live={activeLive} viewers={activeLive.viewers} />
+          <ChatPanel
+            auction={activeAuction}
+            viewers={activeAuction.viewers}
+            comments={commentsByIdx[activeIdx] || []}
+            setComments={(update) =>
+              setCommentsByIdx((prev) => ({
+                ...prev,
+                [activeIdx]: typeof update === 'function' ? (update as (p: Comment[]) => Comment[])(prev[activeIdx] || []) : update,
+              }))
+            }
+          />
         </main>
       </div>
     </>

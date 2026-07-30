@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Zap, Eye, Wallet, Users } from 'lucide-react';
+import { useRouter } from 'next/router';
+import { Zap, TrendingUp, Wallet } from 'lucide-react';
 import { api, ApiError } from '../../../shared/api/http';
 
 type Scope = 'post' | 'account';
@@ -10,12 +11,6 @@ interface Props {
   onClose: () => void;
 }
 
-const OBJECTIVES = [
-  { key: 'views', label: 'Vues', icon: Eye, desc: 'Maximise les vues sur ton contenu' },
-  { key: 'sales', label: 'Ventes', icon: Wallet, desc: 'Optimise pour les achats de capsules' },
-  { key: 'followers', label: 'Abonnés', icon: Users, desc: 'Augmente ton audience' },
-];
-
 const DURATIONS = [
   { days: 1, label: '1 jour' },
   { days: 3, label: '3 jours' },
@@ -24,24 +19,44 @@ const DURATIONS = [
 ];
 
 export function BoostModal({ post, open, onClose }: Props) {
+  const router = useRouter();
   const [scope, setScope] = useState<Scope>(post ? 'post' : 'account');
-  const [objective, setObjective] = useState('views');
   const [duration, setDuration] = useState(3);
   const [pricing, setPricing] = useState<Record<Scope, Record<number, number>> | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [walletBalance, setWalletBalance] = useState<number | null>(null);
 
   useEffect(() => {
     if (!open) return;
     setScope(post ? 'post' : 'account');
+    setConfirming(false);
     api.get<Record<Scope, Record<number, number>>>('/boosts/pricing')
       .then(setPricing)
       .catch(() => setError('Impossible de charger les tarifs.'));
+    // Solde a jour (pas celui en cache) pour savoir, avant meme de tenter le paiement, si on
+    // doit proposer "Confirmer" ou directement "Recharger mon wallet".
+    api.get<{ walletBalance: number }>('/auth/me')
+      .then((me) => setWalletBalance(Number(me.walletBalance)))
+      .catch(() => setWalletBalance(null));
   }, [open, post]);
+
+  // Un changement de portée/durée invalide la confirmation en cours — on ne veut pas
+  // confirmer un montant qui ne correspond plus a ce qui est affiche.
+  useEffect(() => {
+    setConfirming(false);
+  }, [scope, duration]);
 
   if (!open) return null;
 
   const price = pricing?.[scope]?.[duration];
+  const insufficientBalance = price != null && walletBalance != null && walletBalance < price;
+
+  function goToWallet() {
+    onClose();
+    router.push('/profile/me?tab=wallet');
+  }
 
   async function handleBoost() {
     setLoading(true);
@@ -50,12 +65,18 @@ export function BoostModal({ post, open, onClose }: Props) {
       const boost = await api.post('/boosts', {
         scope,
         postId: scope === 'post' ? post!.id : undefined,
-        objective,
         durationDays: duration,
       });
-      const { clientSecret } = await api.post('/payments/boost/intent', { boostId: boost.id });
-      window.location.href = `/checkout/boost/${boost.id}?client_secret=${clientSecret}`;
+      // Simule le paiement via le wallet (deja reel) — pas de Stripe, le boost s'active
+      // immediatement des que le solde est debite.
+      await api.post(`/payments/boost/${boost.id}/wallet-pay`, {});
+      onClose();
     } catch (e) {
+      if (e instanceof ApiError && e.message.includes('Solde insuffisant')) {
+        onClose();
+        router.push('/profile/me?tab=wallet');
+        return;
+      }
       setError(e instanceof ApiError ? e.message : 'Erreur lors de la création du boost');
     } finally {
       setLoading(false);
@@ -99,34 +120,6 @@ export function BoostModal({ post, open, onClose }: Props) {
           </div>
         )}
 
-        <div className="mb-5">
-          <p className="text-xs text-gray-400 uppercase tracking-wide mb-3">Objectif</p>
-          <div className="space-y-2">
-            {OBJECTIVES.map((obj) => {
-              const active = objective === obj.key;
-              return (
-                <button
-                  key={obj.key}
-                  onClick={() => setObjective(obj.key)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-colors ${
-                    active ? 'border-brand bg-brand/10' : 'border-white/10 hover:border-white/20'
-                  }`}
-                >
-                  <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
-                    active ? 'bg-brand/20' : 'bg-white/[0.06]'
-                  }`}>
-                    <obj.icon size={17} className={active ? 'text-brand' : 'text-gray-300'} />
-                  </div>
-                  <div>
-                    <p className="text-sm font-semibold text-white">{obj.label}</p>
-                    <p className="text-xs text-gray-400">{obj.desc}</p>
-                  </div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
         <div className="mb-6">
           <p className="text-xs text-gray-400 uppercase tracking-wide mb-3">Durée</p>
           <div className="grid grid-cols-2 gap-2">
@@ -151,13 +144,66 @@ export function BoostModal({ post, open, onClose }: Props) {
 
         {error && <p className="text-sm text-red-400 mb-3">{error}</p>}
 
-        <button
-          onClick={handleBoost}
-          disabled={loading || price == null}
-          className="w-full py-3.5 bg-brand hover:bg-brand-dark text-black font-semibold rounded-2xl transition-colors disabled:opacity-50"
-        >
-          {loading ? 'Traitement...' : price != null ? `Booster pour ${price.toFixed(2)} €` : 'Chargement…'}
-        </button>
+        {confirming ? (
+          <div className="text-center animate-fade-in">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#a8ff35]/25 to-[#22c55e]/10 border border-[#a8ff35]/30 flex items-center justify-center mx-auto mb-4 animate-pulse-glow">
+              <TrendingUp size={26} className="text-[#a8ff35]" />
+            </div>
+            <p className="text-white font-bold text-[17px] mb-1.5">
+              Tu es sur le point de booster tes ventes !
+            </p>
+            <p className="text-sm text-gray-400 leading-relaxed mb-5">
+              <strong className="text-white">{price?.toFixed(2)} €</strong> seront débités de ton wallet pour{' '}
+              <strong className="text-white">{DURATIONS.find((d) => d.days === duration)?.label}</strong> de mise en avant
+              {scope === 'post' ? ' sur ce post' : ' sur tout ton compte'}.
+            </p>
+
+            {insufficientBalance ? (
+              <div className="space-y-3">
+                <p className="text-xs text-red-400">
+                  Solde insuffisant — {walletBalance?.toFixed(2)} € disponible sur ton wallet.
+                </p>
+                <button
+                  onClick={goToWallet}
+                  className="w-full flex items-center justify-center gap-2 py-3.5 bg-brand hover:bg-brand-dark text-black font-bold rounded-2xl transition-colors"
+                >
+                  <Wallet size={16} /> Recharger mon wallet
+                </button>
+                <button
+                  onClick={() => setConfirming(false)}
+                  className="w-full py-2.5 text-gray-400 text-sm hover:text-white transition-colors"
+                >
+                  Annuler
+                </button>
+              </div>
+            ) : (
+              <div className="flex gap-2.5">
+                <button
+                  onClick={() => setConfirming(false)}
+                  disabled={loading}
+                  className="flex-1 py-3.5 text-gray-400 text-sm font-semibold hover:text-white transition-colors disabled:opacity-50"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={handleBoost}
+                  disabled={loading}
+                  className="flex-[2] py-3.5 bg-gradient-to-r from-[#a8ff35] to-[#6fe600] text-black font-bold rounded-2xl shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.97] transition-all disabled:opacity-50 disabled:shadow-none animate-pulse-glow"
+                >
+                  {loading ? 'Traitement...' : 'Oui, je fonce ! ⚡'}
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirming(true)}
+            disabled={price == null}
+            className="w-full py-3.5 bg-brand hover:bg-brand-dark text-black font-semibold rounded-2xl transition-colors disabled:opacity-50"
+          >
+            {price != null ? `Booster pour ${price.toFixed(2)} €` : 'Chargement…'}
+          </button>
+        )}
       </div>
     </div>
   );

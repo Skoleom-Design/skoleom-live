@@ -1,10 +1,12 @@
 import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
-  UpdateDateColumn, ManyToMany, OneToMany,
+  UpdateDateColumn, ManyToMany, ManyToOne, OneToMany, JoinColumn,
 } from 'typeorm';
 import { CapsuleStatus, CapsuleCondition, CapsuleCategory } from '../../../shared/types/entities';
 import { Post } from '../posts/post.entity';
 import { Order } from '../orders/order.entity';
+import { CapsuleGroup } from './capsule-group.entity';
+import { DecimalColumnTransformer } from '../../common/decimal.transformer';
 
 @Entity('capsules')
 export class Capsule {
@@ -14,10 +16,14 @@ export class Capsule {
   @Column()
   name: string;
 
+  // Optionnel — un article d'occasion ou fait main n'a souvent pas de marque.
+  @Column({ nullable: true })
+  brand: string;
+
   @Column({ type: 'text', nullable: true })
   description: string;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: 'decimal', precision: 10, scale: 2, transformer: DecimalColumnTransformer })
   price: number;
 
   @Column({ default: 'EUR' })
@@ -62,11 +68,21 @@ export class Capsule {
   @Column({ default: 0 })
   soldCount: number;
 
-  @Column({ type: 'decimal', precision: 5, scale: 2, default: 15 })
+  @Column({ type: 'decimal', precision: 5, scale: 2, default: 15, transformer: DecimalColumnTransformer })
   commissionRate: number;
 
   @ManyToMany(() => Post, (post) => post.capsules)
   posts: Post[];
+
+  // Regroupe plusieurs articles créés ensemble sous une même capsule nommée
+  // (ex: "Ma collection sneakers" contenant "Adidas" + "Nike"). Nullable pour
+  // ne pas casser les capsules existantes créées avant ce champ.
+  @Column({ nullable: true })
+  groupId: string;
+
+  @ManyToOne(() => CapsuleGroup, (group) => group.products, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'groupId' })
+  group: CapsuleGroup;
 
   @Column()
   creatorId: string;

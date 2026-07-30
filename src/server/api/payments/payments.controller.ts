@@ -1,5 +1,5 @@
 import {
-  Controller, Post, Body, Param, Headers, RawBodyRequest, Request as Req,
+  Controller, Post, Get, Body, Param, Headers, RawBodyRequest, Request as Req,
   UseGuards, BadRequestException,
 } from '@nestjs/common';
 import { Request } from 'express';
@@ -24,15 +24,9 @@ export class PaymentsController {
   }
 
   @UseGuards(JwtAuthGuard)
-  @Post('boost/intent')
-  createBoostIntent(@Req() req, @Body() body: { boostId: string }) {
-    return this.paymentsService.createBoostPaymentIntent(body.boostId, req.user.id);
-  }
-
-  @UseGuards(JwtAuthGuard)
-  @Post('boost/:id/confirm')
-  confirmBoostPayment(@Req() req, @Param('id') id: string) {
-    return this.paymentsService.confirmBoostPayment(id, req.user.id);
+  @Post('boost/:id/wallet-pay')
+  payBoostWithWallet(@Req() req, @Param('id') id: string) {
+    return this.paymentsService.payBoostWithWallet(req.user.id, id);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -44,13 +38,25 @@ export class PaymentsController {
   @UseGuards(JwtAuthGuard)
   @Post('wallet/topup')
   createWalletTopup(@Req() req, @Body() body: { amount: number }) {
-    return this.paymentsService.createWalletTopupIntent(req.user.id, body.amount);
+    return this.paymentsService.simulateWalletTopup(req.user.id, body.amount);
   }
 
   @UseGuards(JwtAuthGuard)
   @Post('wallet/withdraw')
   withdrawWallet(@Req() req, @Body() body: { amount: number }) {
     return this.paymentsService.withdrawFromWallet(req.user.id, body.amount);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Get('wallet/transactions')
+  getWalletTransactions(@Req() req) {
+    return this.paymentsService.getWalletTransactions(req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('capsule/wallet-pay')
+  payCapsuleWithWallet(@Req() req, @Body() body: { capsuleId: string; selectedVariant?: string }) {
+    return this.paymentsService.payCapsuleWithWallet(req.user.id, body.capsuleId, body.selectedVariant);
   }
 
   @Post('webhook')

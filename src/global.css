@@ -19,6 +19,17 @@
   #__next {
     height: 100%;
   }
+
+  /* Les <button> sans style de focus dédié héritent du contour natif du navigateur au clic —
+     un "cadre" bien visible et d'autant plus voyant que le bouton est grand (ex: like en plein
+     écran). On le supprime au clic tout en gardant un anneau propre pour la navigation clavier. */
+  button:focus {
+    outline: none;
+  }
+  button:focus-visible {
+    outline: 2px solid rgba(168, 255, 53, 0.6);
+    outline-offset: 2px;
+  }
 }
 
 /* ── Direction artistique Skoleom Universe ──────────────────────── */

@@ -1,13 +1,42 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, Repository } from 'typeorm';
+import { In, LessThanOrEqual, Repository } from 'typeorm';
+import { AccessToken } from 'livekit-server-sdk';
 import { LiveSession } from './live-session.entity';
 import { LiveComment } from './live-comment.entity';
 import { Gift } from './gift.entity';
+import { AuctionBid } from './auction-bid.entity';
 import { Capsule } from '../capsules/capsule.entity';
 import { Order } from '../orders/order.entity';
 import { User } from '../users/user.entity';
-import { LiveStatus, OrderStatus } from '../../../shared/types/entities';
+import { WalletTransaction } from '../payments/wallet-transaction.entity';
+import { PaymentsService } from '../payments/payments.service';
+import { LiveStatus, LiveMode, OrderStatus, WalletTransactionType, UserPlan } from '../../../shared/types/entities';
+
+// Nombre de manches d'enchère autorisées par live selon l'offre — même principe que les
+// limites de capsules par offre (voir CAPSULE_GROUP_COUNT_LIMITS dans capsules.service.ts).
+const AUCTION_ROUNDS_LIMIT: Record<UserPlan, number | null> = {
+  [UserPlan.FREE]: 2,
+  [UserPlan.PREMIUM]: 10,
+  [UserPlan.ULTRA]: null,
+};
+
+export interface LaunchAuctionRoundDto {
+  capsuleId: string;
+  startingBid: number;
+  durationSeconds: number;
+}
+
+export interface AuctionSettlement {
+  liveId: string;
+  winnerId: string | null;
+  amount: number | null;
+}
+
+// Si une mise arrive dans les 30 dernières secondes, l'enchère est prolongée de 30s — évite
+// le "sniping" (miser à la toute dernière seconde pour ne laisser aucune chance de surenchérir).
+const ANTI_SNIPE_WINDOW_MS = 30_000;
+const ANTI_SNIPE_EXTENSION_MS = 30_000;
 
 // Catalogue des cadeaux virtuels — doit rester aligné avec GIFTS dans src/pages/live.tsx.
 export const GIFT_CATALOG: Record<string, number> = {
@@ -36,6 +65,11 @@ export class LivesService {
     private ordersRepo: Repository<Order>,
     @InjectRepository(User)
     private usersRepo: Repository<User>,
+    @InjectRepository(WalletTransaction)
+    private walletTxRepo: Repository<WalletTransaction>,
+    @InjectRepository(AuctionBid)
+    private bidsRepo: Repository<AuctionBid>,
+    private paymentsService: PaymentsService,
   ) {}
 
   async start(creatorId: string, title?: string): Promise<LiveSession> {
@@ -46,18 +80,172 @@ export class LivesService {
       creatorId,
       title,
       status: LiveStatus.LIVE,
+      mode: LiveMode.LIVE,
       startedAt: new Date(),
     });
     return this.livesRepo.save(live);
+  }
+
+  async startAuction(creatorId: string, title?: string): Promise<LiveSession> {
+    const existing = await this.livesRepo.findOne({ where: { creatorId, status: LiveStatus.LIVE } });
+    if (existing) throw new BadRequestException('Un live est déjà en cours sur ce compte.');
+
+    const live = this.livesRepo.create({
+      creatorId,
+      title,
+      status: LiveStatus.LIVE,
+      mode: LiveMode.AUCTION,
+      startedAt: new Date(),
+      auctionActive: false,
+    });
+    return this.livesRepo.save(live);
+  }
+
+  // Lance une nouvelle manche d'enchere pour une capsule donnee, en plein direct. Peut etre
+  // appele plusieurs fois de suite sur le meme live (une manche par capsule presentee).
+  async launchCapsuleAuction(liveId: string, creatorId: string, dto: LaunchAuctionRoundDto): Promise<LiveSession> {
+    const live = await this.livesRepo.findOne({ where: { id: liveId, creatorId } });
+    if (!live) throw new NotFoundException('Live introuvable');
+    if (live.mode !== LiveMode.AUCTION) throw new BadRequestException("Ce live n'est pas en mode enchère.");
+    if (live.status !== LiveStatus.LIVE) throw new BadRequestException('Ce live est terminé.');
+    if (live.auctionActive) throw new BadRequestException('Une enchère est déjà en cours — attends qu\'elle se termine.');
+
+    const roundsLimit = AUCTION_ROUNDS_LIMIT[live.creator.plan];
+    if (roundsLimit !== null && live.auctionRoundsCount >= roundsLimit) {
+      throw new BadRequestException(
+        `Ton offre actuelle te donne droit à ${roundsLimit} manches d'enchère par live — passe à un palier supérieur pour en lancer davantage.`,
+      );
+    }
+
+    if (!dto.startingBid || dto.startingBid < 1) {
+      throw new BadRequestException("La mise de départ doit être d'au moins 1€.");
+    }
+    if (!dto.durationSeconds || dto.durationSeconds < 30) {
+      throw new BadRequestException("La durée de l'enchère est invalide.");
+    }
+
+    const capsule = await this.capsulesRepo.findOne({ where: { id: dto.capsuleId, creatorId } });
+    if (!capsule) throw new NotFoundException('Capsule introuvable');
+    if (capsule.stock <= 0) throw new BadRequestException('Cette capsule est épuisée.');
+
+    // .update() ecrit uniquement les colonnes fournies, sans passer par les relations eager
+    // (auctionCapsule/currentBidder) chargees sur `live` — sinon save() sur l'entite peut re-
+    // ecrire l'ancienne relation en memoire par-dessus les colonnes qu'on vient de modifier.
+    await this.livesRepo.update(liveId, {
+      auctionCapsuleId: dto.capsuleId,
+      startingBid: dto.startingBid,
+      currentBid: dto.startingBid,
+      currentBidderId: null as unknown as string,
+      auctionEndsAt: new Date(Date.now() + dto.durationSeconds * 1000),
+      auctionSettled: false,
+      auctionActive: true,
+      auctionRoundsCount: live.auctionRoundsCount + 1,
+    });
+    return (await this.livesRepo.findOne({ where: { id: liveId } }))!;
+  }
+
+  async placeBid(liveId: string, bidderId: string, amount: number): Promise<LiveSession> {
+    const live = await this.livesRepo.findOne({ where: { id: liveId } });
+    if (!live) throw new NotFoundException('Live introuvable');
+    if (live.mode !== LiveMode.AUCTION) throw new BadRequestException("Ce live n'est pas une enchère.");
+    if (!live.auctionActive || (live.auctionEndsAt && live.auctionEndsAt.getTime() <= Date.now())) {
+      throw new BadRequestException('Aucune enchère en cours pour le moment.');
+    }
+    if (live.creatorId === bidderId) {
+      throw new BadRequestException('Tu ne peux pas enchérir sur ta propre enchère.');
+    }
+    if (!amount || amount <= Number(live.currentBid)) {
+      throw new BadRequestException(`Ton enchère doit dépasser ${Number(live.currentBid).toFixed(2)}€.`);
+    }
+
+    const bidder = await this.usersRepo.findOne({ where: { id: bidderId } });
+    if (!bidder || Number(bidder.walletBalance) < amount) {
+      throw new BadRequestException('Solde insuffisant pour cette enchère — recharge ton wallet.');
+    }
+
+    let newEndsAt = live.auctionEndsAt;
+    if (newEndsAt && newEndsAt.getTime() - Date.now() < ANTI_SNIPE_WINDOW_MS) {
+      newEndsAt = new Date(Date.now() + ANTI_SNIPE_EXTENSION_MS);
+    }
+
+    // .update() plutot que save(live) — meme raison que dans launchCapsuleAuction : `live`
+    // porte encore la relation eager currentBidder de l'enchérisseur precedent, et save()
+    // risquerait de la reecrire par-dessus le nouveau currentBidderId qu'on vient de definir.
+    await this.livesRepo.update(liveId, {
+      currentBid: amount,
+      currentBidderId: bidderId,
+      auctionEndsAt: newEndsAt,
+    });
+    await this.bidsRepo.save(this.bidsRepo.create({ liveSessionId: liveId, bidderId, amount }));
+
+    return (await this.livesRepo.findOne({ where: { id: liveId } }))!;
+  }
+
+  async getBidHistory(liveId: string): Promise<AuctionBid[]> {
+    return this.bidsRepo.find({
+      where: { liveSessionId: liveId },
+      order: { createdAt: 'DESC' },
+      take: 50,
+    });
+  }
+
+  // Reglement d'une manche d'enchere : cree la commande gagnante (debit/credit wallet via le
+  // meme chemin qu'un achat de capsule classique) si quelqu'un a enchéri, sinon cloture sans
+  // vente. Ne termine PAS le live — une autre manche peut suivre sur une autre capsule.
+  async settleAuction(liveId: string): Promise<AuctionSettlement> {
+    const live = await this.livesRepo.findOne({ where: { id: liveId } });
+    if (!live || !live.auctionActive || live.auctionSettled) {
+      return { liveId, winnerId: null, amount: null };
+    }
+
+    live.auctionSettled = true;
+    live.auctionActive = false;
+
+    let winnerId: string | null = null;
+    let amount: number | null = null;
+
+    if (live.currentBidderId && live.auctionCapsuleId && live.currentBid) {
+      try {
+        await this.paymentsService.settleAuctionSale(live.currentBidderId, live.auctionCapsuleId, Number(live.currentBid));
+        winnerId = live.currentBidderId;
+        amount = Number(live.currentBid);
+      } catch {
+        // Le solde du gagnant a pu changer entre-temps (ex: dépensé ailleurs) — l'enchère se
+        // clôture quand même sans vente plutôt que de rester bloquée indéfiniment.
+      }
+    }
+
+    await this.livesRepo.save(live);
+    return { liveId, winnerId, amount };
+  }
+
+  async settleExpiredAuctions(): Promise<AuctionSettlement[]> {
+    const expired = await this.livesRepo.find({
+      where: {
+        mode: LiveMode.AUCTION,
+        status: LiveStatus.LIVE,
+        auctionActive: true,
+        auctionEndsAt: LessThanOrEqual(new Date()),
+      },
+    });
+
+    const results: AuctionSettlement[] = [];
+    for (const live of expired) {
+      results.push(await this.settleAuction(live.id));
+    }
+    return results;
   }
 
   async end(id: string, creatorId: string): Promise<LiveSession> {
     const live = await this.livesRepo.findOne({ where: { id, creatorId } });
     if (!live) throw new NotFoundException('Live introuvable');
 
-    live.status = LiveStatus.ENDED;
-    live.endedAt = new Date();
-    return this.livesRepo.save(live);
+    if (live.mode === LiveMode.AUCTION && live.auctionActive) {
+      await this.settleAuction(id);
+    }
+
+    await this.livesRepo.update(id, { status: LiveStatus.ENDED, endedAt: new Date() });
+    return (await this.livesRepo.findOne({ where: { id } }))!;
   }
 
   async getActive(): Promise<LiveSession[]> {
@@ -168,7 +356,7 @@ export class LivesService {
     await this.usersRepo.increment({ id: live.creatorId }, 'walletBalance', creatorAmount);
     await this.usersRepo.increment({ id: live.creatorId }, 'totalEarnings', creatorAmount);
 
-    await this.giftsRepo.save(this.giftsRepo.create({
+    const gift = await this.giftsRepo.save(this.giftsRepo.create({
       giftType,
       senderId,
       receiverId: live.creatorId,
@@ -178,7 +366,84 @@ export class LivesService {
       platformAmount,
     }));
 
+    await this.walletTxRepo.save(this.walletTxRepo.create({
+      userId: senderId,
+      type: WalletTransactionType.GIFT_SENT,
+      amount: -amount,
+      description: `Cadeau envoyé (${giftType})`,
+      reference: gift.id,
+    }));
+    await this.walletTxRepo.save(this.walletTxRepo.create({
+      userId: live.creatorId,
+      type: WalletTransactionType.GIFT_RECEIVED,
+      amount: creatorAmount,
+      description: `Cadeau reçu (${giftType})`,
+      reference: gift.id,
+    }));
+
     const updated = await this.usersRepo.findOne({ where: { id: senderId } });
     return { walletBalance: Number(updated!.walletBalance) };
+  }
+
+  // Utilise par les pages vitrine /live et /enchere : des createurs fictifs (videos de demo),
+  // donc pas de vrai destinataire a créditer — le solde de l'envoyeur est reellement débité
+  // (coherent avec le reste du wallet, deja reel) mais l'integralite part en platformAmount.
+  async sendDemoGift(senderId: string, giftType: string): Promise<{ walletBalance: number }> {
+    const amount = GIFT_CATALOG[giftType];
+    if (!amount) throw new BadRequestException('Cadeau inconnu');
+
+    const sender = await this.usersRepo.findOne({ where: { id: senderId } });
+    if (!sender || Number(sender.walletBalance) < amount) {
+      throw new BadRequestException('Solde insuffisant');
+    }
+
+    await this.usersRepo.decrement({ id: senderId }, 'walletBalance', amount);
+
+    const gift = await this.giftsRepo.save(this.giftsRepo.create({
+      giftType,
+      senderId,
+      receiverId: null,
+      liveSessionId: null,
+      amount,
+      creatorAmount: 0,
+      platformAmount: amount,
+    }));
+
+    await this.walletTxRepo.save(this.walletTxRepo.create({
+      userId: senderId,
+      type: WalletTransactionType.GIFT_SENT,
+      amount: -amount,
+      description: `Cadeau envoyé (${giftType})`,
+      reference: gift.id,
+    }));
+
+    const updated = await this.usersRepo.findOne({ where: { id: senderId } });
+    return { walletBalance: Number(updated!.walletBalance) };
+  }
+
+  // Jeton d'acces LiveKit pour la room video de ce live — une room par liveId. Le createur peut
+  // publier (camera/micro), les spectateurs ne peuvent que recevoir le flux (canPublish: false).
+  async getLiveKitToken(liveId: string, userId: string): Promise<{ token: string; url: string }> {
+    const apiKey = process.env.LIVEKIT_API_KEY;
+    const apiSecret = process.env.LIVEKIT_API_SECRET;
+    const url = process.env.LIVEKIT_URL || process.env.NEXT_PUBLIC_LIVEKIT_URL;
+    if (!apiKey || !apiSecret || !url) {
+      throw new BadRequestException("La diffusion video en direct n'est pas configurée sur ce serveur.");
+    }
+
+    const live = await this.livesRepo.findOne({ where: { id: liveId } });
+    if (!live) throw new NotFoundException('Live introuvable');
+
+    const isPublisher = live.creatorId === userId;
+    const at = new AccessToken(apiKey, apiSecret, { identity: userId });
+    at.addGrant({
+      roomJoin: true,
+      room: liveId,
+      canPublish: isPublisher,
+      canSubscribe: true,
+      canPublishData: false,
+    });
+
+    return { token: await at.toJwt(), url };
   }
 }

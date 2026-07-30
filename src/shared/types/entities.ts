@@ -49,6 +49,18 @@ export enum OrderStatus {
   REFUNDED = 'refunded',
 }
 
+export enum WalletTransactionType {
+  TOPUP = 'topup',
+  WITHDRAWAL = 'withdrawal',
+  CAPSULE_PURCHASE = 'capsule_purchase',
+  CAPSULE_SALE_PENDING = 'capsule_sale_pending',
+  CAPSULE_SALE_RELEASED = 'capsule_sale_released',
+  GIFT_SENT = 'gift_sent',
+  GIFT_RECEIVED = 'gift_received',
+  ADMIN_CREDIT = 'admin_credit',
+  BOOST_PURCHASE = 'boost_purchase',
+}
+
 export enum BoostStatus {
   PENDING = 'pending',
   ACTIVE = 'active',
@@ -70,4 +82,14 @@ export enum BoostScope {
 export enum LiveStatus {
   LIVE = 'live',
   ENDED = 'ended',
+}
+
+export enum LiveMode {
+  LIVE = 'live',
+  AUCTION = 'auction',
+}
+
+export enum NotificationType {
+  LIKE = 'like',
+  COMMENT = 'comment',
 }

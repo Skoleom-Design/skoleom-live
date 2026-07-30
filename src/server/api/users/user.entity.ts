@@ -6,6 +6,7 @@ import { UserRole, UserPlan } from '../../../shared/types/entities';
 import { Post } from '../posts/post.entity';
 import { Order } from '../orders/order.entity';
 import { Boost } from '../boosts/boost.entity';
+import { DecimalColumnTransformer } from '../../common/decimal.transformer';
 
 @Entity('users')
 export class User {
@@ -44,11 +45,16 @@ export class User {
   @Column({ default: true })
   isActive: boolean;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0, transformer: DecimalColumnTransformer })
   totalEarnings: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0 })
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0, transformer: DecimalColumnTransformer })
   walletBalance: number;
+
+  // Gains d'une vente encaissée mais pas encore débloqués — libérés vers walletBalance
+  // seulement quand la commande passe au statut "delivered".
+  @Column({ type: 'decimal', precision: 10, scale: 2, default: 0, transformer: DecimalColumnTransformer })
+  pendingBalance: number;
 
   @Column({ nullable: true })
   stripeAccountId: string;

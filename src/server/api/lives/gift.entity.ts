@@ -3,6 +3,7 @@ import {
 } from 'typeorm';
 import { User } from '../users/user.entity';
 import { LiveSession } from './live-session.entity';
+import { DecimalColumnTransformer } from '../../common/decimal.transformer';
 
 @Entity('gifts')
 export class Gift {
@@ -19,27 +20,29 @@ export class Gift {
   @Column()
   senderId: string;
 
-  @ManyToOne(() => User, { eager: true })
+  // Nuls pour un cadeau "hors-live" (ex: page vitrine /live demo, non rattachee a un vrai
+  // createur/LiveSession) — l'argent est alors integralement compte comme platformAmount.
+  @ManyToOne(() => User, { eager: true, nullable: true })
   @JoinColumn({ name: 'receiverId' })
-  receiver: User;
+  receiver: User | null;
 
-  @Column()
-  receiverId: string;
+  @Column({ nullable: true })
+  receiverId: string | null;
 
-  @ManyToOne(() => LiveSession)
+  @ManyToOne(() => LiveSession, { nullable: true })
   @JoinColumn({ name: 'liveSessionId' })
-  liveSession: LiveSession;
+  liveSession: LiveSession | null;
 
-  @Column()
-  liveSessionId: string;
+  @Column({ nullable: true })
+  liveSessionId: string | null;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: 'decimal', precision: 10, scale: 2, transformer: DecimalColumnTransformer })
   amount: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: 'decimal', precision: 10, scale: 2, transformer: DecimalColumnTransformer })
   creatorAmount: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: 'decimal', precision: 10, scale: 2, transformer: DecimalColumnTransformer })
   platformAmount: number;
 
   @CreateDateColumn()

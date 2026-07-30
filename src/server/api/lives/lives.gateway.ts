@@ -6,8 +6,10 @@ import { Server, Socket } from 'socket.io';
 import { JwtService } from '@nestjs/jwt';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { Interval } from '@nestjs/schedule';
 import { User } from '../users/user.entity';
 import { LivesService } from './lives.service';
+import { LiveSession } from './live-session.entity';
 
 function roomFor(liveId: string): string {
   return `live:${liveId}`;
@@ -132,5 +134,50 @@ export class LivesGateway implements OnGatewayDisconnect {
     if (!this.banned.has(data.liveId)) this.banned.set(data.liveId, new Set());
     this.banned.get(data.liveId)!.add(data.userId);
     this.server.to(roomFor(data.liveId)).emit('userBanned', { userId: data.userId });
+  }
+
+  @SubscribeMessage('placeBid')
+  async handlePlaceBid(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { liveId: string; amount: number; token: string },
+  ) {
+    const user = await this.authenticate(data.token);
+    if (!user) {
+      client.emit('bidError', { message: 'Connecte-toi pour enchérir.' });
+      return;
+    }
+
+    try {
+      const live = await this.livesService.placeBid(data.liveId, user.id, Number(data.amount));
+      this.server.to(roomFor(data.liveId)).emit('bidUpdate', {
+        currentBid: Number(live.currentBid),
+        currentBidderId: live.currentBidderId,
+        currentBidderName: live.currentBidder?.displayName || live.currentBidder?.username,
+        auctionEndsAt: live.auctionEndsAt,
+      });
+    } catch (err) {
+      client.emit('bidError', { message: err instanceof Error ? err.message : 'Enchère refusée.' });
+    }
+  }
+
+  // Verifie toutes les 5s si une enchere en cours vient d'atteindre son echeance, et la regle
+  // (creation de la commande gagnante + notification temps reel) sans intervention du createur.
+  @Interval(5000)
+  async checkExpiredAuctions() {
+    const settlements = await this.livesService.settleExpiredAuctions();
+    for (const s of settlements) {
+      this.server.to(roomFor(s.liveId)).emit('auctionEnded', s);
+    }
+  }
+
+  // Appele par le controller REST juste apres le lancement d'une nouvelle manche d'enchere,
+  // pour que tous les spectateurs deja connectes voient immediatement la nouvelle capsule/mise.
+  broadcastAuctionStarted(liveId: string, live: LiveSession) {
+    this.server.to(roomFor(liveId)).emit('auctionStarted', {
+      capsule: live.auctionCapsule,
+      startingBid: Number(live.startingBid),
+      currentBid: Number(live.currentBid),
+      auctionEndsAt: live.auctionEndsAt,
+    });
   }
 }

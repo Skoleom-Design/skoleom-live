@@ -7,6 +7,7 @@ import {
 import type { Capsule } from '../../../shared/types/api';
 import { categoryLabel, conditionLabel, colorLabel, CAPSULE_COLOR_SWATCHES } from '../../constants/capsule';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { api, ApiError, getToken } from '../../../shared/api/http';
 
 interface Props {
   capsules: Capsule[];
@@ -35,6 +36,7 @@ function ProductView({
   const [selectedOptions, setSelectedOptions] = useState<Record<string, string>>({});
   const [addedToCart, setAddedToCart] = useState(false);
   const [isAdding, setIsAdding] = useState(false);
+  const [buyError, setBuyError] = useState('');
 
   useEffect(() => {
     if (capsule.variants) {
@@ -54,11 +56,24 @@ function ProductView({
 
   async function handleBuy() {
     if (!allSelected || isAdding || addedToCart || isSoldOut) return;
+    if (!getToken()) {
+      window.location.href = '/auth/login';
+      return;
+    }
+    setBuyError('');
     setIsAdding(true);
-    await new Promise((r) => setTimeout(r, 700));
-    setIsAdding(false);
-    setAddedToCart(true);
-    setTimeout(() => onClose(), 950);
+    try {
+      await api.post('/payments/capsule/wallet-pay', {
+        capsuleId: capsule.id,
+        selectedVariant: capsule.variants?.length ? Object.values(selectedOptions).join(' / ') : undefined,
+      });
+      setAddedToCart(true);
+      setTimeout(() => onClose(), 950);
+    } catch (e) {
+      setBuyError(e instanceof ApiError ? e.message : t('capsuleDrawer.buyFailed'));
+    } finally {
+      setIsAdding(false);
+    }
   }
 
   return (
@@ -132,9 +147,16 @@ function ProductView({
       {/* ── PRODUCT INFO (right on desktop, bottom on mobile) ── */}
       <div className="flex-1 flex flex-col overflow-y-auto scrollbar-hide px-5 py-5 gap-4">
         {/* Title */}
-        <h2 className="text-white font-bold text-base leading-snug line-clamp-3">
-          {capsule.name}
-        </h2>
+        <div>
+          {(capsule.group?.name || capsule.brand) && (
+            <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#a8ff35]/80 mb-1">
+              {[capsule.group?.name, capsule.brand].filter(Boolean).join(' · ')}
+            </p>
+          )}
+          <h2 className="text-white font-bold text-base leading-snug line-clamp-3">
+            {capsule.name}
+          </h2>
+        </div>
 
         {/* Price */}
         <div className="flex items-baseline gap-2">
@@ -252,6 +274,17 @@ function ProductView({
         )}
 
         <div className="flex-1" />
+
+        {buyError && (
+          <div className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-xl px-4 py-2.5 mb-1">
+            {buyError}
+            {buyError.toLowerCase().includes('solde') && (
+              <a href="/profile/me?tab=wallet" className="block underline font-semibold mt-1 text-[#a8ff35]">
+                {t('capsuleDrawer.topUpWallet')}
+              </a>
+            )}
+          </div>
+        )}
 
         {/* Buy button */}
         <button
@@ -396,7 +429,7 @@ export function CapsuleDrawer({ capsules, open, onClose }: Props) {
                         )}
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-white truncate">{capsule.name}</p>
+                        <p className="text-sm font-semibold text-white truncate">{capsule.name}{capsule.brand ? ` · ${capsule.brand}` : ''}</p>
                         {capsule.description && (
                           <p className="text-xs text-white/35 line-clamp-1 mt-0.5">{capsule.description}</p>
                         )}

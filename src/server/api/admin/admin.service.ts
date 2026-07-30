@@ -7,9 +7,10 @@ import { User } from '../users/user.entity';
 import { Post } from '../posts/post.entity';
 import { Gift } from '../lives/gift.entity';
 import { LiveSession } from '../lives/live-session.entity';
+import { WalletTransaction } from '../payments/wallet-transaction.entity';
 import { BoostsService } from '../boosts/boosts.service';
 import { AdminActionLog, AdminActionType } from './admin-action-log.entity';
-import { OrderStatus, BoostStatus, PostStatus, UserPlan, BoostScope, BoostObjective } from '../../../shared/types/entities';
+import { OrderStatus, BoostStatus, PostStatus, UserPlan, BoostScope, BoostObjective, WalletTransactionType } from '../../../shared/types/entities';
 
 @Injectable()
 export class AdminService {
@@ -28,6 +29,8 @@ export class AdminService {
     private livesRepo: Repository<LiveSession>,
     @InjectRepository(AdminActionLog)
     private logsRepo: Repository<AdminActionLog>,
+    @InjectRepository(WalletTransaction)
+    private walletTxRepo: Repository<WalletTransaction>,
     private boostsService: BoostsService,
   ) {}
 
@@ -316,6 +319,12 @@ export class AdminService {
       adminId,
       targetUserId: userId,
       details: { amount },
+    }));
+    await this.walletTxRepo.save(this.walletTxRepo.create({
+      userId,
+      type: WalletTransactionType.ADMIN_CREDIT,
+      amount,
+      description: 'Crédit ajouté par un administrateur',
     }));
     return { walletBalance: user!.walletBalance };
   }

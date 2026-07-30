@@ -1,7 +1,7 @@
 import {
   Controller, Get, Post, Patch, Delete, Body, Param, Request, UseGuards,
 } from '@nestjs/common';
-import { CapsulesService, CreateCapsuleDto } from './capsules.service';
+import { CapsulesService, CreateCapsuleDto, CreateCapsuleGroupDto } from './capsules.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
 @Controller('capsules')
@@ -28,6 +28,12 @@ export class CapsulesController {
   @Post()
   create(@Request() req, @Body() dto: CreateCapsuleDto) {
     return this.capsulesService.create(req.user.id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Post('groups')
+  createGroup(@Request() req, @Body() dto: CreateCapsuleGroupDto) {
+    return this.capsulesService.createGroup(req.user.id, dto);
   }
 
   @UseGuards(JwtAuthGuard)

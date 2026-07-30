@@ -35,6 +35,25 @@ export function subcategoryLabel(t: TFunc, category: CapsuleCategory, value: str
   return t(`capsuleForm.subcategories.${category}.${value}`);
 }
 
+// Nombre d'articles autorisés par capsule selon l'offre — mêmes valeurs que celles
+// affichées dans la section abonnement du profil.
+export const CAPSULE_GROUP_LIMITS: Record<'free' | 'premium' | 'ultra', number | null> = {
+  free: 2,
+  premium: 5,
+  ultra: 8,
+};
+
+// Nombre total de capsules autorisées selon l'offre.
+export const CAPSULE_GROUP_COUNT_LIMITS: Record<'free' | 'premium' | 'ultra', number | null> = {
+  free: 2,
+  premium: 15,
+  ultra: null,
+};
+
+export function getCapsuleGroupLimit(plan?: string | null): number | null {
+  return CAPSULE_GROUP_LIMITS[(plan as 'free' | 'premium' | 'ultra') || 'free'] ?? 2;
+}
+
 export function conditionLabel(t: TFunc, value: CapsuleCondition): string {
   return t(`capsuleForm.conditions.${value}`);
 }

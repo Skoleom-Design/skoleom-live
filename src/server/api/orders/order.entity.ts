@@ -5,6 +5,7 @@ import {
 import { OrderStatus } from '../../../shared/types/entities';
 import { User } from '../users/user.entity';
 import { Capsule } from '../capsules/capsule.entity';
+import { DecimalColumnTransformer } from '../../common/decimal.transformer';
 
 @Entity('orders')
 export class Order {
@@ -14,13 +15,13 @@ export class Order {
   @Column({ type: 'simple-enum', enum: OrderStatus, default: OrderStatus.PENDING })
   status: OrderStatus;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: 'decimal', precision: 10, scale: 2, transformer: DecimalColumnTransformer })
   amount: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: 'decimal', precision: 10, scale: 2, transformer: DecimalColumnTransformer })
   commissionAmount: number;
 
-  @Column({ type: 'decimal', precision: 10, scale: 2 })
+  @Column({ type: 'decimal', precision: 10, scale: 2, transformer: DecimalColumnTransformer })
   creatorAmount: number;
 
   @Column({ default: 'EUR' })

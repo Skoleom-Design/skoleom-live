@@ -79,3 +79,19 @@ export const api = {
   patch: <T = any>(path: string, body?: any) => request<T>(path, { method: 'PATCH', body }),
   delete: <T = any>(path: string) => request<T>(path, { method: 'DELETE' }),
 };
+
+export async function uploadFile(file: File, folder: 'posts' | 'capsules' | 'avatars'): Promise<string> {
+  const extension = file.name.split('.').pop() || 'bin';
+  const { uploadUrl, fileUrl } = await api.post<{ uploadUrl: string; fileUrl: string }>('/files/upload-url', {
+    folder,
+    mimeType: file.type,
+    extension,
+  });
+  const putRes = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: { 'Content-Type': file.type },
+    body: file,
+  });
+  if (!putRes.ok) throw new Error('Upload failed');
+  return fileUrl;
+}

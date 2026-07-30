@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
-import { ArrowLeft, Camera, Image as ImageIcon, Loader2, Package, Radio, Import, Plus, X } from 'lucide-react';
+import { ArrowLeft, Camera, Image as ImageIcon, Loader2, Package, Radio, Gavel, Import, Plus, X } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CameraCaptureModal } from '../../client/components/Post/CameraCaptureModal';
 import { InstagramImportModal } from '../../client/components/Post/InstagramImportModal';
@@ -173,14 +173,14 @@ export default function StudioPage() {
     e.preventDefault();
     setCapsuleError('');
 
+    const name = productFormRef.current?.getGroupName();
+    if (!name) return;
     const products = productFormRef.current?.getProducts();
     if (!products) return;
 
     setCapsuleLoading(true);
     try {
-      for (const product of products) {
-        await api.post('/capsules', { postId, ...product });
-      }
+      await api.post('/capsules/groups', { name, postId, products });
       setStep('done');
     } catch (err) {
       setCapsuleError(err instanceof ApiError ? err.message : t('common.genericError'));
@@ -206,7 +206,7 @@ export default function StudioPage() {
             >
               <ArrowLeft size={16} className="text-white/70" />
             </Link>
-            <span className="text-white font-bold text-sm">{t('studio.newPost')}</span>
+            <span className="text-white font-bold text-sm">{t('studio.title')}</span>
 
             {me && (
               <div className="ml-auto flex items-center gap-2">
@@ -232,24 +232,43 @@ export default function StudioPage() {
 
             {step === 'form' && (
               <>
-                <div className="grid grid-cols-2 gap-2 mb-4">
+                {/* ── Section : Direct ─────────────────────────────── */}
+                <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2.5">
+                  {t('studio.sectionLive')}
+                </p>
+                <div className="grid grid-cols-2 gap-2.5 mb-6">
                   <button
                     type="button"
                     onClick={() => router.push('/studio/live')}
-                    className="flex items-center justify-center gap-2 py-3 rounded-xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] text-white/80 text-sm font-semibold transition-all"
+                    className="flex flex-col items-center gap-2 py-5 rounded-2xl border border-red-400/20 bg-red-400/[0.06] hover:bg-red-400/[0.1] hover:border-red-400/35 transition-all"
                   >
-                    <Radio size={15} className="text-red-400" />
-                    {t('studio.startLive')}
+                    <span className="w-10 h-10 rounded-full bg-red-400/15 flex items-center justify-center">
+                      <Radio size={18} className="text-red-400" />
+                    </span>
+                    <span className="text-white text-sm font-semibold">{t('studio.startLive')}</span>
                   </button>
                   <button
                     type="button"
-                    onClick={() => setInstagramModalOpen(true)}
-                    className="flex items-center justify-center gap-1.5 py-3 px-2 rounded-xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] text-white/80 text-[11px] font-semibold leading-tight text-center transition-all"
+                    onClick={() => router.push('/studio/live?mode=auction')}
+                    className="flex flex-col items-center gap-2 py-5 rounded-2xl border border-[#a8ff35]/20 bg-[#a8ff35]/[0.06] hover:bg-[#a8ff35]/[0.1] hover:border-[#a8ff35]/35 transition-all"
                   >
-                    <Import size={15} className="text-[#a8ff35] shrink-0" />
-                    {t('studio.importSocial')}
+                    <span className="w-10 h-10 rounded-full bg-[#a8ff35]/15 flex items-center justify-center">
+                      <Gavel size={18} className="text-[#a8ff35]" />
+                    </span>
+                    <span className="text-white text-sm font-semibold">{t('studio.startAuction')}</span>
                   </button>
                 </div>
+
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="h-px flex-1 bg-white/[0.08]" />
+                  <span className="text-[11px] text-white/25 uppercase tracking-wider">{t('common.or')}</span>
+                  <div className="h-px flex-1 bg-white/[0.08]" />
+                </div>
+
+                {/* ── Section : Nouveau post ───────────────────────── */}
+                <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2.5">
+                  {t('studio.sectionPost')}
+                </p>
 
                 <form onSubmit={handlePublish} className="space-y-4">
                 <input
@@ -276,23 +295,33 @@ export default function StudioPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setCameraOpen(true)}
-                      className="aspect-square rounded-2xl border border-dashed border-white/15 bg-white/[0.03] hover:bg-white/[0.06] flex flex-col items-center justify-center gap-2 transition-colors"
-                    >
-                      <Camera size={22} className="text-white/40" />
-                      <span className="text-white/40 text-sm">{t('studio.createPost')}</span>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => importInputRef.current?.click()}
-                      className="aspect-square rounded-2xl border border-dashed border-white/15 bg-white/[0.03] hover:bg-white/[0.06] flex flex-col items-center justify-center gap-2 transition-colors"
-                    >
-                      <ImageIcon size={22} className="text-white/40" />
-                      <span className="text-white/40 text-sm">{t('studio.import')}</span>
-                    </button>
+                  <div className="grid grid-cols-2 gap-2.5">
+                    {/* Bordure degradee cyan/lime (meme esprit "cosmique" que le filet de la
+                        sidebar) au lieu d'un simple border-white/10 qui se voyait a peine. */}
+                    <div className="aspect-square rounded-2xl p-[1.5px] bg-gradient-to-br from-[#00ffff]/50 via-[#a8ff35]/45 to-[#00ffff]/15 hover:from-[#00ffff]/70 hover:via-[#a8ff35]/65 hover:to-[#00ffff]/25 transition-all">
+                      <button
+                        type="button"
+                        onClick={() => setCameraOpen(true)}
+                        className="w-full h-full rounded-2xl bg-white/[0.04] hover:bg-white/[0.07] flex flex-col items-center justify-center gap-2.5 transition-all"
+                      >
+                        <span className="w-11 h-11 rounded-full bg-white/[0.06] flex items-center justify-center">
+                          <Camera size={20} className="text-white/70" />
+                        </span>
+                        <span className="text-white/70 text-sm font-medium">{t('studio.createPost')}</span>
+                      </button>
+                    </div>
+                    <div className="aspect-square rounded-2xl p-[1.5px] bg-gradient-to-br from-[#00ffff]/50 via-[#a8ff35]/45 to-[#00ffff]/15 hover:from-[#00ffff]/70 hover:via-[#a8ff35]/65 hover:to-[#00ffff]/25 transition-all">
+                      <button
+                        type="button"
+                        onClick={() => importInputRef.current?.click()}
+                        className="w-full h-full rounded-2xl bg-white/[0.04] hover:bg-white/[0.07] flex flex-col items-center justify-center gap-2.5 transition-all"
+                      >
+                        <span className="w-11 h-11 rounded-full bg-white/[0.06] flex items-center justify-center">
+                          <ImageIcon size={20} className="text-white/70" />
+                        </span>
+                        <span className="text-white/70 text-sm font-medium">{t('studio.import')}</span>
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -350,6 +379,15 @@ export default function StudioPage() {
                   )}
                 </div>
 
+                <button
+                  type="button"
+                  onClick={() => setInstagramModalOpen(true)}
+                  className="w-full flex items-center justify-center gap-1.5 py-2 text-white/35 hover:text-white/60 text-[12px] font-medium transition-colors"
+                >
+                  <Import size={13} className="shrink-0" />
+                  {t('studio.importSocial')}
+                </button>
+
                 {error && (
                   <p className="text-red-400 text-sm bg-red-400/10 px-4 py-2.5 rounded-xl border border-red-400/20">
                     {error}
@@ -380,16 +418,18 @@ export default function StudioPage() {
                   </div>
                 ) : (
                   <>
-                    <div className="flex bg-white/[0.05] rounded-full p-1">
+                    <div className="relative flex bg-white/[0.05] rounded-full p-1">
+                      <div
+                        className="absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-full bg-white shadow-sm transition-transform duration-300 ease-out"
+                        style={{ transform: capsuleMode === 'new' ? 'translateX(calc(100% + 4px))' : 'translateX(0)' }}
+                      />
                       {(['existing', 'new'] as CapsuleMode[]).map((m) => (
                         <button
                           key={m}
                           type="button"
                           onClick={() => { setCapsuleMode(m); setCapsuleError(''); }}
-                          className={`flex-1 py-2 rounded-full text-sm font-medium transition-all ${
-                            capsuleMode === m
-                              ? 'bg-white text-black shadow-sm'
-                              : 'text-white/45 hover:text-white/70'
+                          className={`relative z-10 flex-1 py-2 rounded-full text-sm font-medium transition-colors duration-300 ${
+                            capsuleMode === m ? 'text-black' : 'text-white/45 hover:text-white/70'
                           }`}
                         >
                           {m === 'existing' ? `${t('studio.existingCapsule')}${myCapsules.length ? ` (${myCapsules.length})` : ''}` : t('studio.newCapsuleTab')}
@@ -399,11 +439,11 @@ export default function StudioPage() {
 
                     {capsuleMode === 'existing' ? (
                       myCapsules.length === 0 ? (
-                        <p className="text-center text-white/30 text-sm py-6">
+                        <p key="existing-empty" className="text-center text-white/30 text-sm py-6 animate-fade-in">
                           {t('studio.noCapsuleYet')}
                         </p>
                       ) : (
-                      <form onSubmit={handleAttachCapsule} className="space-y-4">
+                      <form key="existing" onSubmit={handleAttachCapsule} className="space-y-4 animate-fade-in">
                         <div className="space-y-2 max-h-64 overflow-y-auto scrollbar-hide">
                           {myCapsules.map((c) => (
                             <button
@@ -424,7 +464,7 @@ export default function StudioPage() {
                                 )}
                               </div>
                               <div className="flex-1 min-w-0">
-                                <p className="text-sm font-semibold text-white truncate">{c.name}</p>
+                                <p className="text-sm font-semibold text-white truncate">{c.name}{c.group?.name ? ` · ${c.group.name}` : ''}</p>
                                 <p className="text-xs text-white/40">{c.price.toFixed(2)} {c.currency} · {t('studio.inStock', { count: c.stock })}</p>
                               </div>
                             </button>
@@ -447,7 +487,7 @@ export default function StudioPage() {
                       </form>
                       )
                     ) : (
-                      <form onSubmit={handleAddCapsule} className="space-y-4">
+                      <form key="new" onSubmit={handleAddCapsule} className="space-y-4 animate-fade-in">
                         <CapsuleProductForm ref={productFormRef} />
 
                         {capsuleError && (
@@ -469,7 +509,7 @@ export default function StudioPage() {
                 )}
 
                 <button
-                  onClick={() => router.push(`/post/${postId}`)}
+                  onClick={() => router.push('/profile/me?tab=posts')}
                   className="w-full py-3 text-white/45 text-sm hover:text-white/70 transition-colors"
                 >
                   {t('studio.skipStep')}
@@ -481,7 +521,7 @@ export default function StudioPage() {
               <div className="text-center space-y-4">
                 <h2 className="text-white font-bold text-lg">{t('studio.capsuleAdded')}</h2>
                 <button
-                  onClick={() => router.push(`/post/${postId}`)}
+                  onClick={() => router.push('/profile/me?tab=posts')}
                   className="btn-skoleom w-full py-3.5 rounded-full text-sm shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.98]"
                 >
                   {t('studio.viewPost')}

@@ -122,7 +122,7 @@ export default function LoginPage() {
         <div className="flex-1 flex flex-col items-center justify-center px-4 py-8">
           <div className="w-full max-w-sm">
             {/* Heading */}
-            <div className="text-center mb-8">
+            <div key={tab} className="text-center mb-8 animate-fade-in">
               <div className="w-14 h-14 rounded-2xl bg-[#a8ff35]/10 border border-[#a8ff35]/20 flex items-center justify-center mx-auto mb-4">
                 <img src="/skoleom-mark.png" alt="" className="w-8 h-8 object-contain" />
               </div>
@@ -134,16 +134,18 @@ export default function LoginPage() {
               </p>
             </div>
 
-            {/* Tab toggle */}
-            <div className="flex bg-white/[0.05] rounded-full p-1 mb-7">
+            {/* Tab toggle — pastille glissante au lieu d'un swap de fond instantane */}
+            <div className="relative flex bg-white/[0.05] rounded-full p-1 mb-7">
+              <div
+                className="absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-full bg-white shadow-sm transition-transform duration-300 ease-out"
+                style={{ transform: tab === 'register' ? 'translateX(calc(100% + 4px))' : 'translateX(0)' }}
+              />
               {(['login', 'register'] as Tab[]).map((tabOption) => (
                 <button
                   key={tabOption}
                   onClick={() => { setTab(tabOption); setError(''); }}
-                  className={`flex-1 py-2 rounded-full text-sm font-medium transition-all ${
-                    tab === tabOption
-                      ? 'bg-white text-black shadow-sm'
-                      : 'text-white/45 hover:text-white/70'
+                  className={`relative z-10 flex-1 py-2 rounded-full text-sm font-medium transition-colors duration-300 ${
+                    tab === tabOption ? 'text-black' : 'text-white/45 hover:text-white/70'
                   }`}
                 >
                   {tabOption === 'login' ? t('auth.login') : t('auth.register')}
@@ -153,8 +155,14 @@ export default function LoginPage() {
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
-              {tab === 'register' && (
-                <div>
+              {/* Grille 0fr/1fr : anime la hauteur du champ username en douceur au lieu de le
+                  faire apparaitre/disparaitre brutalement au changement d'onglet. */}
+              <div
+                className={`grid transition-[grid-template-rows] duration-300 ease-in-out ${
+                  tab === 'register' ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'
+                }`}
+              >
+                <div className="overflow-hidden">
                   <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
                     {t('auth.username')}
                   </label>
@@ -164,10 +172,11 @@ export default function LoginPage() {
                     onChange={(e) => setUsername(e.target.value)}
                     placeholder={t('auth.usernamePlaceholder')}
                     autoComplete="username"
+                    tabIndex={tab === 'register' ? 0 : -1}
                     className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
                   />
                 </div>
-              )}
+              </div>
 
               <div>
                 <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">

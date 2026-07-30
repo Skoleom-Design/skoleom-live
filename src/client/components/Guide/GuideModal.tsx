@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import {
   X, UserCircle2, ShoppingCart, Plus, Layers, TrendingUp, Zap, Crown, Gift, Megaphone,
-  RefreshCw, Landmark, ShieldCheck, Handshake, Trophy, Shirt, Ticket, Laptop, Globe,
+  RefreshCw, Landmark, ShieldCheck, Handshake, Trophy, Shirt, Ticket, Laptop, Globe, Store, Star, Gavel,
 } from 'lucide-react';
 
 type Tab = 'creator' | 'buyer' | 'skoleom';
@@ -165,27 +165,53 @@ export function GuideModal({ open, onClose }: Props) {
                   Pour les créateurs &amp; vendeurs
                 </p>
                 <h2 className="text-[22px] font-extrabold tracking-tight leading-snug mb-1.5">
-                  Go Live, vends,<br />gagne de l&apos;argent.
+                  Lance une Enchère,<br />vends au meilleur prix.
                 </h2>
-                <p className="text-[14px] text-white/52 leading-relaxed mb-5">
-                  Tu crées du contenu ? Lance un Live et monétise chaque session en intégrant tes produits directement grâce à la <strong className="text-white">Capsule</strong> — tes viewers achètent en direct.
+                <p className="text-[14px] text-white/52 leading-relaxed mb-3">
+                  Tu crées du contenu ? Lance une <strong className="text-white">Enchère</strong> en direct : fixe une mise de départ, tes viewers misent en temps réel dans le chat, le prix grimpe jusqu&apos;au bout.
+                </p>
+
+                {/* Qui peut être créateur — pas réservé à un profil type */}
+                <div className="flex gap-2 mb-2 flex-wrap">
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border border-[#a8ff35]/30 bg-[#a8ff35]/10 text-[#a8ff35]">
+                    <Store size={11} /> Une marque
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border border-[#a8ff35]/30 bg-[#a8ff35]/10 text-[#a8ff35]">
+                    <Star size={11} /> Un influenceur
+                  </span>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border border-[#a8ff35]/30 bg-[#a8ff35]/10 text-[#a8ff35]">
+                    <UserCircle2 size={11} /> Toi, tout simplement
+                  </span>
+                </div>
+                <p className="text-[12px] text-white/40 leading-relaxed mb-5">
+                  Aucun statut requis pour créer : marque, influenceur ou simple utilisateur qui veut vendre un article — tout le monde peut lancer sa Capsule.
                 </p>
 
                 <div className="flex flex-col gap-3 mb-5">
                   <Step
                     num={1} accent="blue"
-                    title="Crée ton compte & choisis ton plan"
-                    desc="Inscris-toi en 30 secondes. Choisis ton abonnement selon tes ambitions — commence gratuitement avec 2 Capsules, passe en Premium pour scaler."
+                    title="Crée ton compte & choisis ton offre"
+                    desc="Inscris-toi en 30 secondes. Ton offre détermine combien de manches d'enchère tu peux lancer par live — commence gratuitement avec 2 manches, passe en Premium pour scaler."
                   />
                   <Step
                     num={2} accent="blue"
-                    title="Lance ton Live"
-                    desc="Démarre une session live depuis ton Studio — pour divertir, présenter tes produits, partager ton univers ou tes créations. Neufs ou d'occasion, tout est bienvenu."
+                    title="Lance ton Enchère"
+                    desc="Démarre une session enchère depuis ton Studio, choisis un produit, fixe une mise de départ et une durée — c'est parti. Neufs ou d'occasion, tout est bienvenu."
                   />
                   <Step
                     num={3} accent="blue"
-                    title="Intègre une Capsule & vends en direct"
-                    desc="Ajoute tes articles à ta Capsule en temps réel. Le bouton apparaît sur l'écran de tes viewers — ils achètent sans quitter le Live, ton pourcentage tombe immédiatement."
+                    title="Le prix grimpe en direct"
+                    desc="Tes viewers misent en temps réel dans le chat — une mise de dernière seconde prolonge automatiquement l'enchère (anti-sniping). Le plus offrant remporte le produit, ton pourcentage tombe immédiatement."
+                    extra={
+                      <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-semibold border border-[#a8ff35]/30 bg-[#a8ff35]/10 text-[#a8ff35] mt-2">
+                        <Gavel size={11} /> Nombre de manches selon ton offre
+                      </span>
+                    }
+                  />
+                  <Step
+                    num={4} accent="blue"
+                    title="Ou lance un Live classique"
+                    desc="Présente tes produits à prix fixe grâce à la Capsule — le bouton apparaît sur l'écran de tes viewers, ils achètent sans quitter le Live."
                     extra={
                       <div className="flex items-center gap-2 mt-2">
                         <CapsulePreview />
@@ -413,14 +439,14 @@ export function GuideModal({ open, onClose }: Props) {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-[14px] font-bold mb-1">Abonnements créateurs</p>
-                      <p className="text-[13px] text-white/52 leading-relaxed mb-3">3 paliers pour débloquer plus de Capsules et d&apos;articles — avant ou pendant un Live.</p>
+                      <p className="text-[13px] text-white/52 leading-relaxed mb-3">3 paliers pour débloquer plus de Capsules, d&apos;articles et de manches d&apos;enchère — avant ou pendant un Live.</p>
 
                       {/* Plans */}
                       <div className="grid grid-cols-3 gap-2 mt-1">
                         {[
-                          { name: 'Standard',      price: '0€',     limit: '2 Capsules · 2 art.',  icon: null },
-                          { name: 'Premium',       price: '9,90€',  limit: '15 Capsules · 5 art.', icon: 'blue' },
-                          { name: 'Ultra Premium', price: '29,90€', limit: '∞ Capsules · 10 art.', icon: 'gold' },
+                          { name: 'Standard',      price: '0€',     limit: '2 Capsules · 2 art. · 2 enchères',  icon: null },
+                          { name: 'Premium',       price: '9,90€',  limit: '15 Capsules · 5 art. · 10 enchères', icon: 'blue' },
+                          { name: 'Ultra Premium', price: '29,90€', limit: '∞ Capsules · 8 art. · ∞ enchères', icon: 'gold' },
                         ].map(plan => (
                           <div
                             key={plan.name}

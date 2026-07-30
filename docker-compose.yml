@@ -1,0 +1,22 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: skoleom-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: skoleom_dev_pw
+      MYSQL_DATABASE: skoleom_live
+    ports:
+      # Port hote 3308 (pas 3306/3307, deja pris par des instances MySQL/MariaDB natives sur
+      # cette machine) pour eviter tout conflit.
+      - '3308:3306'
+    volumes:
+      - skoleom_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost', '-uroot', '-pskoleom_dev_pw']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  skoleom_mysql_data:

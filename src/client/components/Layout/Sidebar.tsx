@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Orbit, Search, Video, User, Settings2, PlusCircle, ShieldAlert } from 'lucide-react';
+import { Orbit, Search, Video, User, PlusCircle, ShieldAlert, Gavel } from 'lucide-react';
 import { GuideButton } from '../Guide/GuideModal';
-import { getStoredUser } from '../../../shared/api/http';
+import { api, getStoredUser, getToken } from '../../../shared/api/http';
 import { useLanguage } from '../../i18n/LanguageContext';
+
+const NOTIFICATIONS_POLL_MS = 30_000;
 
 export function AppSidebar() {
   const router = useRouter();
   const { t } = useLanguage();
   const [isAdmin, setIsAdmin] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     const user = getStoredUser();
@@ -18,10 +21,32 @@ export function AppSidebar() {
     setAvatarUrl(user?.avatarUrl);
   }, []);
 
+  // Petit badge sur "Profil" pour les likes/commentaires reçus — un polling simple suffit,
+  // pas besoin d'un canal temps reel dedie pour un compteur qu'on consulte de toute façon
+  // en changeant de page.
+  useEffect(() => {
+    if (!getToken()) return;
+    function fetchUnreadCount() {
+      api.get<{ count: number }>('/notifications/unread-count').then((res) => setUnreadCount(res.count)).catch(() => {});
+    }
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, NOTIFICATIONS_POLL_MS);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Visiter son profil marque les notifications comme lues — le badge disparaît.
+  useEffect(() => {
+    if (router.pathname === '/profile/me' && unreadCount > 0) {
+      api.patch('/notifications/read-all', {}).then(() => setUnreadCount(0)).catch(() => {});
+    }
+  }, [router.pathname, unreadCount]);
+
   // Home/loupe/carre+ sont les pictogrammes exacts d'Instagram — Orbit rattache "Explorer" au
   // theme Univers cosmique de la DA, et un rond+ (au lieu d'un carre+) suffit a rompre la ressemblance.
   const NAV = [
-    { href: '/live', icon: Video, label: t('sidebar.live') },
+    // Mis en grise — le focus produit est mis sur les enchères pour l'instant.
+    { href: '/live', icon: Video, label: t('sidebar.live'), disabled: true },
+    { href: '/enchere', icon: Gavel, label: t('sidebar.auction') },
     { href: '/', icon: Orbit, label: t('sidebar.explore') },
     { href: '/explore', icon: Search, label: t('sidebar.search') },
     ...(isAdmin ? [] : [{ href: '/studio', icon: PlusCircle, label: t('sidebar.studio') }]),
@@ -50,22 +75,15 @@ export function AppSidebar() {
           const isActive =
             item.href === '/' ? router.pathname === '/' : router.pathname.startsWith(item.href);
           const avatar = 'avatarUrl' in item ? item.avatarUrl : undefined;
+          const disabled = 'disabled' in item && item.disabled;
 
-          return (
-            <Link
-              key={item.label}
-              href={item.href}
-              className={`flex items-center gap-3 pl-1.5 pr-4 py-1.5 rounded-full text-[15px] transition-all ${
-                isActive
-                  ? 'font-bold text-black bg-skoleom-gradient-warm shadow-glow-lime-sm'
-                  : 'font-normal text-white/80 hover:bg-white/[0.05] hover:text-white'
-              }`}
-            >
+          const content = (
+            <>
               {/* Chaque icone vit dans sa propre pastille — pas un glyphe nu flottant a cote
                   du libelle comme sur Insta/X/LinkedIn. */}
               <span
-                className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all ${
-                  isActive ? 'bg-black/15' : 'bg-white/[0.06] border border-white/10'
+                className={`relative w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all ${
+                  disabled ? 'bg-white/[0.03] border border-white/[0.06]' : isActive ? 'bg-black/15' : 'bg-white/[0.06] border border-white/10'
                 }`}
               >
                 {avatar ? (
@@ -80,27 +98,42 @@ export function AppSidebar() {
                     fillOpacity={isActive ? 0.18 : undefined}
                   />
                 )}
+                {item.href === '/profile/me' && unreadCount > 0 && (
+                  <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-black/80" />
+                )}
               </span>
               {item.label}
+            </>
+          );
+
+          if (disabled) {
+            return (
+              <span
+                key={item.label}
+                aria-disabled="true"
+                className="flex items-center gap-3 pl-1.5 pr-4 py-1.5 rounded-full text-[15px] font-normal text-white/25 cursor-not-allowed select-none"
+              >
+                {content}
+              </span>
+            );
+          }
+
+          return (
+            <Link
+              key={item.label}
+              href={item.href}
+              className={`flex items-center gap-3 pl-1.5 pr-4 py-1.5 rounded-full text-[15px] transition-all ${
+                isActive
+                  ? 'font-bold text-black bg-skoleom-gradient-warm shadow-glow-lime-sm'
+                  : 'font-normal text-white/80 hover:bg-white/[0.05] hover:text-white'
+              }`}
+            >
+              {content}
             </Link>
           );
         })}
         <GuideButton />
       </nav>
-
-      {!isAdmin && (
-        <div className="relative border-t border-white/[0.06] pt-3 mt-2">
-          <Link
-            href="/admin"
-            className="flex items-center gap-3 pl-1.5 pr-4 py-1.5 rounded-full text-[15px] text-white/40 hover:text-white hover:bg-white/[0.05] transition-colors"
-          >
-            <span className="w-8 h-8 rounded-full flex items-center justify-center shrink-0 bg-white/[0.06] border border-white/10">
-              <Settings2 size={16} strokeWidth={1.75} />
-            </span>
-            {t('sidebar.admin')}
-          </Link>
-        </div>
-      )}
     </aside>
   );
 }

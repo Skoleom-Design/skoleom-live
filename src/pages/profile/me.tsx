@@ -1,10 +1,11 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
 import {
   LogOut, Plus, Trash2, Package, BarChart2, Grid3x3, Loader2, Pencil, Camera, X,
   Heart, Zap, Wallet, ArrowDownToLine, ArrowUpFromLine, Radio, Settings, Check,
+  Receipt, ShoppingBag, Gift, Clock, Truck, MoreVertical, Landmark, CreditCard,
 } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { BoostModal } from '../../client/components/Boost/BoostModal';
@@ -25,6 +26,7 @@ interface MeUser {
   role: string;
   plan?: PlanKey;
   walletBalance?: number;
+  pendingBalance?: number;
   totalEarnings?: number;
 }
 
@@ -50,6 +52,7 @@ const PLANS: { key: PlanKey; price: string }[] = [
 interface CapsuleData {
   id: string;
   name: string;
+  brand?: string;
   price: number;
   currency: string;
   stock: number;
@@ -60,11 +63,14 @@ interface CapsuleData {
   subcategory?: string;
   size?: string;
   colors?: string[];
+  groupId?: string;
+  group?: { id: string; name: string };
 }
 
 interface PostData {
   id: string;
   caption?: string;
+  tags?: string[];
   mediaUrl: string;
   thumbnailUrl?: string;
   type: 'photo' | 'video';
@@ -87,7 +93,35 @@ interface Analytics {
   totals: { views: number; likes: number; sold: number; revenue: number };
 }
 
-type Tab = 'posts' | 'capsules' | 'favoris' | 'wallet' | 'stats';
+interface WalletTransactionData {
+  id: string;
+  type: string;
+  amount: number;
+  description?: string;
+  createdAt: string;
+}
+
+interface OrderData {
+  id: string;
+  status: 'pending' | 'paid' | 'delivered' | 'refunded';
+  amount: number;
+  creatorAmount: number;
+  currency: string;
+  capsule?: { id: string; name: string; imageUrl?: string };
+  buyer?: { id: string; username: string; displayName?: string };
+  creator?: { id: string; username: string; displayName?: string };
+  createdAt: string;
+}
+
+interface BuyerStats {
+  totalSpent: number;
+  capsulesBought: number;
+  giftsSent: number;
+  giftsSentAmount: number;
+}
+
+type Tab = 'posts' | 'capsules' | 'favoris' | 'wallet' | 'transactions' | 'stats';
+type StatsView = 'creator' | 'buyer';
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -114,6 +148,18 @@ export default function ProfilePage() {
   const [newCapsuleSaving, setNewCapsuleSaving] = useState(false);
   const newCapsuleFormRef = useRef<CapsuleProductFormHandle>(null);
 
+  // Regroupe les capsules par capsule-groupe (une capsule nommée = plusieurs produits).
+  // Les capsules sans groupe (créées avant ce champ) restent affichées seules.
+  const capsuleGroups = useMemo(() => {
+    const map = new Map<string, { name: string | null; items: CapsuleData[] }>();
+    for (const c of myCapsules) {
+      const key = c.groupId || `standalone-${c.id}`;
+      if (!map.has(key)) map.set(key, { name: c.group?.name || null, items: [] });
+      map.get(key)!.items.push(c);
+    }
+    return Array.from(map.entries()).map(([key, value]) => ({ key, ...value }));
+  }, [myCapsules]);
+
   const [likedPosts, setLikedPosts] = useState<LikedPost[]>([]);
   const [planSaving, setPlanSaving] = useState(false);
   const [planError, setPlanError] = useState('');
@@ -124,6 +170,10 @@ export default function ProfilePage() {
   const [topupAmount, setTopupAmount] = useState('20');
   const [topupError, setTopupError] = useState('');
   const [topupLoading, setTopupLoading] = useState(false);
+  const [topupMethod, setTopupMethod] = useState<'card' | 'skoleom'>('card');
+  const [cardNumber, setCardNumber] = useState('');
+  const [cardExpiry, setCardExpiry] = useState('');
+  const [cardCvc, setCardCvc] = useState('');
 
   const [withdrawOpen, setWithdrawOpen] = useState(false);
   const [withdrawAmount, setWithdrawAmount] = useState('');
@@ -132,6 +182,21 @@ export default function ProfilePage() {
 
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [notice, setNotice] = useState('');
+
+  const [walletTransactions, setWalletTransactions] = useState<WalletTransactionData[]>([]);
+  const [ordersData, setOrdersData] = useState<{ purchases: OrderData[]; sales: OrderData[] }>({ purchases: [], sales: [] });
+  const [buyerStats, setBuyerStats] = useState<BuyerStats | null>(null);
+  const [statsView, setStatsView] = useState<StatsView>('creator');
+  const [deliveringId, setDeliveringId] = useState<string | null>(null);
+
+  const [openMenuPostId, setOpenMenuPostId] = useState<string | null>(null);
+  const [editPostOpen, setEditPostOpen] = useState(false);
+  const [editPostTarget, setEditPostTarget] = useState<PostData | null>(null);
+  const [editCaption, setEditCaption] = useState('');
+  const [editTags, setEditTags] = useState<string[]>([]);
+  const [editTagInput, setEditTagInput] = useState('');
+  const [editPostError, setEditPostError] = useState('');
+  const [editPostSaving, setEditPostSaving] = useState(false);
 
   function showComingSoon(label: string) {
     setNotice(t('profile.comingSoon', { label }));
@@ -149,16 +214,22 @@ export default function ProfilePage() {
     }
     (async () => {
       try {
-        const [me, stats, liked, capsules] = await Promise.all([
+        const [me, stats, liked, capsules, transactions, orders, buyer] = await Promise.all([
           api.get<MeUser>('/auth/me'),
           api.get<Analytics>('/posts/analytics/me'),
           api.get<LikedPost[]>('/posts/liked/me').catch(() => []),
           api.get<CapsuleData[]>('/capsules/mine').catch(() => []),
+          api.get<WalletTransactionData[]>('/payments/wallet/transactions').catch(() => []),
+          api.get<{ purchases: OrderData[]; sales: OrderData[] }>('/orders/me').catch(() => ({ purchases: [], sales: [] })),
+          api.get<BuyerStats>('/orders/me/buyer-stats').catch(() => null),
         ]);
         setUser(me);
         setAnalytics(stats);
         setLikedPosts(liked);
         setMyCapsules(capsules);
+        setWalletTransactions(transactions);
+        setOrdersData(orders);
+        setBuyerStats(buyer);
       } catch (err) {
         setError(err instanceof ApiError ? err.message : t('common.genericError'));
       } finally {
@@ -166,6 +237,29 @@ export default function ProfilePage() {
       }
     })();
   }, []);
+
+  useEffect(() => {
+    if (!router.isReady) return;
+    const queryTab = router.query.tab;
+    if (typeof queryTab === 'string' && ['posts', 'capsules', 'favoris', 'wallet', 'transactions', 'stats'].includes(queryTab)) {
+      setTab(queryTab as Tab);
+    }
+  }, [router.isReady, router.query.tab]);
+
+  async function handleMarkDelivered(orderId: string) {
+    setDeliveringId(orderId);
+    try {
+      await api.patch(`/orders/${orderId}/deliver`, {});
+      const refreshed = await api.get<{ purchases: OrderData[]; sales: OrderData[] }>('/orders/me');
+      setOrdersData(refreshed);
+      const me = await api.get<MeUser>('/auth/me');
+      setUser(me);
+    } catch {
+      // silent — la liste reflète toujours l'état serveur au prochain rechargement
+    } finally {
+      setDeliveringId(null);
+    }
+  }
 
   async function handleChangePlan(plan: PlanKey) {
     if (!user || plan === user.plan) return;
@@ -181,6 +275,15 @@ export default function ProfilePage() {
     }
   }
 
+  async function refreshWalletTransactions() {
+    try {
+      const transactions = await api.get<WalletTransactionData[]>('/payments/wallet/transactions');
+      setWalletTransactions(transactions);
+    } catch {
+      // best-effort — le solde affiché reste correct meme si l'historique ne se rafraichit pas
+    }
+  }
+
   async function handleTopup(e: React.FormEvent) {
     e.preventDefault();
     setTopupError('');
@@ -189,12 +292,35 @@ export default function ProfilePage() {
       setTopupError(t('profile.invalidAmount'));
       return;
     }
+    // Aucun vrai processeur de paiement n'est branché — ces coordonnées bancaires ne sont
+    // jamais envoyées au serveur, elles ne servent qu'à simuler un vrai formulaire de paiement.
+    if (topupMethod === 'card') {
+      if (!/^\d{16}$/.test(cardNumber.replace(/\s/g, ''))) {
+        setTopupError(t('profile.invalidCard'));
+        return;
+      }
+      if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(cardExpiry)) {
+        setTopupError(t('profile.invalidCardExpiry'));
+        return;
+      }
+      if (!/^\d{3}$/.test(cardCvc)) {
+        setTopupError(t('profile.invalidCardCvc'));
+        return;
+      }
+    }
     setTopupLoading(true);
     try {
-      const { clientSecret } = await api.post<{ clientSecret: string }>('/payments/wallet/topup', { amount });
-      router.push(`/checkout/wallet?client_secret=${clientSecret}`);
+      const res = await api.post<{ walletBalance: number }>('/payments/wallet/topup', { amount });
+      setUser((prev) => (prev ? { ...prev, walletBalance: res.walletBalance } : prev));
+      await refreshWalletTransactions();
+      setTopupOpen(false);
+      setTopupAmount('20');
+      setCardNumber('');
+      setCardExpiry('');
+      setCardCvc('');
     } catch (err) {
       setTopupError(err instanceof ApiError ? err.message : t('common.genericError'));
+    } finally {
       setTopupLoading(false);
     }
   }
@@ -211,6 +337,7 @@ export default function ProfilePage() {
     try {
       const res = await api.post<{ walletBalance: number }>('/payments/wallet/withdraw', { amount });
       setUser((prev) => (prev ? { ...prev, walletBalance: res.walletBalance } : prev));
+      await refreshWalletTransactions();
       setWithdrawOpen(false);
       setWithdrawAmount('');
     } catch (err) {
@@ -236,6 +363,53 @@ export default function ProfilePage() {
       setAnalytics((prev) => (prev ? { ...prev, posts: prev.posts.filter((p) => p.id !== postId) } : prev));
     } catch {
       // silent — la liste reflète toujours l'état serveur au prochain rechargement
+    }
+  }
+
+  function openEditPost(post: PostData) {
+    setEditPostTarget(post);
+    setEditCaption(post.caption || '');
+    setEditTags(post.tags || []);
+    setEditTagInput('');
+    setEditPostError('');
+    setEditPostOpen(true);
+    setOpenMenuPostId(null);
+  }
+
+  function addEditTag() {
+    const tag = editTagInput.trim().replace(/^#/, '');
+    if (!tag || editTags.includes(tag)) {
+      setEditTagInput('');
+      return;
+    }
+    setEditTags((prev) => [...prev, tag]);
+    setEditTagInput('');
+  }
+
+  function removeEditTag(tag: string) {
+    setEditTags((prev) => prev.filter((x) => x !== tag));
+  }
+
+  async function handleUpdatePost(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editPostTarget) return;
+    setEditPostError('');
+    setEditPostSaving(true);
+    try {
+      const updated = await api.patch<PostData>(`/posts/${editPostTarget.id}`, {
+        caption: editCaption.trim() || undefined,
+        tags: editTags,
+      });
+      setAnalytics((prev) =>
+        prev
+          ? { ...prev, posts: prev.posts.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)) }
+          : prev,
+      );
+      setEditPostOpen(false);
+    } catch (err) {
+      setEditPostError(err instanceof ApiError ? err.message : t('common.genericError'));
+    } finally {
+      setEditPostSaving(false);
     }
   }
 
@@ -308,17 +482,18 @@ export default function ProfilePage() {
     e.preventDefault();
     setNewCapsuleError('');
 
+    const name = newCapsuleFormRef.current?.getGroupName();
+    if (!name) return;
     const products = newCapsuleFormRef.current?.getProducts();
     if (!products) return;
 
     setNewCapsuleSaving(true);
     try {
-      for (const product of products) {
-        await api.post<CapsuleData>('/capsules', {
-          postId: newCapsulePostId || undefined,
-          ...product,
-        });
-      }
+      await api.post('/capsules/groups', {
+        name,
+        postId: newCapsulePostId || undefined,
+        products,
+      });
       const refreshed = await api.get<CapsuleData[]>('/capsules/mine');
       setMyCapsules(refreshed);
       setCapsuleModalOpen(false);
@@ -351,6 +526,7 @@ export default function ProfilePage() {
     { key: 'capsules' as Tab, label: t('profile.capsules'), icon: Package },
     { key: 'favoris' as Tab, label: t('profile.favorites'), icon: Heart },
     { key: 'wallet' as Tab, label: t('profile.wallet'), icon: Wallet },
+    { key: 'transactions' as Tab, label: t('profile.transactions'), icon: Receipt },
     { key: 'stats' as Tab, label: t('profile.stats'), icon: BarChart2 },
   ];
 
@@ -457,16 +633,25 @@ export default function ProfilePage() {
               analytics.posts.length === 0 ? (
                 <EmptyState text={t('profile.noPostsYet')} />
               ) : (
+                <>
+                {openMenuPostId && (
+                  <div className="fixed inset-0 z-10" onClick={() => setOpenMenuPostId(null)} />
+                )}
                 <div className="grid grid-cols-3 gap-1">
                   {analytics.posts.map((post) => (
-                    <div key={post.id} className="relative aspect-square bg-white/[0.04] rounded-lg overflow-hidden group">
-                      <Link href={`/post/${post.id}`} className="block w-full h-full">
-                        {post.thumbnailUrl || post.type === 'photo' ? (
-                          <img src={post.thumbnailUrl || post.mediaUrl} alt="" className="w-full h-full object-cover" />
-                        ) : (
-                          <video src={post.mediaUrl} className="w-full h-full object-cover" muted />
-                        )}
-                      </Link>
+                    <div key={post.id} className="relative aspect-square group">
+                      {/* Bordure degradee cyan/lime — meme traitement que sur /post/[id] et le studio */}
+                      <div className="absolute inset-0 rounded-lg p-[1.5px] bg-gradient-to-br from-[#00ffff]/50 via-[#a8ff35]/45 to-[#00ffff]/15">
+                        <div className="w-full h-full rounded-lg overflow-hidden bg-white/[0.04]">
+                          <Link href={`/post/${post.id}`} className="block w-full h-full">
+                            {post.thumbnailUrl || post.type === 'photo' ? (
+                              <img src={post.thumbnailUrl || post.mediaUrl} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              <video src={post.mediaUrl} className="w-full h-full object-cover" muted />
+                            )}
+                          </Link>
+                        </div>
+                      </div>
                       <button
                         onClick={() => { setBoostPost(post); setBoostOpen(true); }}
                         title={t('profile.boostPost')}
@@ -474,16 +659,39 @@ export default function ProfilePage() {
                       >
                         <Zap size={13} className="text-[#a8ff35]" />
                       </button>
-                      <button
-                        onClick={() => handleDeletePost(post.id)}
-                        title={t('profile.deletePost')}
-                        className="absolute top-1.5 left-1.5 w-7 h-7 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-red-500/70 transition-all"
+                      <div
+                        className={`absolute top-1.5 left-1.5 transition-opacity ${
+                          openMenuPostId === post.id ? 'opacity-100 z-20' : 'opacity-0 group-hover:opacity-100'
+                        }`}
                       >
-                        <Trash2 size={13} className="text-white" />
-                      </button>
+                        <button
+                          onClick={() => setOpenMenuPostId(openMenuPostId === post.id ? null : post.id)}
+                          title={t('profile.postOptions')}
+                          className="w-7 h-7 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 flex items-center justify-center hover:bg-black/80 transition-all"
+                        >
+                          <MoreVertical size={13} className="text-white" />
+                        </button>
+                        {openMenuPostId === post.id && (
+                          <div className="absolute top-9 left-0 w-44 bg-[#0d0d0f] border border-white/[0.08] rounded-xl shadow-xl overflow-hidden">
+                            <button
+                              onClick={() => openEditPost(post)}
+                              className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] text-white hover:bg-white/[0.08] transition-all"
+                            >
+                              <Pencil size={14} /> {t('profile.editPost')}
+                            </button>
+                            <button
+                              onClick={() => { setOpenMenuPostId(null); handleDeletePost(post.id); }}
+                              className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] text-red-400 hover:bg-red-500/10 transition-all"
+                            >
+                              <Trash2 size={14} /> {t('profile.moveToTrash')}
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
+                </>
               )
             )}
 
@@ -543,29 +751,38 @@ export default function ProfilePage() {
                   <EmptyState text={t('profile.noCapsulesYet')} />
                 ) : (
                   <div className="space-y-3">
-                    {myCapsules.map((c) => (
-                    <div key={c.id} className="flex items-center gap-3 bg-white/[0.03] border border-white/[0.07] rounded-[16px] p-3">
-                      <div className="w-12 h-12 rounded-lg bg-white/[0.05] overflow-hidden shrink-0 flex items-center justify-center">
-                        {c.imageUrl ? (
-                          <img src={c.imageUrl} alt={c.name} className="w-full h-full object-cover" />
-                        ) : (
-                          <Package size={18} className="text-white/25" />
-                        )}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-semibold text-white truncate">{c.name}</p>
-                        <p className="text-[12px] text-white/40">
-                          {c.price.toFixed(2)} {c.currency} · {c.soldCount} {t('profile.sold')} · {c.stock} {t('profile.inStock')}
-                          {c.category && c.subcategory && ` · ${subcategoryLabel(t, c.category, c.subcategory)}`}
-                          {c.category && !c.subcategory && ` · ${categoryLabel(t, c.category)}`}
-                          {c.size && ` · ${c.size}`}
-                          {c.condition && ` · ${conditionLabel(t, c.condition)}`}
+                    {capsuleGroups.map((group) => (
+                    <div key={group.key} className="bg-white/[0.03] border border-white/[0.07] rounded-[16px] p-3 space-y-2">
+                      {group.name && (
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#a8ff35] px-1">
+                          Capsule · {group.name}
                         </p>
-                      </div>
-                      <button onClick={() => handleRemoveCapsule(c.id)}
-                        className="w-8 h-8 rounded-full hover:bg-red-500/20 flex items-center justify-center text-white/25 hover:text-red-400 transition-all">
-                        <Trash2 size={14} />
-                      </button>
+                      )}
+                      {group.items.map((c) => (
+                        <div key={c.id} className="flex items-center gap-3">
+                          <div className="w-12 h-12 rounded-lg bg-white/[0.05] overflow-hidden shrink-0 flex items-center justify-center">
+                            {c.imageUrl ? (
+                              <img src={c.imageUrl} alt={c.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <Package size={18} className="text-white/25" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-semibold text-white truncate">{c.name}{c.brand ? ` · ${c.brand}` : ''}</p>
+                            <p className="text-[12px] text-white/40">
+                              {c.price.toFixed(2)} {c.currency} · {c.soldCount} {t('profile.sold')} · {c.stock} {t('profile.inStock')}
+                              {c.category && c.subcategory && ` · ${subcategoryLabel(t, c.category, c.subcategory)}`}
+                              {c.category && !c.subcategory && ` · ${categoryLabel(t, c.category)}`}
+                              {c.size && ` · ${c.size}`}
+                              {c.condition && ` · ${conditionLabel(t, c.condition)}`}
+                            </p>
+                          </div>
+                          <button onClick={() => handleRemoveCapsule(c.id)}
+                            className="w-8 h-8 rounded-full hover:bg-red-500/20 flex items-center justify-center text-white/25 hover:text-red-400 transition-all">
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      ))}
                     </div>
                     ))}
                   </div>
@@ -607,7 +824,7 @@ export default function ProfilePage() {
                   </p>
                   <div className="flex gap-2">
                     <button
-                      onClick={() => { setTopupOpen(true); setTopupError(''); }}
+                      onClick={() => { setTopupOpen(true); setTopupError(''); setTopupMethod('card'); }}
                       className="btn-skoleom flex-1 flex items-center justify-center gap-2 py-2.5 rounded-full text-[13px] hover:shadow-glow-lime-sm transition-all"
                     >
                       <ArrowDownToLine size={14} /> {t('profile.addFunds')}
@@ -619,27 +836,203 @@ export default function ProfilePage() {
                       <ArrowUpFromLine size={14} /> {t('profile.withdraw')}
                     </button>
                   </div>
+                  <button
+                    onClick={() => showComingSoon('Skoleom Wallet')}
+                    className="mt-2 w-full flex items-center justify-center gap-2 py-2 rounded-full border border-dashed border-white/10 text-white/40 text-[12px] font-medium hover:text-white/60 hover:border-white/20 transition-all"
+                  >
+                    <Landmark size={13} /> {t('profile.comingSoon', { label: 'Skoleom Wallet' })}
+                  </button>
                 </div>
+                {(user.pendingBalance ?? 0) > 0 && (
+                  <div className="bg-amber-400/[0.06] border border-amber-400/20 rounded-[16px] p-4 flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-full bg-amber-400/15 flex items-center justify-center shrink-0">
+                      <Clock size={16} className="text-amber-400" />
+                    </div>
+                    <div>
+                      <p className="text-[12px] text-amber-400/80">{t('profile.pendingBalance')}</p>
+                      <p className="text-[16px] font-bold text-white">{(user.pendingBalance ?? 0).toFixed(2)} €</p>
+                    </div>
+                  </div>
+                )}
+
                 <div className="bg-white/[0.03] border border-white/[0.07] rounded-[16px] p-4">
                   <p className="text-[12px] text-white/40">{t('profile.totalRevenue')}</p>
                   <p className="text-[18px] font-bold text-white">{(user.totalEarnings ?? 0).toFixed(2)} €</p>
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2">
+                    {t('profile.transactionHistory')}
+                  </p>
+                  {walletTransactions.length === 0 ? (
+                    <p className="text-[13px] text-white/30">{t('profile.noTransactions')}</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {walletTransactions.map((wtx) => (
+                        <div key={wtx.id} className="flex items-center justify-between bg-white/[0.02] border border-white/[0.05] rounded-xl px-3.5 py-2.5">
+                          <div className="min-w-0">
+                            <p className="text-[13px] text-white/80 truncate">{wtx.description || t(`profile.txType.${wtx.type}`)}</p>
+                            <p className="text-[11px] text-white/30">{new Date(wtx.createdAt).toLocaleDateString()}</p>
+                          </div>
+                          <p className={`text-[13px] font-bold shrink-0 ${wtx.amount >= 0 ? 'text-green-400' : 'text-white/60'}`}>
+                            {wtx.amount >= 0 ? '+' : ''}{wtx.amount.toFixed(2)} €
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {tab === 'transactions' && (
+              <div className="space-y-6 max-w-sm">
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2 flex items-center gap-1.5">
+                    <ShoppingBag size={12} /> {t('profile.myPurchases')}
+                  </p>
+                  {ordersData.purchases.length === 0 ? (
+                    <EmptyState text={t('profile.noPurchases')} />
+                  ) : (
+                    <div className="space-y-2">
+                      {ordersData.purchases.map((o) => (
+                        <div key={o.id} className="flex items-center gap-3 bg-white/[0.03] border border-white/[0.07] rounded-[14px] p-3">
+                          <div className="w-11 h-11 rounded-lg bg-white/[0.05] overflow-hidden shrink-0 flex items-center justify-center">
+                            {o.capsule?.imageUrl ? (
+                              <img src={o.capsule.imageUrl} className="w-full h-full object-cover" alt="" />
+                            ) : (
+                              <Package size={16} className="text-white/25" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-semibold text-white truncate">{o.capsule?.name || '—'}</p>
+                            <p className="text-[11px] text-white/40">{o.amount.toFixed(2)} {o.currency} · {new Date(o.createdAt).toLocaleDateString()}</p>
+                          </div>
+                          <StatusBadge status={o.status} t={t} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2 flex items-center gap-1.5">
+                    <Package size={12} /> {t('profile.mySales')}
+                  </p>
+                  {ordersData.sales.length === 0 ? (
+                    <EmptyState text={t('profile.noSales')} />
+                  ) : (
+                    <div className="space-y-2">
+                      {ordersData.sales.map((o) => (
+                        <div key={o.id} className="flex items-center gap-3 bg-white/[0.03] border border-white/[0.07] rounded-[14px] p-3">
+                          <div className="w-11 h-11 rounded-lg bg-white/[0.05] overflow-hidden shrink-0 flex items-center justify-center">
+                            {o.capsule?.imageUrl ? (
+                              <img src={o.capsule.imageUrl} className="w-full h-full object-cover" alt="" />
+                            ) : (
+                              <Package size={16} className="text-white/25" />
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[13px] font-semibold text-white truncate">{o.capsule?.name || '—'}</p>
+                            <p className="text-[11px] text-white/40">{o.creatorAmount.toFixed(2)} {o.currency} · {new Date(o.createdAt).toLocaleDateString()}</p>
+                          </div>
+                          {o.status === 'paid' ? (
+                            <button
+                              onClick={() => handleMarkDelivered(o.id)}
+                              disabled={deliveringId === o.id}
+                              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#a8ff35] text-black text-[11px] font-bold hover:brightness-110 disabled:opacity-50 transition-all"
+                            >
+                              {deliveringId === o.id ? <Loader2 size={12} className="animate-spin" /> : <Truck size={12} />}
+                              {t('profile.markDelivered')}
+                            </button>
+                          ) : (
+                            <StatusBadge status={o.status} t={t} />
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             )}
 
             {tab === 'stats' && (
-              <div className="grid grid-cols-2 gap-3">
-                {[
-                  { label: t('profile.totalViews'), value: analytics.totals.views },
-                  { label: t('profile.totalLikes'), value: analytics.totals.likes },
-                  { label: t('profile.capsulesSold'), value: analytics.totals.sold },
-                  { label: t('profile.netRevenue'), value: `${analytics.totals.revenue.toFixed(2)} €` },
-                ].map((s) => (
-                  <div key={s.label} className="bg-white/[0.03] border border-white/[0.07] rounded-[16px] p-4">
-                    <p className="text-[20px] font-extrabold text-white">{s.value}</p>
-                    <p className="text-[12px] text-white/40 mt-1">{s.label}</p>
+              <div className="max-w-sm">
+                <div className="flex gap-2 mb-4">
+                  <button
+                    onClick={() => setStatsView('creator')}
+                    className={`flex-1 py-2 rounded-full text-[13px] font-semibold border transition-all ${
+                      statsView === 'creator' ? 'bg-[#a8ff35] text-black border-[#a8ff35]' : 'bg-white/[0.04] text-white/60 border-white/10 hover:border-white/25'
+                    }`}
+                  >
+                    {t('profile.statsCreator')}
+                  </button>
+                  <button
+                    onClick={() => setStatsView('buyer')}
+                    className={`flex-1 py-2 rounded-full text-[13px] font-semibold border transition-all ${
+                      statsView === 'buyer' ? 'bg-[#a8ff35] text-black border-[#a8ff35]' : 'bg-white/[0.04] text-white/60 border-white/10 hover:border-white/25'
+                    }`}
+                  >
+                    {t('profile.statsBuyer')}
+                  </button>
+                </div>
+
+                {statsView === 'creator' ? (
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      { label: t('profile.totalViews'), value: analytics.totals.views },
+                      { label: t('profile.totalLikes'), value: analytics.totals.likes },
+                      { label: t('profile.capsulesSold'), value: analytics.totals.sold },
+                      { label: t('profile.netRevenue'), value: `${analytics.totals.revenue.toFixed(2)} €` },
+                    ].map((s) => (
+                      <div key={s.label} className="bg-white/[0.03] border border-white/[0.07] rounded-[16px] p-4">
+                        <p className="text-[20px] font-extrabold text-white">{s.value}</p>
+                        <p className="text-[12px] text-white/40 mt-1">{s.label}</p>
+                      </div>
+                    ))}
                   </div>
-                ))}
+                ) : (
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-3">
+                      {[
+                        { label: t('profile.capsulesBought'), value: buyerStats?.capsulesBought ?? 0 },
+                        { label: t('profile.giftsSent'), value: buyerStats?.giftsSent ?? 0 },
+                      ].map((s) => (
+                        <div key={s.label} className="bg-white/[0.03] border border-white/[0.07] rounded-[16px] p-4">
+                          <p className="text-[20px] font-extrabold text-white">{s.value}</p>
+                          <p className="text-[12px] text-white/40 mt-1">{s.label}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {(() => {
+                      const totalSpent = buyerStats?.totalSpent ?? 0;
+                      const { next, progress, remaining } = getSpendProgress(totalSpent);
+                      return (
+                        <div className="bg-gradient-to-r from-[#a8ff35]/10 to-[#6fe600]/5 border border-[#a8ff35]/20 rounded-[16px] p-4">
+                          <div className="flex items-center justify-between mb-2">
+                            <p className="text-[13px] font-bold text-white flex items-center gap-1.5">
+                              <Gift size={14} className="text-[#a8ff35]" />
+                              {next ? t('profile.nextReward', { reward: next.reward }) : t('profile.allRewardsUnlocked')}
+                            </p>
+                            <p className="text-[12px] text-white/40">{totalSpent.toFixed(2)} €</p>
+                          </div>
+                          <div className="w-full h-2 rounded-full bg-white/[0.06] overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-[#a8ff35] to-[#6fe600] rounded-full transition-all"
+                              style={{ width: `${progress}%` }}
+                            />
+                          </div>
+                          {next && (
+                            <p className="text-[11px] text-white/35 mt-1.5">
+                              {t('profile.remainingToUnlock', { amount: remaining.toFixed(2) })}
+                            </p>
+                          )}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
               </div>
             )}
 
@@ -808,6 +1201,31 @@ export default function ProfilePage() {
               </button>
             </div>
             <form onSubmit={handleTopup} className="space-y-4">
+              <div className="relative flex bg-white/[0.05] rounded-full p-1">
+                <div
+                  className="absolute top-1 bottom-1 left-1 w-[calc(50%-4px)] rounded-full bg-white shadow-sm transition-transform duration-300 ease-out"
+                  style={{ transform: topupMethod === 'skoleom' ? 'translateX(calc(100% + 4px))' : 'translateX(0)' }}
+                />
+                <button
+                  type="button"
+                  onClick={() => setTopupMethod('card')}
+                  className={`relative z-10 flex-1 flex items-center justify-center gap-1.5 py-2 rounded-full text-[12px] font-semibold transition-colors duration-300 ${
+                    topupMethod === 'card' ? 'text-black' : 'text-white/50'
+                  }`}
+                >
+                  <CreditCard size={13} /> {t('profile.addFundsMethodCard')}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTopupMethod('skoleom')}
+                  className={`relative z-10 flex-1 flex items-center justify-center gap-1.5 py-2 rounded-full text-[12px] font-semibold transition-colors duration-300 ${
+                    topupMethod === 'skoleom' ? 'text-black' : 'text-white/50'
+                  }`}
+                >
+                  <Landmark size={13} /> {t('profile.addFundsMethodWallet')}
+                </button>
+              </div>
+
               <div>
                 <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
                   {t('profile.amount')}
@@ -821,6 +1239,59 @@ export default function ProfilePage() {
                   className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
                 />
               </div>
+
+              {topupMethod === 'card' ? (
+                <div key="card" className="space-y-3 animate-fade-in">
+                  <div>
+                    <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
+                      {t('profile.cardNumber')}
+                    </label>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="4242 4242 4242 4242"
+                      value={cardNumber}
+                      onChange={(e) => setCardNumber(e.target.value)}
+                      maxLength={19}
+                      className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                    />
+                  </div>
+                  <div className="flex gap-3">
+                    <div className="flex-1">
+                      <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
+                        {t('profile.cardExpiry')}
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="MM/AA"
+                        value={cardExpiry}
+                        onChange={(e) => setCardExpiry(e.target.value)}
+                        maxLength={5}
+                        className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                      />
+                    </div>
+                    <div className="flex-1">
+                      <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
+                        {t('profile.cardCvc')}
+                      </label>
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        placeholder="123"
+                        value={cardCvc}
+                        onChange={(e) => setCardCvc(e.target.value)}
+                        maxLength={3}
+                        className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p key="skoleom" className="text-[12px] text-white/40 bg-white/[0.03] border border-white/[0.06] rounded-xl px-4 py-3 animate-fade-in">
+                  {t('profile.addFundsSkoleomWalletHint')}
+                </p>
+              )}
+
               {topupError && (
                 <p className="text-red-400 text-sm bg-red-400/10 px-4 py-2.5 rounded-xl border border-red-400/20">
                   {topupError}
@@ -876,6 +1347,80 @@ export default function ProfilePage() {
                 className="btn-skoleom w-full py-3.5 rounded-full text-sm shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.98] disabled:opacity-60 gap-2"
               >
                 {withdrawLoading ? <Loader2 size={16} className="animate-spin" /> : t('profile.requestWithdraw')}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editPostOpen && editPostTarget && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+          <div className="cosmic-modal w-full max-w-sm overflow-hidden border border-white/[0.08] rounded-[20px] p-5">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-white font-bold text-base">{t('profile.editPost')}</h2>
+              <button onClick={() => setEditPostOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
+                <X size={16} className="text-white" />
+              </button>
+            </div>
+            <form onSubmit={handleUpdatePost} className="space-y-4">
+              <div>
+                <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
+                  {t('profile.captionLabel')}
+                </label>
+                <textarea
+                  value={editCaption}
+                  onChange={(e) => setEditCaption(e.target.value)}
+                  rows={3}
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm resize-none focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
+                  {t('profile.tagsLabel')}
+                </label>
+                {editTags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {editTags.map((tag) => (
+                      <span key={tag} className="inline-flex items-center gap-1 bg-white/[0.06] border border-white/10 rounded-full pl-2.5 pr-1.5 py-1 text-[12px] text-white/70">
+                        #{tag}
+                        <button type="button" onClick={() => removeEditTag(tag)} className="w-4 h-4 rounded-full hover:bg-white/20 flex items-center justify-center">
+                          <X size={10} />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    value={editTagInput}
+                    onChange={(e) => setEditTagInput(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addEditTag(); } }}
+                    placeholder={t('studio.addTagPlaceholder')}
+                    className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={addEditTag}
+                    disabled={!editTagInput.trim()}
+                    className="w-10 h-10 rounded-xl bg-white/[0.06] border border-white/10 flex items-center justify-center text-white/60 hover:text-white hover:bg-white/[0.1] disabled:opacity-40 transition-all"
+                  >
+                    <Plus size={16} />
+                  </button>
+                </div>
+              </div>
+              {editPostError && (
+                <p className="text-red-400 text-sm bg-red-400/10 px-4 py-2.5 rounded-xl border border-red-400/20">
+                  {editPostError}
+                </p>
+              )}
+              <button
+                type="submit"
+                disabled={editPostSaving}
+                className="btn-skoleom w-full py-3.5 rounded-full text-sm shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.98] disabled:opacity-60 gap-2"
+              >
+                {editPostSaving ? <Loader2 size={16} className="animate-spin" /> : t('profile.saveChanges')}
               </button>
             </form>
           </div>
@@ -945,4 +1490,39 @@ function EmptyState({ text }: { text: string }) {
       <p className="text-[14px]">{text}</p>
     </div>
   );
+}
+
+const ORDER_STATUS_STYLE: Record<string, { color: string; bg: string }> = {
+  pending: { color: '#facc15', bg: 'rgba(250,204,21,0.1)' },
+  paid: { color: '#f59e0b', bg: 'rgba(245,158,11,0.1)' },
+  delivered: { color: '#22c55e', bg: 'rgba(34,197,94,0.1)' },
+  refunded: { color: '#f87171', bg: 'rgba(248,113,113,0.1)' },
+};
+
+function StatusBadge({ status, t }: { status: string; t: (key: string) => string }) {
+  const style = ORDER_STATUS_STYLE[status] || ORDER_STATUS_STYLE.pending;
+  return (
+    <span
+      className="shrink-0 text-[10px] font-bold px-2.5 py-1 rounded-full"
+      style={{ color: style.color, background: style.bg }}
+    >
+      {t(`profile.orderStatus.${status}`)}
+    </span>
+  );
+}
+
+// Paliers de dépense cumulée (achats + cadeaux) qui débloquent une récompense — purement
+// une mécanique d'engagement affichée côté client, aucune livraison de cadeau réelle.
+const SPEND_TIERS = [
+  { threshold: 20, reward: 'Badge Bronze 🥉' },
+  { threshold: 50, reward: 'Cadeau surprise 🎁' },
+  { threshold: 100, reward: 'Badge Or 🏆 + cadeau premium' },
+];
+
+function getSpendProgress(totalSpent: number) {
+  const next = SPEND_TIERS.find((tier) => totalSpent < tier.threshold);
+  if (!next) return { next: null as typeof SPEND_TIERS[number] | null, progress: 100, remaining: 0 };
+  const prevThreshold = [...SPEND_TIERS].reverse().find((tier) => tier.threshold <= totalSpent)?.threshold ?? 0;
+  const progress = ((totalSpent - prevThreshold) / (next.threshold - prevThreshold)) * 100;
+  return { next, progress: Math.max(0, Math.min(100, progress)), remaining: next.threshold - totalSpent };
 }

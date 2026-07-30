@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/router';
 import { Search, Loader2 } from 'lucide-react';
 import { AppSidebar } from '../client/components/Layout/Sidebar';
+import { BoostBadge } from '../client/components/Boost/BoostBadge';
 import type { Post } from '../shared/types/api';
 import { api } from '../shared/api/http';
 
@@ -72,12 +73,19 @@ export default function ExplorePage() {
                   <Link
                     key={post.id}
                     href={`/post/${post.id}`}
-                    className="relative aspect-square bg-white/[0.04] overflow-hidden group"
+                    className={`relative aspect-square bg-white/[0.04] overflow-hidden group ${
+                      post.isBoosted ? 'ring-2 ring-[#a8ff35]/60' : ''
+                    }`}
                   >
                     {post.thumbnailUrl || post.type === 'photo' ? (
                       <img src={post.thumbnailUrl || post.mediaUrl} alt="" className="w-full h-full object-cover" />
                     ) : (
                       <video src={post.mediaUrl} className="w-full h-full object-cover" muted />
+                    )}
+                    {post.isBoosted && (
+                      <div className="absolute top-1.5 left-1.5 z-10">
+                        <BoostBadge />
+                      </div>
                     )}
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors" />
                   </Link>
