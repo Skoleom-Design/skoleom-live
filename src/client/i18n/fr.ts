@@ -103,6 +103,7 @@ export const fr = {
   capsuleForm: {
     capsuleName: 'Nom de la capsule',
     capsuleNamePlaceholder: 'Ex: Ma collection sneakers',
+    productNumber: 'Produit {{n}}',
     takePhoto: 'Prendre une photo',
     importPhoto: 'Depuis mes fichiers',
     productName: 'Nom du produit',

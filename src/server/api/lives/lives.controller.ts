@@ -101,8 +101,22 @@ export class LivesController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Patch(':id/featured')
+  async setFeatured(@Param('id') id: string, @Body() body: { capsuleId: string | null }, @Request() req) {
+    const live = await this.livesService.setFeaturedCapsule(id, req.user.id, body.capsuleId);
+    this.livesGateway.broadcastFeaturedCapsule(id, live);
+    return live;
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post(':id/gift')
-  sendGift(@Param('id') id: string, @Body() body: { giftType: string }, @Request() req) {
-    return this.livesService.sendGift(id, req.user.id, body.giftType);
+  async sendGift(@Param('id') id: string, @Body() body: { giftType: string }, @Request() req) {
+    const result = await this.livesService.sendGift(id, req.user.id, body.giftType);
+    this.livesGateway.broadcastGift(id, {
+      giftType: body.giftType,
+      username: result.senderUsername,
+      displayName: result.senderDisplayName,
+    });
+    return { walletBalance: result.walletBalance };
   }
 }

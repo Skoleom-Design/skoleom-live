@@ -180,4 +180,20 @@ export class LivesGateway implements OnGatewayDisconnect {
       auctionEndsAt: live.auctionEndsAt,
     });
   }
+
+  // Appele par le controller REST juste apres un changement de produit mis en avant (file de
+  // vente en mode live classique), pour que tous les spectateurs voient immediatement le
+  // nouveau "en vente maintenant" sans avoir a recharger la page.
+  broadcastFeaturedCapsule(liveId: string, live: LiveSession) {
+    this.server.to(roomFor(liveId)).emit('featuredCapsuleChanged', {
+      capsuleId: live.featuredCapsuleId ?? null,
+      capsule: live.featuredCapsule ?? null,
+    });
+  }
+
+  // Appele par le controller REST juste apres l'envoi reussi d'un cadeau, pour que le createur
+  // et tous les spectateurs le voient apparaitre en temps reel dans le fil de commentaires.
+  broadcastGift(liveId: string, data: { giftType: string; username: string; displayName?: string }) {
+    this.server.to(roomFor(liveId)).emit('giftSent', data);
+  }
 }

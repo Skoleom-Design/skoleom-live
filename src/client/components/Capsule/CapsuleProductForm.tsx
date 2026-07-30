@@ -209,6 +209,9 @@ export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle>(function 
         </p>
       </div>
 
+      {/* Demarcation entre la capsule (conteneur) et ses produits individuels. */}
+      <div className="h-px bg-white/10" />
+
       {products.length > 0 && (
         <div className="space-y-2">
           <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40">
@@ -239,6 +242,31 @@ export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle>(function 
           ))}
         </div>
       )}
+
+      {/* Demarcation claire : chaque produit est numerote, comme une fiche d'article separee
+          (inspire du flow d'ajout d'articles de Whatnot avant un live). */}
+      <div className="flex items-center gap-3 pt-2">
+        <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#a8ff35] whitespace-nowrap">
+          {t('capsuleForm.productNumber', { n: products.length + 1 })}
+        </span>
+        <div className="flex-1 h-px bg-white/10" />
+      </div>
+
+      <input
+        type="text"
+        value={draft.name}
+        onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
+        placeholder={t('capsuleForm.productName')}
+        className={fieldClass}
+      />
+
+      <input
+        type="text"
+        value={draft.brand}
+        onChange={(e) => setDraft((d) => ({ ...d, brand: e.target.value }))}
+        placeholder={t('capsuleForm.brand')}
+        className={fieldClass}
+      />
 
       <div className="flex items-center gap-3">
         <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-white/[0.05] border border-white/[0.08] shrink-0 flex items-center justify-center">
@@ -280,22 +308,6 @@ export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle>(function 
         <input ref={fileInputRef} type="file" accept="image/*" onChange={onFileChange} className="hidden" />
       </div>
       <CameraCaptureModal open={cameraOpen} onClose={() => setCameraOpen(false)} onCapture={applyImageFile} photoOnly />
-
-      <input
-        type="text"
-        value={draft.name}
-        onChange={(e) => setDraft((d) => ({ ...d, name: e.target.value }))}
-        placeholder={t('capsuleForm.productName')}
-        className={fieldClass}
-      />
-
-      <input
-        type="text"
-        value={draft.brand}
-        onChange={(e) => setDraft((d) => ({ ...d, brand: e.target.value }))}
-        placeholder={t('capsuleForm.brand')}
-        className={fieldClass}
-      />
 
       <textarea
         value={draft.description}

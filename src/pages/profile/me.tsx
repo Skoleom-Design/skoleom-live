@@ -244,7 +244,10 @@ export default function ProfilePage() {
     if (typeof queryTab === 'string' && ['posts', 'capsules', 'favoris', 'wallet', 'transactions', 'stats'].includes(queryTab)) {
       setTab(queryTab as Tab);
     }
-  }, [router.isReady, router.query.tab]);
+    // Permet aux autres pages (ex: le picker d'enchère du studio, sans capsule disponible) de
+    // renvoyer directement ici avec la modale de création déjà ouverte.
+    if (router.query.openCapsule === '1') openCapsuleModal();
+  }, [router.isReady, router.query.tab, router.query.openCapsule]);
 
   async function handleMarkDelivered(orderId: string) {
     setDeliveringId(orderId);

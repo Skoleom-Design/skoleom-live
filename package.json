@@ -7,7 +7,7 @@
     "dev:server": "nest start --watch",
     "dev:client": "next dev -p 3001",
     "build": "nest build && next build",
-    "start": "node dist/main.js",
+    "start": "node dist/server/main.js",
     "lint": "eslint \"src/**/*.ts\" \"src/**/*.tsx\"",
     "typeorm": "typeorm-ts-node-commonjs"
   },

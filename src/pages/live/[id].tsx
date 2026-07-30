@@ -4,8 +4,10 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { io, Socket } from 'socket.io-client';
 import { Room, RoomEvent, Track } from 'livekit-client';
-import { ArrowLeft, Users, Send, Gavel, Timer, Package, Crown } from 'lucide-react';
+import { ArrowLeft, Users, Send, Gavel, Timer, Package, Crown, Gift, Wallet, Plus } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
+import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
+import { GIFTS, COIN_PACKS, giftById, type GiftDef } from '../../client/constants/gifts';
 import { api, ApiError, getToken, getStoredUser } from '../../shared/api/http';
 import type { Capsule } from '../../shared/types/api';
 
@@ -26,6 +28,8 @@ interface LiveSession {
   auctionEndsAt?: string;
   auctionSettled?: boolean;
   auctionActive?: boolean;
+  featuredCapsuleId?: string | null;
+  featuredCapsule?: Capsule | null;
   creator: { id: string; username: string; displayName?: string; avatarUrl?: string };
 }
 
@@ -36,6 +40,8 @@ interface LiveComment {
   username: string;
   createdAt: string;
   isBid?: boolean;
+  isGift?: boolean;
+  giftEmoji?: string;
 }
 
 function fmtCountdown(seconds: number): string {
@@ -73,6 +79,21 @@ export default function LiveViewerPage() {
   const [bidOpen, setBidOpen] = useState(false);
   const [bidCustom, setBidCustom] = useState('');
   const [bidError, setBidError] = useState('');
+  const [capsuleDrawerOpen, setCapsuleDrawerOpen] = useState(false);
+
+  const [sidebarTab, setSidebarTab] = useState<'chat' | 'gifts'>('chat');
+  const [coins, setCoins] = useState(0);
+  const [sentGift, setSentGift] = useState<string | null>(null);
+  const [giftError, setGiftError] = useState('');
+  const [showRecharge, setShowRecharge] = useState(false);
+
+  // Le solde de coins reflete le vrai wallet (walletBalance, 100 coins = 1€).
+  useEffect(() => {
+    if (!getToken()) return;
+    api.get<{ walletBalance: number }>('/auth/me')
+      .then((me) => setCoins(Math.round(Number(me.walletBalance ?? 0) * 100)))
+      .catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!router.isReady || typeof id !== 'string') return;
@@ -91,6 +112,8 @@ export default function LiveViewerPage() {
       .finally(() => setLoading(false));
   }, [router.isReady, id]);
 
+  // Depend uniquement de live?.id (pas de `live` en entier) : mettre a jour live.featuredCapsule
+  // (file de vente) ne doit pas fermer/rouvrir la connexion.
   useEffect(() => {
     if (!live || typeof id !== 'string') return;
 
@@ -131,13 +154,29 @@ export default function LiveViewerPage() {
       setRoundActive(false);
       setAuctionResult(d);
     });
+    socket.on('featuredCapsuleChanged', (d: { capsuleId: string | null; capsule: Capsule | null }) => {
+      setLive((prev) => (prev ? { ...prev, featuredCapsuleId: d.capsuleId, featuredCapsule: d.capsule } : prev));
+    });
+    socket.on('giftSent', (d: { giftType: string; username: string; displayName?: string }) => {
+      const gift = giftById(d.giftType);
+      if (!gift) return;
+      setComments((prev) => [...prev, {
+        id: `gift-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        text: `a envoyé ${gift.emoji} ${gift.name}`,
+        userId: '',
+        username: d.displayName || d.username,
+        createdAt: new Date().toISOString(),
+        isGift: true,
+        giftEmoji: gift.emoji,
+      }]);
+    });
 
     return () => {
       socket.emit('leave', { liveId: id });
       socket.close();
       socketRef.current = null;
     };
-  }, [live, id]);
+  }, [live?.id, id]);
 
   // Reception de la video en direct (LiveKit) — se connecte a la room en lecture seule et
   // affiche le flux du createur des qu'il est publie. Si LiveKit n'est pas configure cote
@@ -183,7 +222,7 @@ export default function LiveViewerPage() {
       if (roomRef.current === room) roomRef.current = null;
       setVideoConnected(false);
     };
-  }, [live, id]);
+  }, [live?.id, id]);
 
   useEffect(() => {
     commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -195,7 +234,7 @@ export default function LiveViewerPage() {
     tick();
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
-  }, [live, auctionEndsAt]);
+  }, [live?.mode, auctionEndsAt]);
 
   function sendComment(e: React.FormEvent) {
     e.preventDefault();
@@ -211,6 +250,36 @@ export default function LiveViewerPage() {
     if (!live || !socketRef.current) return;
     setBidError('');
     socketRef.current.emit('placeBid', { liveId: live.id, amount, token: getToken() });
+  }
+
+  // Debite reellement le wallet et credite le createur (50% de la valeur) — a la difference de
+  // /lives/gift/demo utilise sur la page vitrine, ce live est reel : le cadeau part au vrai
+  // createur, et le serveur diffuse l'evenement 'giftSent' a tout le monde (voir listener ci-dessus).
+  async function sendRealGift(gift: GiftDef) {
+    if (!getToken()) { router.push('/auth/login'); return; }
+    if (!live) return;
+    if (coins < gift.coins) { setShowRecharge(true); return; }
+    setGiftError('');
+    try {
+      const res = await api.post<{ walletBalance: number }>(`/lives/${live.id}/gift`, { giftType: gift.id });
+      setCoins(Math.round(Number(res.walletBalance) * 100));
+      setSentGift(gift.id);
+      setTimeout(() => setSentGift(null), 1200);
+      setSidebarTab('chat');
+    } catch (err) {
+      setGiftError(err instanceof ApiError ? err.message : "Erreur lors de l'envoi du cadeau.");
+    }
+  }
+
+  async function buyCoins(pack: { coins: number; eur: string }) {
+    const amount = parseFloat(pack.eur.replace('€', '').replace(',', '.'));
+    try {
+      const res = await api.post<{ walletBalance: number }>('/payments/wallet/topup', { amount });
+      setCoins(Math.round(Number(res.walletBalance) * 100));
+    } catch {
+      // Erreur reseau/auth — le solde reel n'a pas bouge, on ne change rien localement.
+    }
+    setShowRecharge(false);
   }
 
   if (loading) {
@@ -334,6 +403,20 @@ export default function LiveViewerPage() {
                       </p>
                     </div>
                   )}
+
+                  {/* Produit "en vente maintenant" — file de vente façon Whatnot, pilotée par le
+                      créateur depuis son studio et diffusée en temps réel via websocket. */}
+                  {!isAuction && live.featuredCapsule && (
+                    <div className="absolute bottom-3 inset-x-0 flex justify-center px-4">
+                      <button
+                        onClick={() => setCapsuleDrawerOpen(true)}
+                        className="skoleom-capsule-btn skoleom-capsule-btn--breathe"
+                      >
+                        <img src="/skoleom-mark.png" alt="Skoleom" className="skoleom-capsule-btn-logo" />
+                        <span>{live.featuredCapsule.name} · {live.featuredCapsule.price.toFixed(2)} €</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
 
                 {isAuction && roundActive && (
@@ -360,50 +443,161 @@ export default function LiveViewerPage() {
             </div>
 
             <div className="w-[300px] shrink-0 flex flex-col bg-white/[0.03] border border-white/[0.07] rounded-2xl overflow-hidden">
-              <div className="px-4 py-3 border-b border-white/[0.06] text-white/70 text-xs font-bold uppercase tracking-wider">
-                Commentaires
-              </div>
-              <div className="flex-1 overflow-y-auto scrollbar-hide px-4 py-3 space-y-2.5">
-                {comments.length === 0 && (
-                  <p className="text-white/25 text-xs text-center mt-4">Aucun commentaire pour l&apos;instant.</p>
-                )}
-                {comments.map((c) => {
-                  const isHost = c.userId === live.creator.id;
-                  if (c.isBid) {
-                    return (
-                      <div key={c.id} className="flex items-center gap-2 text-[13px] leading-snug bg-white/[0.03] rounded-xl px-2 py-1.5">
-                        <span className="w-5 h-5 rounded-full bg-[#a8ff35]/15 flex items-center justify-center shrink-0">
-                          <Gavel size={11} className="text-[#a8ff35]" />
-                        </span>
-                        <p className="min-w-0">
-                          <span className="font-semibold mr-1 text-[#a8ff35]">{c.username}</span>
-                          <span className="text-[#a8ff35]/80 break-words font-medium">{c.text}</span>
-                        </p>
-                      </div>
-                    );
-                  }
-                  return (
-                    <div key={c.id} className="text-[13px] leading-snug">
-                      <span className={`font-semibold mr-1 ${isHost ? 'text-[#f59e0b]' : 'text-[#a8ff35]'}`}>{c.username}</span>
-                      {isHost && <Crown size={11} className="inline text-[#f59e0b] mr-1 -translate-y-px" />}
-                      <span className="text-white/80 break-words">{c.text}</span>
-                    </div>
-                  );
-                })}
-                <div ref={commentsEndRef} />
-              </div>
-              <form onSubmit={sendComment} className="p-3 border-t border-white/[0.06] flex items-center gap-2">
-                <input
-                  type="text"
-                  value={commentInput}
-                  onChange={(e) => setCommentInput(e.target.value)}
-                  placeholder="Commenter…"
-                  className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-full px-3.5 py-2 text-white placeholder:text-white/25 text-[13px] focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 transition-all"
-                />
-                <button type="submit" className="w-9 h-9 rounded-full bg-white/[0.06] hover:bg-white/10 flex items-center justify-center shrink-0 transition-all">
-                  <Send size={14} className="text-[#a8ff35]" />
+              <div className="flex shrink-0 border-b border-white/[0.06]">
+                <button
+                  onClick={() => setSidebarTab('chat')}
+                  className={`flex-1 py-2.5 text-[12px] font-bold uppercase tracking-wider transition-colors border-b-2 ${
+                    sidebarTab === 'chat' ? 'border-[#a8ff35] text-white' : 'border-transparent text-white/35 hover:text-white/60'
+                  }`}
+                >
+                  Commentaires
                 </button>
-              </form>
+                <button
+                  onClick={() => setSidebarTab('gifts')}
+                  className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 text-[12px] font-bold uppercase tracking-wider transition-colors border-b-2 ${
+                    sidebarTab === 'gifts' ? 'bg-[#f59e0b]/[0.16] border-[#f59e0b] text-[#f59e0b]' : 'bg-[#f59e0b]/[0.06] border-transparent text-[#f59e0b]/70 hover:bg-[#f59e0b]/[0.1]'
+                  }`}
+                >
+                  <Gift size={12} /> Cadeaux
+                </button>
+              </div>
+
+              {sidebarTab === 'chat' ? (
+                <>
+                  <div className="flex-1 overflow-y-auto scrollbar-hide px-4 py-3 space-y-2.5">
+                    {comments.length === 0 && (
+                      <p className="text-white/25 text-xs text-center mt-4">Aucun commentaire pour l&apos;instant.</p>
+                    )}
+                    {comments.map((c) => {
+                      const isHost = c.userId === live.creator.id;
+                      if (c.isGift) {
+                        return (
+                          <div key={c.id} className="flex items-center gap-2 text-[13px] leading-snug bg-white/[0.03] rounded-xl px-2 py-1.5">
+                            <span className="text-[18px] leading-none shrink-0">{c.giftEmoji}</span>
+                            <p className="min-w-0">
+                              <span className="font-semibold mr-1 text-[#f59e0b]">{c.username}</span>
+                              <span className="text-[#f59e0b]/80 break-words font-medium">{c.text}</span>
+                            </p>
+                          </div>
+                        );
+                      }
+                      if (c.isBid) {
+                        return (
+                          <div key={c.id} className="flex items-center gap-2 text-[13px] leading-snug bg-white/[0.03] rounded-xl px-2 py-1.5">
+                            <span className="w-5 h-5 rounded-full bg-[#a8ff35]/15 flex items-center justify-center shrink-0">
+                              <Gavel size={11} className="text-[#a8ff35]" />
+                            </span>
+                            <p className="min-w-0">
+                              <span className="font-semibold mr-1 text-[#a8ff35]">{c.username}</span>
+                              <span className="text-[#a8ff35]/80 break-words font-medium">{c.text}</span>
+                            </p>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div key={c.id} className="text-[13px] leading-snug">
+                          <span className={`font-semibold mr-1 ${isHost ? 'text-[#f59e0b]' : 'text-[#a8ff35]'}`}>{c.username}</span>
+                          {isHost && <Crown size={11} className="inline text-[#f59e0b] mr-1 -translate-y-px" />}
+                          <span className="text-white/80 break-words">{c.text}</span>
+                        </div>
+                      );
+                    })}
+                    <div ref={commentsEndRef} />
+                  </div>
+                  <form onSubmit={sendComment} className="p-3 border-t border-white/[0.06] flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={commentInput}
+                      onChange={(e) => setCommentInput(e.target.value)}
+                      placeholder="Commenter…"
+                      className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-full px-3.5 py-2 text-white placeholder:text-white/25 text-[13px] focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 transition-all"
+                    />
+                    <button type="submit" className="w-9 h-9 rounded-full bg-white/[0.06] hover:bg-white/10 flex items-center justify-center shrink-0 transition-all">
+                      <Send size={14} className="text-[#a8ff35]" />
+                    </button>
+                  </form>
+                </>
+              ) : (
+                <div className="flex flex-col flex-1 overflow-hidden">
+                  <div className="px-4 py-3 border-b border-white/[0.06] shrink-0 flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-7 h-7 rounded-full bg-[#f59e0b]/20 border border-[#f59e0b]/40 flex items-center justify-center">
+                        <Wallet size={13} className="text-[#f59e0b]" />
+                      </div>
+                      <div>
+                        <p className="text-[15px] font-extrabold text-white leading-none">{coins.toLocaleString('fr-FR')} 🪙</p>
+                        <p className="text-[10px] text-white/35 mt-0.5">≈ {(coins / 100).toFixed(2).replace('.', ',')} €</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setShowRecharge((r) => !r)}
+                      className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#f59e0b]/15 border border-[#f59e0b]/35 text-[#f59e0b] text-[12px] font-bold hover:bg-[#f59e0b]/25 transition-colors"
+                    >
+                      <Plus size={12} /> Recharger
+                    </button>
+                  </div>
+
+                  {showRecharge && (
+                    <div className="px-3 py-3 border-b border-white/[0.06] shrink-0">
+                      <p className="text-[11px] font-bold text-[#f59e0b] uppercase tracking-wide mb-2">Packs de coins</p>
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {COIN_PACKS.map((pack) => (
+                          <button
+                            key={pack.coins}
+                            onClick={() => buyCoins(pack)}
+                            className="flex items-center justify-between px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-xl hover:border-[#f59e0b]/50 hover:bg-[#f59e0b]/[0.08] transition-all"
+                          >
+                            <span className="text-[13px] font-bold text-white">{pack.coins} 🪙</span>
+                            <span className="text-[12px] font-semibold text-[#f59e0b]">{pack.eur}</span>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  <div className="px-4 py-2 shrink-0">
+                    <p className="text-[11px] text-white/35">
+                      Envoie un cadeau à <span className="text-white/60 font-semibold">{live.creator.username}</span> — il reçoit 50% de la valeur.
+                    </p>
+                  </div>
+
+                  {giftError && (
+                    <p className="mx-4 mb-2 text-red-400 text-[11px] bg-red-400/10 px-3 py-2 rounded-xl border border-red-400/20">{giftError}</p>
+                  )}
+
+                  <div className="flex-1 overflow-y-auto scrollbar-hide px-3 pb-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      {GIFTS.map((gift) => {
+                        const canAfford = coins >= gift.coins;
+                        const wasSent = sentGift === gift.id;
+                        return (
+                          <button
+                            key={gift.id}
+                            onClick={() => sendRealGift(gift)}
+                            className={`relative flex flex-col items-center gap-1.5 rounded-[16px] p-3 border transition-all ${
+                              wasSent
+                                ? 'scale-95 bg-white/[0.12] border-white/30'
+                                : canAfford
+                                ? 'bg-white/[0.04] border-white/[0.07] hover:border-white/20 hover:bg-white/[0.08] active:scale-95'
+                                : 'bg-white/[0.02] border-white/[0.04] opacity-50 cursor-not-allowed'
+                            }`}
+                          >
+                            <span className="text-[24px] leading-none">{gift.emoji}</span>
+                            <p className="text-[11px] font-bold text-white">{gift.name}</p>
+                            <span className="text-[10px] font-semibold text-[#f59e0b]">{gift.coins} 🪙</span>
+                            <p className="text-[9px] text-white/30">{gift.eur}</p>
+                            {wasSent && (
+                              <div className="absolute inset-0 rounded-[16px] flex items-center justify-center bg-black/40">
+                                <span className="text-[20px]">✓</span>
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </main>
@@ -473,6 +667,14 @@ export default function LiveViewerPage() {
             </button>
           </div>
         </div>
+      )}
+
+      {live.featuredCapsule && (
+        <CapsuleDrawer
+          capsules={[live.featuredCapsule]}
+          open={capsuleDrawerOpen}
+          onClose={() => setCapsuleDrawerOpen(false)}
+        />
       )}
     </>
   );

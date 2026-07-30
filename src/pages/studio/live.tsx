@@ -6,11 +6,13 @@ import { io, Socket } from 'socket.io-client';
 import { Room, Track } from 'livekit-client';
 import {
   ArrowLeft, Mic, MicOff, Video, VideoOff, Radio, Loader2, Send, Users, Package, X, ShoppingBag,
-  Crown, Trash2, UserX, Gavel, Timer,
+  Crown, Trash2, UserX, Gavel, Timer, ChevronRight, Plus,
 } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
 import { api, ApiError, getToken, getStoredUser } from '../../shared/api/http';
+import { getCapsuleGroupLimit } from '../../client/constants/capsule';
+import { giftById } from '../../client/constants/gifts';
 import type { Capsule } from '../../shared/types/api';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
@@ -32,6 +34,9 @@ interface LiveSession {
   auctionEndsAt?: string;
   auctionSettled?: boolean;
   auctionActive?: boolean;
+  auctionRoundsCount?: number;
+  featuredCapsuleId?: string | null;
+  featuredCapsule?: Capsule | null;
 }
 
 interface LiveComment {
@@ -42,9 +47,20 @@ interface LiveComment {
   avatarUrl?: string;
   createdAt: string;
   isBid?: boolean;
+  isGift?: boolean;
+  giftEmoji?: string;
 }
 
 const DURATION_OPTIONS = [2, 5, 10, 30];
+
+// Doit rester aligné avec AUCTION_ROUNDS_LIMIT dans lives.service.ts — affiché ici comme rappel
+// avant le lancement d'une manche (pas de nouvel appel serveur, ce sont les mêmes paliers que
+// ceux déjà exposés côté client pour les capsules).
+const AUCTION_ROUNDS_LIMIT_CLIENT: Record<'free' | 'premium' | 'ultra', number | null> = {
+  free: 2,
+  premium: 10,
+  ultra: null,
+};
 
 function fmtElapsed(seconds: number): string {
   const m = Math.floor(seconds / 60).toString().padStart(2, '0');
@@ -71,6 +87,11 @@ export default function StudioLivePage() {
   const roomRef = useRef<Room | null>(null);
   const publishedLiveIdRef = useRef<string | null>(null);
   const myId = getStoredUser()?.id;
+  // Garde-fou pour ne terminer le live qu'une seule fois (clic sur "Terminer" OU depart de la
+  // page), et connait toujours l'id courant sans faire re-souscrire l'effet ci-dessous a chaque
+  // mise a jour de `live` (file de vente, cadeaux...).
+  const liveEndedRef = useRef(false);
+  const liveIdRef = useRef<string | null>(null);
 
   const [mediaError, setMediaError] = useState('');
   const [mediaReady, setMediaReady] = useState(false);
@@ -89,17 +110,22 @@ export default function StudioLivePage() {
   const [sales, setSales] = useState({ count: 0, revenue: 0 });
 
   const [myCapsules, setMyCapsules] = useState<Capsule[]>([]);
-  const [featuredCapsule, setFeaturedCapsule] = useState<Capsule | null>(null);
   const [capsulePickerOpen, setCapsulePickerOpen] = useState(false);
   const [capsuleDrawerOpen, setCapsuleDrawerOpen] = useState(false);
 
-  const [mode, setMode] = useState<LiveMode>('live');
+  // Mode "live classique" desactive pour l'instant (voir bouton grise ci-dessous) — le studio
+  // se concentre sur les enchères, donc on pre-selectionne directement ce mode.
+  const [mode, setMode] = useState<LiveMode>('auction');
 
   // Le bouton "Enchere" du Studio renvoie ici avec ?mode=auction pour pre-selectionner le mode.
   useEffect(() => {
     if (!router.isReady) return;
     if (router.query.mode === 'auction') setMode('auction');
   }, [router.isReady, router.query.mode]);
+
+  const myPlan = (getStoredUser()?.plan || 'free') as 'free' | 'premium' | 'ultra';
+  const auctionRoundsLimit = AUCTION_ROUNDS_LIMIT_CLIENT[myPlan];
+  const capsuleProductsLimit = getCapsuleGroupLimit(myPlan);
 
   // Lancement d'une manche d'enchere — choisi en plein direct, capsule par capsule.
   const [auctionCapsuleId, setAuctionCapsuleId] = useState('');
@@ -138,7 +164,6 @@ export default function StudioLivePage() {
     api.get<LiveSession | null>('/lives/mine').then((existing) => {
       if (!existing) return;
       setLive(existing);
-      setFeaturedCapsule(existing.capsules?.[0] ?? null);
       if (existing.mode === 'auction' && existing.auctionActive) {
         setRoundActive(true);
         setActiveAuctionCapsule(existing.auctionCapsule ?? null);
@@ -232,9 +257,11 @@ export default function StudioLivePage() {
     tick();
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
-  }, [live]);
+  }, [live?.startedAt]);
 
   // Connexion WebSocket pour le chat + compteur de spectateurs, une fois le live demarre.
+  // Depend uniquement de live?.id (pas de `live` en entier) : mettre a jour live.capsules /
+  // live.featuredCapsule (file de vente) ne doit pas fermer/rouvrir la connexion.
   useEffect(() => {
     if (!live) return;
 
@@ -272,13 +299,57 @@ export default function StudioLivePage() {
       setRoundActive(false);
       setAuctionResult(d);
     });
+    socket.on('featuredCapsuleChanged', (d: { capsuleId: string | null; capsule: Capsule | null }) => {
+      setLive((prev) => (prev ? { ...prev, featuredCapsuleId: d.capsuleId, featuredCapsule: d.capsule } : prev));
+    });
+    socket.on('giftSent', (d: { giftType: string; username: string; displayName?: string }) => {
+      const gift = giftById(d.giftType);
+      if (!gift) return;
+      setComments((prev) => [...prev, {
+        id: `gift-${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        text: `a envoyé ${gift.emoji} ${gift.name}`,
+        userId: '',
+        username: d.displayName || d.username,
+        createdAt: new Date().toISOString(),
+        isGift: true,
+        giftEmoji: gift.emoji,
+      }]);
+    });
 
     return () => {
       socket.emit('leave', { liveId: live.id });
       socket.close();
       socketRef.current = null;
     };
-  }, [live]);
+  }, [live?.id]);
+
+  useEffect(() => {
+    liveIdRef.current = live?.id ?? null;
+  }, [live?.id]);
+
+  // Quitter le studio (navigation interne ou fermeture d'onglet) sans avoir clique "Terminer le
+  // live" laissait le live actif indefiniment cote serveur (bloquant tout nouveau lancement —
+  // voir LivesService.start/startAuction) alors que la camera/le flux s'arretent bel et bien
+  // localement. On termine donc le live cote serveur des qu'on part, comme le ferait "Terminer
+  // le live" — rester "en direct" est desormais lie au fait de rester sur cette page.
+  useEffect(() => {
+    function endOnLeave() {
+      if (liveEndedRef.current || !liveIdRef.current) return;
+      liveEndedRef.current = true;
+      const token = getToken();
+      fetch(`/api/lives/${liveIdRef.current}/end`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        keepalive: true,
+      }).catch(() => {});
+    }
+    router.events.on('routeChangeStart', endOnLeave);
+    window.addEventListener('pagehide', endOnLeave);
+    return () => {
+      router.events.off('routeChangeStart', endOnLeave);
+      window.removeEventListener('pagehide', endOnLeave);
+    };
+  }, [router]);
 
   // Diffusion video reelle vers les spectateurs (LiveKit) — publie le flux camera/micro deja
   // obtenu pour l'apercu local, une fois le live demarre. Si LiveKit n'est pas configure cote
@@ -313,7 +384,7 @@ export default function StudioLivePage() {
     return () => {
       cancelled = true;
     };
-  }, [live, mediaReady]);
+  }, [live?.id, mediaReady]);
 
   // Compte a rebours de l'enchere — recalcule chaque seconde a partir de auctionEndsAt (mis a
   // jour par les evenements bidUpdate en cas de prolongation anti-sniping).
@@ -323,7 +394,7 @@ export default function StudioLivePage() {
     tick();
     const timer = setInterval(tick, 1000);
     return () => clearInterval(timer);
-  }, [live, auctionEndsAt]);
+  }, [live?.mode, auctionEndsAt]);
 
   useEffect(() => {
     commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -341,7 +412,7 @@ export default function StudioLivePage() {
     poll();
     const timer = setInterval(poll, 5000);
     return () => { cancelled = true; clearInterval(timer); };
-  }, [live]);
+  }, [live?.id]);
 
   function toggleMic() {
     const track = streamRef.current?.getAudioTracks()[0];
@@ -408,6 +479,7 @@ export default function StudioLivePage() {
   async function handleEnd() {
     if (!live) return;
     setEnding(true);
+    liveEndedRef.current = true;
     try {
       await api.patch(`/lives/${live.id}/end`);
       streamRef.current?.getTracks().forEach((t) => t.stop());
@@ -416,6 +488,7 @@ export default function StudioLivePage() {
       router.push('/profile/me');
     } catch {
       setEnding(false);
+      liveEndedRef.current = false;
     }
   }
 
@@ -438,15 +511,43 @@ export default function StudioLivePage() {
     socketRef.current.emit('banUser', { liveId: live.id, userId, token: getToken() });
   }
 
+  // Met en avant un produit — file de vente façon Whatnot. `setFeatured` persiste le choix
+  // cote serveur (PATCH /lives/:id/featured), qui diffuse ensuite le changement a tous les
+  // spectateurs via websocket (voir le listener 'featuredCapsuleChanged' plus haut).
+  async function setFeatured(capsuleId: string | null) {
+    if (!live) return;
+    try {
+      const updated = await api.patch<LiveSession>(`/lives/${live.id}/featured`, { capsuleId });
+      setLive((prev) => (prev ? { ...prev, ...updated } : updated));
+    } catch {
+      // silencieux — le produit mis en avant reste simplement inchange
+    }
+  }
+
+  // Choix depuis le picker : attache d'abord la capsule au live si besoin (roster de vente),
+  // puis la met en avant immediatement.
   async function selectCapsule(capsule: Capsule) {
     if (!live) return;
     try {
-      await api.post(`/lives/${live.id}/capsules`, { capsuleId: capsule.id });
-      setFeaturedCapsule(capsule);
+      let current: LiveSession = live;
+      if (!live.capsules?.some((c) => c.id === capsule.id)) {
+        current = await api.post<LiveSession>(`/lives/${live.id}/capsules`, { capsuleId: capsule.id });
+        setLive((prev) => (prev ? { ...prev, ...current } : current));
+      }
       setCapsulePickerOpen(false);
+      await setFeatured(capsule.id);
     } catch {
       // silencieux — la capsule reste simplement non mise en avant
     }
+  }
+
+  // Avance a l'article suivant de la file (ordre d'attachement) — boucle au premier une fois
+  // le dernier atteint, comme le "Suivant" d'une file Whatnot pendant un live.
+  function advanceFeatured() {
+    if (!live?.capsules?.length) return;
+    const idx = live.capsules.findIndex((c) => c.id === live.featuredCapsuleId);
+    const next = live.capsules[(idx + 1) % live.capsules.length];
+    setFeatured(next.id);
   }
 
   return (
@@ -530,7 +631,7 @@ export default function StudioLivePage() {
                     </div>
                   )}
 
-                  {live && live.mode !== 'auction' && featuredCapsule && (
+                  {live && live.mode !== 'auction' && live.featuredCapsule && (
                     <button
                       onClick={() => setCapsuleDrawerOpen(true)}
                       className="skoleom-capsule-btn skoleom-capsule-btn--breathe absolute bottom-3 right-3 z-10"
@@ -580,10 +681,9 @@ export default function StudioLivePage() {
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        onClick={() => setMode('live')}
-                        className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold transition-all ${
-                          mode === 'live' ? 'bg-[#a8ff35] text-black border-[#a8ff35]' : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08]'
-                        }`}
+                        disabled
+                        title="Bientôt disponible — le studio se concentre sur les enchères pour le moment."
+                        className="flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold bg-white/[0.02] text-white/25 border-white/[0.06] cursor-not-allowed"
                       >
                         <Radio size={14} /> Live classique
                       </button>
@@ -650,12 +750,34 @@ export default function StudioLivePage() {
                           </div>
                         ) : (
                           <div className="space-y-3 bg-white/[0.03] border border-white/[0.07] rounded-2xl p-4">
+                            {auctionRoundsLimit !== null && (
+                              <p
+                                className={`text-[11px] leading-relaxed rounded-lg px-2.5 py-2 border ${
+                                  (live.auctionRoundsCount ?? 0) >= auctionRoundsLimit
+                                    ? 'bg-red-400/10 text-red-300 border-red-400/20'
+                                    : 'bg-white/[0.03] text-white/40 border-white/[0.06]'
+                                }`}
+                              >
+                                {(live.auctionRoundsCount ?? 0) >= auctionRoundsLimit ? 'Limite atteinte — ' : ''}
+                                Ton offre actuelle te permet {auctionRoundsLimit} manche{auctionRoundsLimit > 1 ? 's' : ''} d&apos;enchère par live, avec jusqu&apos;à {capsuleProductsLimit ?? 'un nombre illimité de'} produit{capsuleProductsLimit !== 1 ? 's' : ''} par capsule.{' '}
+                                <Link href="/profile/me?tab=capsules" className="underline font-semibold hover:brightness-110">
+                                  Mettre à jour ton offre
+                                </Link>{' '}
+                                pour plus de manches.
+                              </p>
+                            )}
+
                             <div>
                               <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2">
                                 Lancer une enchère pour…
                               </p>
                               {myCapsules.length === 0 ? (
-                                <p className="text-white/40 text-xs">Crée d&apos;abord une capsule depuis ton profil.</p>
+                                <Link
+                                  href="/profile/me?tab=capsules&openCapsule=1"
+                                  className="flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-white/15 text-white/50 text-xs font-medium hover:bg-white/[0.04] hover:text-white hover:border-white/25 transition-all"
+                                >
+                                  <Package size={14} /> Crée d&apos;abord une capsule depuis ton profil
+                                </Link>
                               ) : (
                                 <div className="space-y-1.5 max-h-40 overflow-y-auto scrollbar-hide">
                                   {myCapsules.map((c) => (
@@ -724,7 +846,7 @@ export default function StudioLivePage() {
 
                                 <button
                                   onClick={handleLaunchAuction}
-                                  disabled={launching}
+                                  disabled={launching || (auctionRoundsLimit !== null && (live.auctionRoundsCount ?? 0) >= auctionRoundsLimit)}
                                   className="btn-skoleom w-full py-2.5 rounded-full text-sm disabled:opacity-60 flex items-center justify-center gap-2"
                                 >
                                   {launching ? <Loader2 size={14} className="animate-spin" /> : <Gavel size={14} />}
@@ -736,13 +858,79 @@ export default function StudioLivePage() {
                         )}
                       </>
                     ) : (
-                      <button
-                        onClick={() => setCapsulePickerOpen(true)}
-                        className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06] text-white/80 text-sm font-semibold transition-all"
-                      >
-                        <Package size={15} className="text-[#a8ff35]" />
-                        {featuredCapsule ? `Capsule : ${featuredCapsule.name}` : 'Mettre en avant une capsule'}
-                      </button>
+                      <div className="space-y-3 bg-white/[0.03] border border-white/[0.07] rounded-2xl p-4">
+                        <div className="flex items-center justify-between">
+                          <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40">
+                            File de vente
+                          </p>
+                          <button
+                            type="button"
+                            onClick={() => setCapsulePickerOpen(true)}
+                            className="flex items-center gap-1 text-[11px] font-semibold text-[#a8ff35] hover:brightness-110 transition-all"
+                          >
+                            <Plus size={12} /> Ajouter
+                          </button>
+                        </div>
+
+                        {live.featuredCapsule ? (
+                          <div className="flex items-center gap-3 p-2.5 rounded-xl border border-[#a8ff35]/40 bg-[#a8ff35]/10">
+                            <div className="w-11 h-11 rounded-lg bg-white/[0.05] overflow-hidden shrink-0 flex items-center justify-center">
+                              {live.featuredCapsule.imageUrl ? (
+                                <img src={live.featuredCapsule.imageUrl} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <Package size={16} className="text-white/25" />
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-[#a8ff35]">En vente maintenant</p>
+                              <p className="text-sm font-semibold text-white truncate">{live.featuredCapsule.name}</p>
+                            </div>
+                            <span className="text-[#a8ff35] font-bold text-sm shrink-0">{live.featuredCapsule.price.toFixed(2)} €</span>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setCapsulePickerOpen(true)}
+                            className="w-full flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-white/15 text-white/50 text-sm font-medium hover:bg-white/[0.04] hover:text-white hover:border-white/25 transition-all"
+                          >
+                            <Package size={15} /> Choisir le premier produit
+                          </button>
+                        )}
+
+                        {live.capsules && live.capsules.filter((c) => c.id !== live.featuredCapsuleId).length > 0 && (
+                          <div className="space-y-1.5">
+                            <p className="text-[10px] font-semibold uppercase tracking-wider text-white/30">À suivre</p>
+                            {live.capsules.filter((c) => c.id !== live.featuredCapsuleId).map((c) => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => setFeatured(c.id)}
+                                className="w-full flex items-center gap-2.5 p-2 rounded-xl border border-white/[0.06] bg-white/[0.02] hover:bg-white/[0.06] text-left transition-all"
+                              >
+                                <div className="w-8 h-8 rounded-lg bg-white/[0.05] overflow-hidden shrink-0 flex items-center justify-center">
+                                  {c.imageUrl ? (
+                                    <img src={c.imageUrl} alt="" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <Package size={12} className="text-white/25" />
+                                  )}
+                                </div>
+                                <span className="flex-1 min-w-0 text-[13px] text-white/70 truncate">{c.name}</span>
+                                <span className="text-white/30 text-[12px] shrink-0">{c.price.toFixed(2)} €</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+
+                        {live.capsules && live.capsules.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={advanceFeatured}
+                            className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-white/[0.06] hover:bg-white/10 text-white text-sm font-semibold transition-all"
+                          >
+                            Suivant <ChevronRight size={14} />
+                          </button>
+                        )}
+                      </div>
                     )}
                     <button
                       onClick={handleEnd}
@@ -768,6 +956,17 @@ export default function StudioLivePage() {
                   )}
                   {comments.map((c) => {
                     const isHost = c.userId === myId;
+                    if (c.isGift) {
+                      return (
+                        <div key={c.id} className="flex items-center gap-2 text-[13px] leading-snug bg-white/[0.03] rounded-xl px-2 py-1.5">
+                          <span className="text-[18px] leading-none shrink-0">{c.giftEmoji}</span>
+                          <p className="min-w-0">
+                            <span className="font-semibold mr-1 text-[#f59e0b]">{c.username}</span>
+                            <span className="text-[#f59e0b]/80 break-words font-medium">{c.text}</span>
+                          </p>
+                        </div>
+                      );
+                    }
                     if (c.isBid) {
                       return (
                         <div key={c.id} className="flex items-center gap-2 text-[13px] leading-snug bg-white/[0.03] rounded-xl px-2 py-1.5">
@@ -858,7 +1057,7 @@ export default function StudioLivePage() {
                     key={c.id}
                     onClick={() => selectCapsule(c)}
                     className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
-                      featuredCapsule?.id === c.id
+                      live?.featuredCapsuleId === c.id
                         ? 'border-[#a8ff35] bg-[#a8ff35]/10'
                         : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06]'
                     }`}
@@ -882,9 +1081,9 @@ export default function StudioLivePage() {
         </div>
       )}
 
-      {featuredCapsule && (
+      {live?.featuredCapsule && (
         <CapsuleDrawer
-          capsules={[featuredCapsule]}
+          capsules={[live.featuredCapsule]}
           open={capsuleDrawerOpen}
           onClose={() => setCapsuleDrawerOpen(false)}
         />

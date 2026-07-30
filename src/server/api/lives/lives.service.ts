@@ -287,8 +287,27 @@ export class LivesService {
     if (!live) throw new NotFoundException('Live introuvable');
 
     live.capsules = live.capsules.filter((c) => c.id !== capsuleId);
+    if (live.featuredCapsuleId === capsuleId) live.featuredCapsuleId = null as unknown as string;
     await this.livesRepo.save(live);
     return live;
+  }
+
+  // Met en avant (ou retire, si capsuleId est null) le produit "en vente maintenant" d'un live
+  // classique — c'est la file de vente façon Whatnot : le créateur avance manuellement de
+  // produit en produit pendant le direct, et le changement est diffusé à tous les spectateurs
+  // (voir LivesGateway.broadcastFeaturedCapsule, appelé par le controller juste après).
+  async setFeaturedCapsule(liveId: string, creatorId: string, capsuleId: string | null): Promise<LiveSession> {
+    const live = await this.livesRepo.findOne({ where: { id: liveId, creatorId }, relations: ['capsules'] });
+    if (!live) throw new NotFoundException('Live introuvable');
+    if (live.mode !== LiveMode.LIVE) {
+      throw new BadRequestException("La mise en avant de produit n'est disponible qu'en mode live classique.");
+    }
+    if (capsuleId !== null && !live.capsules.some((c) => c.id === capsuleId)) {
+      throw new BadRequestException("Cette capsule n'est pas attachée à ce live — ajoute-la d'abord.");
+    }
+
+    await this.livesRepo.update(liveId, { featuredCapsuleId: capsuleId as unknown as string });
+    return (await this.livesRepo.findOne({ where: { id: liveId }, relations: ['capsules'] }))!;
   }
 
   async getSales(liveId: string): Promise<{ count: number; revenue: number }> {
@@ -336,7 +355,7 @@ export class LivesService {
     return live?.creatorId === userId;
   }
 
-  async sendGift(liveId: string, senderId: string, giftType: string): Promise<{ walletBalance: number }> {
+  async sendGift(liveId: string, senderId: string, giftType: string): Promise<{ walletBalance: number; senderUsername: string; senderDisplayName?: string }> {
     const live = await this.livesRepo.findOne({ where: { id: liveId } });
     if (!live) throw new NotFoundException('Live introuvable');
     if (live.creatorId === senderId) throw new BadRequestException('Tu ne peux pas t\'envoyer un cadeau à toi-même');
@@ -382,7 +401,11 @@ export class LivesService {
     }));
 
     const updated = await this.usersRepo.findOne({ where: { id: senderId } });
-    return { walletBalance: Number(updated!.walletBalance) };
+    return {
+      walletBalance: Number(updated!.walletBalance),
+      senderUsername: sender.username,
+      senderDisplayName: sender.displayName,
+    };
   }
 
   // Utilise par les pages vitrine /live et /enchere : des createurs fictifs (videos de demo),

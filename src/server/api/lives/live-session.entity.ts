@@ -38,6 +38,15 @@ export class LiveSession {
   @JoinTable({ name: 'live_capsules' })
   capsules: Capsule[];
 
+  // Produit actuellement mis en avant en mode live classique (file de vente façon Whatnot) —
+  // doit faire partie de `capsules`. Nul si aucun produit n'a encore été choisi.
+  @ManyToOne(() => Capsule, { nullable: true, eager: true })
+  @JoinColumn({ name: 'featuredCapsuleId' })
+  featuredCapsule: Capsule;
+
+  @Column({ nullable: true })
+  featuredCapsuleId: string;
+
   // Champs specifiques au mode "enchere" — nuls pour un live classique.
   @ManyToOne(() => Capsule, { nullable: true, eager: true })
   @JoinColumn({ name: 'auctionCapsuleId' })
