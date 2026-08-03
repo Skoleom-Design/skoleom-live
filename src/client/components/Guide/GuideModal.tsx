@@ -3,7 +3,52 @@ import { createPortal } from 'react-dom';
 import {
   X, UserCircle2, ShoppingCart, Plus, Layers, TrendingUp, Zap, Crown, Gift, Megaphone,
   RefreshCw, Landmark, ShieldCheck, Handshake, Trophy, Shirt, Ticket, Laptop, Globe, Store, Star, Gavel,
+  Play, Clock,
 } from 'lucide-react';
+
+// Lecteur video explicatif — passe `src` une fois la vraie video prete (mp4 ou embed
+// YouTube/Vimeo), affiche un placeholder stylise en attendant.
+function ExplainerVideo({ accent, duration, caption, src }: {
+  accent: 'blue' | 'green' | 'purple';
+  duration: string;
+  caption: string;
+  src?: string;
+}) {
+  const colors = {
+    blue: { text: '#a8ff35', border: '#a8ff3530', bg: '#a8ff3510', glow: 'rgba(168,255,53,0.25)' },
+    green: { text: '#22c55e', border: '#22c55e30', bg: '#22c55e10', glow: 'rgba(34,197,94,0.25)' },
+    purple: { text: '#a855f7', border: '#a855f730', bg: '#a855f710', glow: 'rgba(168,85,247,0.25)' },
+  }[accent];
+
+  if (src) {
+    return (
+      <div className="rounded-[18px] overflow-hidden border mb-5" style={{ borderColor: colors.border }}>
+        <video src={src} controls className="w-full aspect-video bg-black" />
+      </div>
+    );
+  }
+
+  return (
+    <div
+      className="relative rounded-[18px] overflow-hidden border mb-5 aspect-video flex flex-col items-center justify-center text-center px-6"
+      style={{ borderColor: colors.border, background: `linear-gradient(135deg, ${colors.bg}, transparent)` }}
+    >
+      <button
+        type="button"
+        disabled
+        className="w-14 h-14 rounded-full flex items-center justify-center mb-3 border transition-all duration-200"
+        style={{ background: colors.bg, borderColor: colors.border, boxShadow: `0 0 24px ${colors.glow}` }}
+      >
+        <Play size={22} style={{ color: colors.text }} fill={colors.text} />
+      </button>
+      <p className="text-[13px] font-bold text-white mb-1">{caption}</p>
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold" style={{ color: colors.text }}>
+        <Clock size={11} />
+        Vidéo bientôt disponible · {duration}
+      </div>
+    </div>
+  );
+}
 
 type Tab = 'creator' | 'buyer' | 'skoleom';
 
@@ -186,6 +231,12 @@ export function GuideModal({ open, onClose }: Props) {
                 <p className="text-[12px] text-white/40 leading-relaxed mb-5">
                   Aucun statut requis pour créer : marque, influenceur ou simple utilisateur qui veut vendre un article — tout le monde peut lancer sa Capsule.
                 </p>
+
+                <ExplainerVideo
+                  accent="blue"
+                  duration="1 min 30"
+                  caption="Regarde comment lancer ta première Enchère"
+                />
 
                 <div className="flex flex-col gap-3 mb-5">
                   <Step
