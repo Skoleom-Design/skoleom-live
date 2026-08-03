@@ -33,7 +33,7 @@ async function bootstrap() {
 
   const port = process.env.PORT || 3000;
   await app.listen(port);
-  console.log(`skoleomLive API running on :${port}`);
+  console.log(`skoleomLive running on :${port}`);
 }
 
 bootstrap();

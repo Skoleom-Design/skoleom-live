@@ -31,7 +31,7 @@ Le paiement (Stripe), le calcul des commissions, l'authentification JWT et le st
 - [Licence](#licence)
 
 ## Stack
-- **Backend**: NestJS 10 + TypeORM + MySQL
+- **Backend**: NestJS 10 + TypeORM + PostgreSQL
 - **Frontend**: Next.js 15 + React 19 + TailwindCSS
 - **Paiement**: Stripe
 - **Stockage médias**: AWS S3 (URLs présignées)
@@ -153,8 +153,8 @@ cp .env.example .env
 # 2. Installer les dépendances
 npm install
 
-# 3. Créer la base de données MySQL
-mysql -u root -e "CREATE DATABASE skoleom_live;"
+# 3. Base de données : `docker compose up -d` pour un Postgres local (voir docker-compose.yml),
+#    ou laisser DB_HOST vide dans .env pour retomber sur SQLite (aucune config requise).
 
 # 4. Lancer en développement (API :3000 + Front :3001)
 npm run dev
@@ -340,7 +340,7 @@ Points à vérifier avant mise en prod :
 ## Checklist dev
 
 ```
-1. MySQL lancé et base skoleom_live créée
+1. Postgres lancé (`docker compose up -d`) ou DB_HOST vide pour SQLite
 2. .env rempli (DB, JWT_SECRET, Stripe test keys, AWS S3)
 3. npm install
 4. npm run dev (API :3000 + Front :3001)

@@ -35,12 +35,15 @@ import { InstagramModule } from './api/instagram/instagram.module';
     ScheduleModule.forRoot(),
     process.env.DB_HOST
       ? TypeOrmModule.forRoot({
-          type: 'mysql',
+          type: 'postgres',
           host: process.env.DB_HOST,
-          port: parseInt(process.env.DB_PORT || '3306'),
-          username: process.env.DB_USERNAME || 'root',
+          port: parseInt(process.env.DB_PORT || '5432'),
+          username: process.env.DB_USERNAME || 'postgres',
           password: process.env.DB_PASSWORD || '',
           database: process.env.DB_NAME || 'skoleom_live',
+          // Supabase (et la plupart des hebergeurs Postgres geres) exige TLS sur la connexion ;
+          // rejectUnauthorized: false accepte leur certificat auto-signe / chaine non verifiee.
+          ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
           entities: [User, Post, Comment, Capsule, CapsuleGroup, Order, Boost, LiveSession, LiveComment, Gift, AuctionBid, WalletTransaction, AdminActionLog, Notification],
           synchronize: process.env.NODE_ENV !== 'production',
           logging: process.env.NODE_ENV === 'development',
