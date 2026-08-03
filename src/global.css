@@ -202,6 +202,19 @@
   animation: fade-in 0.25s ease-out both;
 }
 
+/* Cadeau 3D qui "explose" au-dessus de la video puis s'envole en s'estompant — visible par
+   tout le monde (hote + spectateurs), pas seulement dans le chat. */
+@keyframes gift-burst {
+  0%   { opacity: 0; transform: translateY(30px) scale(0.35) rotate(-8deg); }
+  15%  { opacity: 1; transform: translateY(-2px) scale(1.2) rotate(4deg); }
+  25%  { transform: translateY(0) scale(1) rotate(0deg); }
+  80%  { opacity: 1; transform: translateY(-14px) scale(1); }
+  100% { opacity: 0; transform: translateY(-70px) scale(0.8); }
+}
+.animate-gift-burst {
+  animation: gift-burst 3.2s cubic-bezier(0.16, 0.84, 0.24, 1) both;
+}
+
 @layer utilities {
   .scrollbar-hide {
     -ms-overflow-style: none;

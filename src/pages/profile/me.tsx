@@ -6,11 +6,13 @@ import {
   LogOut, Plus, Trash2, Package, BarChart2, Grid3x3, Loader2, Pencil, Camera, X,
   Heart, Zap, Wallet, ArrowDownToLine, ArrowUpFromLine, Radio, Settings, Check,
   Receipt, ShoppingBag, Gift, Clock, Truck, MoreVertical, Landmark, CreditCard,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { BoostModal } from '../../client/components/Boost/BoostModal';
 import { CapsuleProductForm, CapsuleProductFormHandle } from '../../client/components/Capsule/CapsuleProductForm';
-import { api, ApiError, getToken, getStoredUser, clearSession } from '../../shared/api/http';
+import { CameraCaptureModal } from '../../client/components/Post/CameraCaptureModal';
+import { api, ApiError, getToken, getStoredUser, clearSession, uploadFile } from '../../shared/api/http';
 import type { CapsuleCondition, CapsuleCategory } from '../../shared/types/api';
 import { categoryLabel, conditionLabel, subcategoryLabel } from '../../client/constants/capsule';
 import { useLanguage } from '../../client/i18n/LanguageContext';
@@ -198,6 +200,23 @@ export default function ProfilePage() {
   const [editPostError, setEditPostError] = useState('');
   const [editPostSaving, setEditPostSaving] = useState(false);
 
+  // Remplacement du media (photo/video) — reste vide (media d'origine conserve) tant que
+  // l'utilisateur n'a pas choisi un nouveau fichier.
+  const [editFile, setEditFile] = useState<File | null>(null);
+  const [editPreview, setEditPreview] = useState('');
+  const [editCameraOpen, setEditCameraOpen] = useState(false);
+  const editFileInputRef = useRef<HTMLInputElement>(null);
+
+  // Capsules rattachees au post en cours d'edition — attach/detach sont immediats (comme
+  // partout ailleurs dans l'app), independants du bouton "Enregistrer" de la modale.
+  const [editAttachedCapsules, setEditAttachedCapsules] = useState<CapsuleData[]>([]);
+  const [editCapsuleActionId, setEditCapsuleActionId] = useState<string | null>(null);
+  const [editCapsulePickerOpen, setEditCapsulePickerOpen] = useState(false);
+  const [editMyCapsules, setEditMyCapsules] = useState<CapsuleData[] | null>(null);
+  const [editCapsuleError, setEditCapsuleError] = useState('');
+
+  const [livesCount, setLivesCount] = useState(0);
+
   function showComingSoon(label: string) {
     setNotice(t('profile.comingSoon', { label }));
     setTimeout(() => setNotice(''), 3000);
@@ -214,7 +233,7 @@ export default function ProfilePage() {
     }
     (async () => {
       try {
-        const [me, stats, liked, capsules, transactions, orders, buyer] = await Promise.all([
+        const [me, stats, liked, capsules, transactions, orders, buyer, lives] = await Promise.all([
           api.get<MeUser>('/auth/me'),
           api.get<Analytics>('/posts/analytics/me'),
           api.get<LikedPost[]>('/posts/liked/me').catch(() => []),
@@ -222,6 +241,7 @@ export default function ProfilePage() {
           api.get<WalletTransactionData[]>('/payments/wallet/transactions').catch(() => []),
           api.get<{ purchases: OrderData[]; sales: OrderData[] }>('/orders/me').catch(() => ({ purchases: [], sales: [] })),
           api.get<BuyerStats>('/orders/me/buyer-stats').catch(() => null),
+          api.get<{ count: number }>('/lives/mine/count').catch(() => ({ count: 0 })),
         ]);
         setUser(me);
         setAnalytics(stats);
@@ -230,6 +250,7 @@ export default function ProfilePage() {
         setWalletTransactions(transactions);
         setOrdersData(orders);
         setBuyerStats(buyer);
+        setLivesCount(lives.count);
       } catch (err) {
         setError(err instanceof ApiError ? err.message : t('common.genericError'));
       } finally {
@@ -374,9 +395,79 @@ export default function ProfilePage() {
     setEditCaption(post.caption || '');
     setEditTags(post.tags || []);
     setEditTagInput('');
+    setEditFile(null);
+    setEditPreview('');
+    setEditAttachedCapsules(post.capsules || []);
+    setEditCapsulePickerOpen(false);
+    setEditCapsuleError('');
     setEditPostError('');
     setEditPostOpen(true);
     setOpenMenuPostId(null);
+  }
+
+  function applyEditFile(file: File) {
+    setEditFile(file);
+    setEditPreview(URL.createObjectURL(file));
+  }
+
+  function onEditFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (f) applyEditFile(f);
+  }
+
+  async function openEditCapsulePicker() {
+    setEditCapsuleError('');
+    setEditCapsulePickerOpen(true);
+    if (editMyCapsules === null) {
+      try {
+        setEditMyCapsules(await api.get<CapsuleData[]>('/capsules/mine'));
+      } catch {
+        setEditMyCapsules([]);
+      }
+    }
+  }
+
+  // Garde la carte du post (sous la modale) synchronisee avec les attach/detach immediats,
+  // pour ne pas afficher un nombre de capsules perime tant que la modale est ouverte.
+  function syncPostCapsules(postId: string, capsules: CapsuleData[]) {
+    setEditPostTarget((prev) => (prev && prev.id === postId ? { ...prev, capsules } : prev));
+    setAnalytics((prev) =>
+      prev ? { ...prev, posts: prev.posts.map((p) => (p.id === postId ? { ...p, capsules } : p)) } : prev,
+    );
+  }
+
+  async function attachExistingCapsule(capsule: CapsuleData) {
+    if (!editPostTarget) return;
+    setEditCapsuleActionId(capsule.id);
+    setEditCapsuleError('');
+    try {
+      await api.post(`/capsules/${capsule.id}/attach`, { postId: editPostTarget.id });
+      const updated = [...editAttachedCapsules, capsule];
+      setEditAttachedCapsules(updated);
+      syncPostCapsules(editPostTarget.id, updated);
+      setEditCapsulePickerOpen(false);
+    } catch (err) {
+      setEditCapsuleError(err instanceof ApiError ? err.message : t('common.genericError'));
+    } finally {
+      setEditCapsuleActionId(null);
+    }
+  }
+
+  async function detachCapsule(capsuleId: string) {
+    if (!editPostTarget) return;
+    setEditCapsuleActionId(capsuleId);
+    setEditCapsuleError('');
+    try {
+      await api.post(`/capsules/${capsuleId}/detach`, { postId: editPostTarget.id });
+      const updated = editAttachedCapsules.filter((c) => c.id !== capsuleId);
+      setEditAttachedCapsules(updated);
+      syncPostCapsules(editPostTarget.id, updated);
+    } catch (err) {
+      setEditCapsuleError(err instanceof ApiError ? err.message : t('common.genericError'));
+    } finally {
+      setEditCapsuleActionId(null);
+    }
   }
 
   function addEditTag() {
@@ -399,15 +490,23 @@ export default function ProfilePage() {
     setEditPostError('');
     setEditPostSaving(true);
     try {
+      let media: { mediaUrl: string; type: 'photo' | 'video' } | undefined;
+      if (editFile) {
+        const mediaUrl = await uploadFile(editFile, 'posts');
+        media = { mediaUrl, type: editFile.type.startsWith('video/') ? 'video' : 'photo' };
+      }
       const updated = await api.patch<PostData>(`/posts/${editPostTarget.id}`, {
         caption: editCaption.trim() || undefined,
         tags: editTags,
+        ...media,
       });
       setAnalytics((prev) =>
         prev
           ? { ...prev, posts: prev.posts.map((p) => (p.id === updated.id ? { ...p, ...updated } : p)) }
           : prev,
       );
+      setEditFile(null);
+      setEditPreview('');
       setEditPostOpen(false);
     } catch (err) {
       setEditPostError(err instanceof ApiError ? err.message : t('common.genericError'));
@@ -568,18 +667,6 @@ export default function ProfilePage() {
                   )}
                 </div>
                 {user.bio && <p className="text-[13px] text-white/45 mb-3">{user.bio}</p>}
-                <div className="flex gap-6">
-                  {[
-                    { label: t('profile.views'), value: analytics.totals.views },
-                    { label: t('profile.sales'), value: analytics.totals.sold },
-                    { label: t('profile.revenue'), value: `${analytics.totals.revenue.toFixed(2)} €` },
-                  ].map((s) => (
-                    <div key={s.label} className="text-center">
-                      <p className="text-[16px] font-extrabold text-white">{s.value}</p>
-                      <p className="text-[11px] text-white/40">{s.label}</p>
-                    </div>
-                  ))}
-                </div>
               </div>
               <div className="flex flex-col items-end gap-2">
                 <Link href="/studio"
@@ -987,6 +1074,8 @@ export default function ProfilePage() {
                       { label: t('profile.totalLikes'), value: analytics.totals.likes },
                       { label: t('profile.capsulesSold'), value: analytics.totals.sold },
                       { label: t('profile.netRevenue'), value: `${analytics.totals.revenue.toFixed(2)} €` },
+                      { label: t('profile.totalPosts'), value: analytics.posts.length },
+                      { label: t('profile.totalLives'), value: livesCount },
                     ].map((s) => (
                       <div key={s.label} className="bg-white/[0.03] border border-white/[0.07] rounded-[16px] p-4">
                         <p className="text-[20px] font-extrabold text-white">{s.value}</p>
@@ -1358,7 +1447,7 @@ export default function ProfilePage() {
 
       {editPostOpen && editPostTarget && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
-          <div className="cosmic-modal w-full max-w-sm overflow-hidden border border-white/[0.08] rounded-[20px] p-5">
+          <div className="cosmic-modal w-full max-w-md max-h-[88vh] overflow-y-auto scrollbar-hide border border-white/[0.08] rounded-[20px] p-5">
             <div className="flex items-center justify-between mb-5">
               <h2 className="text-white font-bold text-base">{t('profile.editPost')}</h2>
               <button onClick={() => setEditPostOpen(false)}
@@ -1367,6 +1456,58 @@ export default function ProfilePage() {
               </button>
             </div>
             <form onSubmit={handleUpdatePost} className="space-y-4">
+              <div>
+                <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
+                  {t('profile.mediaLabel')}
+                </label>
+                <div className="flex items-center gap-3">
+                  <div className="relative w-20 h-20 rounded-xl overflow-hidden bg-white/[0.05] border border-white/[0.08] shrink-0 flex items-center justify-center">
+                    {editPreview ? (
+                      editFile?.type.startsWith('video/') ? (
+                        <video src={editPreview} className="w-full h-full object-cover" muted />
+                      ) : (
+                        <img src={editPreview} className="w-full h-full object-cover" alt="" />
+                      )
+                    ) : editPostTarget.type === 'video' ? (
+                      <video src={editPostTarget.mediaUrl} className="w-full h-full object-cover" muted />
+                    ) : (
+                      <img src={editPostTarget.mediaUrl} className="w-full h-full object-cover" alt="" />
+                    )}
+                    {editPreview && (
+                      <button
+                        type="button"
+                        onClick={() => { setEditFile(null); setEditPreview(''); }}
+                        className="absolute top-1 right-1 w-5 h-5 rounded-full bg-black/60 hover:bg-black/80 flex items-center justify-center"
+                      >
+                        <X size={11} className="text-white" />
+                      </button>
+                    )}
+                  </div>
+                  <div className="flex-1 grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setEditCameraOpen(true)}
+                      className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl border border-dashed border-white/15 text-white/50 text-[11px] font-medium hover:bg-white/[0.04] hover:text-white hover:border-white/25 transition-all"
+                    >
+                      <Camera size={16} />
+                      {t('capsuleForm.takePhoto')}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => editFileInputRef.current?.click()}
+                      className="flex flex-col items-center justify-center gap-1 py-2.5 rounded-xl border border-dashed border-white/15 text-white/50 text-[11px] font-medium hover:bg-white/[0.04] hover:text-white hover:border-white/25 transition-all"
+                    >
+                      <ImageIcon size={16} />
+                      {t('capsuleForm.importPhoto')}
+                    </button>
+                  </div>
+                  <input ref={editFileInputRef} type="file" accept="image/*,video/*" onChange={onEditFileChange} className="hidden" />
+                </div>
+                {editPreview && (
+                  <p className="text-[11px] text-[#a8ff35] mt-1.5">{t('profile.newMediaReady')}</p>
+                )}
+                <CameraCaptureModal open={editCameraOpen} onClose={() => setEditCameraOpen(false)} onCapture={applyEditFile} />
+              </div>
               <div>
                 <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
                   {t('profile.captionLabel')}
@@ -1413,6 +1554,97 @@ export default function ProfilePage() {
                   </button>
                 </div>
               </div>
+
+              <div>
+                <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
+                  {t('profile.attachedCapsulesLabel')}
+                </label>
+                {editAttachedCapsules.length > 0 && (
+                  <div className="space-y-1.5 mb-2">
+                    {editAttachedCapsules.map((c) => (
+                      <div key={c.id} className="flex items-center gap-2.5 bg-white/[0.04] border border-white/10 rounded-xl p-2">
+                        <div className="w-8 h-8 rounded-lg bg-white/[0.05] overflow-hidden shrink-0 flex items-center justify-center">
+                          {c.imageUrl ? (
+                            <img src={c.imageUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <Package size={12} className="text-white/25" />
+                          )}
+                        </div>
+                        <span className="flex-1 min-w-0 text-[13px] text-white truncate">{c.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => detachCapsule(c.id)}
+                          disabled={editCapsuleActionId === c.id}
+                          className="w-6 h-6 rounded-full hover:bg-red-500/20 flex items-center justify-center text-white/30 hover:text-red-400 transition-all disabled:opacity-40 shrink-0"
+                        >
+                          {editCapsuleActionId === c.id ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {editCapsulePickerOpen ? (
+                  <div className="bg-white/[0.03] border border-white/10 rounded-xl p-3 space-y-2">
+                    {editMyCapsules === null ? (
+                      <div className="flex justify-center py-4">
+                        <Loader2 size={16} className="animate-spin text-white/30" />
+                      </div>
+                    ) : (
+                      (() => {
+                        const available = editMyCapsules.filter((c) => !editAttachedCapsules.some((a) => a.id === c.id));
+                        return available.length === 0 ? (
+                          <p className="text-white/30 text-xs text-center py-2">{t('profile.noOtherCapsuleAvailable')}</p>
+                        ) : (
+                          <div className="space-y-1.5 max-h-48 overflow-y-auto scrollbar-hide">
+                            {available.map((c) => (
+                              <button
+                                key={c.id}
+                                type="button"
+                                onClick={() => attachExistingCapsule(c)}
+                                disabled={editCapsuleActionId === c.id}
+                                className="w-full flex items-center gap-2.5 p-2 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.06] text-left transition-all disabled:opacity-50"
+                              >
+                                <div className="w-8 h-8 rounded-lg bg-white/[0.05] overflow-hidden shrink-0 flex items-center justify-center">
+                                  {c.imageUrl ? (
+                                    <img src={c.imageUrl} alt="" className="w-full h-full object-cover" />
+                                  ) : (
+                                    <Package size={12} className="text-white/25" />
+                                  )}
+                                </div>
+                                <span className="flex-1 min-w-0 text-[13px] text-white truncate">{c.name}</span>
+                                {editCapsuleActionId === c.id && <Loader2 size={12} className="animate-spin text-white/40 shrink-0" />}
+                              </button>
+                            ))}
+                          </div>
+                        );
+                      })()
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setEditCapsulePickerOpen(false)}
+                      className="w-full py-1.5 text-white/35 hover:text-white/60 text-[11px] transition-colors"
+                    >
+                      {t('common.cancel')}
+                    </button>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={openEditCapsulePicker}
+                    className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl border border-dashed border-white/15 text-white/50 text-[12px] font-medium hover:bg-white/[0.04] hover:text-white hover:border-white/25 transition-all"
+                  >
+                    <Plus size={13} /> {t('profile.attachExistingCapsule')}
+                  </button>
+                )}
+
+                {editCapsuleError && (
+                  <p className="text-red-400 text-xs bg-red-400/10 px-3 py-2 rounded-xl border border-red-400/20 mt-2">
+                    {editCapsuleError}
+                  </p>
+                )}
+              </div>
+
               {editPostError && (
                 <p className="text-red-400 text-sm bg-red-400/10 px-4 py-2.5 rounded-xl border border-red-400/20">
                   {editPostError}

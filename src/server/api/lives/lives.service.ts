@@ -75,6 +75,7 @@ export class LivesService {
   async start(creatorId: string, title?: string): Promise<LiveSession> {
     const existing = await this.livesRepo.findOne({ where: { creatorId, status: LiveStatus.LIVE } });
     if (existing) throw new BadRequestException('Un live est déjà en cours sur ce compte.');
+    await this.assertNotInRestartCooldown(creatorId);
 
     const live = this.livesRepo.create({
       creatorId,
@@ -89,6 +90,7 @@ export class LivesService {
   async startAuction(creatorId: string, title?: string): Promise<LiveSession> {
     const existing = await this.livesRepo.findOne({ where: { creatorId, status: LiveStatus.LIVE } });
     if (existing) throw new BadRequestException('Un live est déjà en cours sur ce compte.');
+    await this.assertNotInRestartCooldown(creatorId);
 
     const live = this.livesRepo.create({
       creatorId,
@@ -99,6 +101,35 @@ export class LivesService {
       auctionActive: false,
     });
     return this.livesRepo.save(live);
+  }
+
+  // Delai minimum entre la fin d'un live et le suivant — evite de pouvoir relancer un live
+  // immediatement (ex: navigation qui vient de le terminer automatiquement par erreur), sans
+  // pour autant bloquer longtemps un vendeur qui a fait une vraie erreur.
+  private readonly LIVE_RESTART_COOLDOWN_MS = 60_000;
+
+  // Secondes restantes avant de pouvoir relancer un live — 0 si aucun cooldown en cours.
+  // Utilise a la fois par le controller (endpoint affiche cote client avant meme de cliquer
+  // "Démarrer") et par assertNotInRestartCooldown ci-dessous (verification serveur faisant foi).
+  async getRestartCooldownSeconds(creatorId: string): Promise<number> {
+    const lastEnded = await this.livesRepo.findOne({
+      where: { creatorId, status: LiveStatus.ENDED },
+      order: { endedAt: 'DESC' },
+    });
+    if (!lastEnded?.endedAt) return 0;
+    const elapsed = Date.now() - new Date(lastEnded.endedAt).getTime();
+    return elapsed < this.LIVE_RESTART_COOLDOWN_MS
+      ? Math.ceil((this.LIVE_RESTART_COOLDOWN_MS - elapsed) / 1000)
+      : 0;
+  }
+
+  private async assertNotInRestartCooldown(creatorId: string): Promise<void> {
+    const remaining = await this.getRestartCooldownSeconds(creatorId);
+    if (remaining > 0) {
+      throw new BadRequestException(
+        `Merci d'attendre encore ${remaining} seconde${remaining > 1 ? 's' : ''} avant de relancer un live.`,
+      );
+    }
   }
 
   // Lance une nouvelle manche d'enchere pour une capsule donnee, en plein direct. Peut etre
@@ -262,6 +293,12 @@ export class LivesService {
     });
   }
 
+  // Nombre total de lives déjà faits par ce créateur (tous statuts confondus) — affiché dans
+  // les statistiques du profil, à côté du nombre de posts.
+  async countByCreator(creatorId: string): Promise<number> {
+    return this.livesRepo.count({ where: { creatorId } });
+  }
+
   async getById(id: string): Promise<LiveSession> {
     const live = await this.livesRepo.findOne({ where: { id }, relations: ['capsules'] });
     if (!live) throw new NotFoundException('Live introuvable');
@@ -406,6 +443,35 @@ export class LivesService {
       senderUsername: sender.username,
       senderDisplayName: sender.displayName,
     };
+  }
+
+  // Classement des plus gros donateurs de ce live (somme des cadeaux envoyes) — affiche au-dessus
+  // du chat pour inciter a la competition sociale entre spectateurs.
+  async getTopDonors(liveId: string): Promise<{ userId: string; username: string; displayName?: string; avatarUrl?: string; totalAmount: number }[]> {
+    const rows = await this.giftsRepo
+      .createQueryBuilder('gift')
+      .select('gift.senderId', 'userId')
+      .addSelect('SUM(gift.amount)', 'totalAmount')
+      .innerJoin('gift.sender', 'sender')
+      .addSelect('sender.username', 'username')
+      .addSelect('sender.displayName', 'displayName')
+      .addSelect('sender.avatarUrl', 'avatarUrl')
+      .where('gift.liveSessionId = :liveId', { liveId })
+      .groupBy('gift.senderId')
+      .addGroupBy('sender.username')
+      .addGroupBy('sender.displayName')
+      .addGroupBy('sender.avatarUrl')
+      .orderBy('totalAmount', 'DESC')
+      .limit(10)
+      .getRawMany();
+
+    return rows.map((r) => ({
+      userId: r.userId,
+      username: r.username,
+      displayName: r.displayName || undefined,
+      avatarUrl: r.avatarUrl || undefined,
+      totalAmount: Number(r.totalAmount),
+    }));
   }
 
   // Utilise par les pages vitrine /live et /enchere : des createurs fictifs (videos de demo),

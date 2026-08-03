@@ -162,6 +162,17 @@ export class CapsulesService {
     return capsule;
   }
 
+  async detachFromPost(capsuleId: string, postId: string, creatorId: string): Promise<Capsule> {
+    const capsule = await this.capsulesRepo.findOne({
+      where: { id: capsuleId, creatorId },
+      relations: ['posts'],
+    });
+    if (!capsule) throw new NotFoundException('Capsule not found');
+    capsule.posts = capsule.posts.filter((p) => p.id !== postId);
+    await this.capsulesRepo.save(capsule);
+    return capsule;
+  }
+
   async update(id: string, creatorId: string, updates: Partial<CreateCapsuleDto>): Promise<Capsule> {
     if (updates.price !== undefined && updates.price < 1) {
       throw new BadRequestException('Le prix minimum est de 1€.');

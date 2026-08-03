@@ -4,9 +4,10 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { io, Socket } from 'socket.io-client';
 import { Room, RoomEvent, Track } from 'livekit-client';
-import { ArrowLeft, Users, Send, Gavel, Timer, Package, Crown, Gift, Wallet, Plus } from 'lucide-react';
+import { ArrowLeft, Users, Send, Gavel, Timer, Package, Crown, Gift, Wallet, Plus, Trophy } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
+import { GiftBurstOverlay, type ActiveGiftBurst } from '../../client/components/Live/GiftBurstOverlay';
 import { GIFTS, COIN_PACKS, giftById, type GiftDef } from '../../client/constants/gifts';
 import { api, ApiError, getToken, getStoredUser } from '../../shared/api/http';
 import type { Capsule } from '../../shared/types/api';
@@ -41,7 +42,15 @@ interface LiveComment {
   createdAt: string;
   isBid?: boolean;
   isGift?: boolean;
-  giftEmoji?: string;
+  giftImage?: string;
+}
+
+interface TopDonor {
+  userId: string;
+  username: string;
+  displayName?: string;
+  avatarUrl?: string;
+  totalAmount: number;
 }
 
 function fmtCountdown(seconds: number): string {
@@ -87,6 +96,14 @@ export default function LiveViewerPage() {
   const [giftError, setGiftError] = useState('');
   const [showRecharge, setShowRecharge] = useState(false);
 
+  // Cadeaux qui "explosent" au-dessus de la video (visibles par tout le monde, pas seulement
+  // dans le chat) — chaque item se retire automatiquement apres son animation.
+  const [screenGifts, setScreenGifts] = useState<ActiveGiftBurst[]>([]);
+  const screenGiftTimeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const [topDonors, setTopDonors] = useState<TopDonor[]>([]);
+  const [topDonorsOpen, setTopDonorsOpen] = useState(false);
+
   // Le solde de coins reflete le vrai wallet (walletBalance, 100 coins = 1€).
   useEffect(() => {
     if (!getToken()) return;
@@ -111,6 +128,19 @@ export default function LiveViewerPage() {
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
   }, [router.isReady, id]);
+
+  // Classement des plus gros donateurs de ce live — recharge a l'arrivee, puis periodiquement
+  // (et juste apres reception d'un cadeau, voir listener 'giftSent' ci-dessous).
+  function fetchTopDonors(liveId: string) {
+    api.get<TopDonor[]>(`/lives/${liveId}/top-donors`).then(setTopDonors).catch(() => {});
+  }
+
+  useEffect(() => {
+    if (!live?.id) return;
+    fetchTopDonors(live.id);
+    const timer = setInterval(() => fetchTopDonors(live.id), 20000);
+    return () => clearInterval(timer);
+  }, [live?.id]);
 
   // Depend uniquement de live?.id (pas de `live` en entier) : mettre a jour live.featuredCapsule
   // (file de vente) ne doit pas fermer/rouvrir la connexion.
@@ -160,21 +190,33 @@ export default function LiveViewerPage() {
     socket.on('giftSent', (d: { giftType: string; username: string; displayName?: string }) => {
       const gift = giftById(d.giftType);
       if (!gift) return;
+      const username = d.displayName || d.username;
+
       setComments((prev) => [...prev, {
         id: `gift-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        text: `a envoyé ${gift.emoji} ${gift.name}`,
+        text: `a envoyé ${gift.name}`,
         userId: '',
-        username: d.displayName || d.username,
+        username,
         createdAt: new Date().toISOString(),
         isGift: true,
-        giftEmoji: gift.emoji,
+        giftImage: gift.image3d,
       }]);
+
+      const burstId = `burst-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      setScreenGifts((prev) => [...prev, { id: burstId, gift, username }]);
+      screenGiftTimeouts.current.push(
+        setTimeout(() => setScreenGifts((prev) => prev.filter((g) => g.id !== burstId)), 3200),
+      );
+
+      if (typeof id === 'string') fetchTopDonors(id);
     });
 
     return () => {
       socket.emit('leave', { liveId: id });
       socket.close();
       socketRef.current = null;
+      screenGiftTimeouts.current.forEach(clearTimeout);
+      screenGiftTimeouts.current = [];
     };
   }, [live?.id, id]);
 
@@ -417,6 +459,8 @@ export default function LiveViewerPage() {
                       </button>
                     </div>
                   )}
+
+                  <GiftBurstOverlay items={screenGifts} />
                 </div>
 
                 {isAuction && roundActive && (
@@ -442,7 +486,50 @@ export default function LiveViewerPage() {
               </div>
             </div>
 
-            <div className="w-[300px] shrink-0 flex flex-col bg-white/[0.03] border border-white/[0.07] rounded-2xl overflow-hidden">
+            <div className="w-[300px] shrink-0 flex flex-col gap-2">
+              <button
+                onClick={() => setTopDonorsOpen((o) => !o)}
+                className="shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-[#f59e0b]/20 via-[#f59e0b]/10 to-transparent border border-[#f59e0b]/30 hover:border-[#f59e0b]/50 transition-all text-left"
+              >
+                <span className="w-8 h-8 rounded-full bg-[#f59e0b]/20 flex items-center justify-center shrink-0">
+                  <Trophy size={15} className="text-[#f59e0b]" />
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[10px] font-bold uppercase tracking-wider text-[#f59e0b]/80">Top donateur</span>
+                  <span className="block text-[13px] font-semibold text-white truncate">
+                    {topDonors[0] ? `👑 ${topDonors[0].displayName || topDonors[0].username}` : 'Sois le premier !'}
+                  </span>
+                </span>
+              </button>
+
+              {topDonorsOpen && (
+                <div className="shrink-0 bg-[#0d0d0f] border border-[#f59e0b]/25 rounded-2xl p-3 max-h-64 overflow-y-auto scrollbar-hide">
+                  {topDonors.length === 0 ? (
+                    <p className="text-white/30 text-xs text-center py-4">Aucun cadeau envoyé pour l&apos;instant — sois le premier à soutenir {live.creator.username} !</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {topDonors.map((donor, i) => (
+                        <div key={donor.userId} className="flex items-center gap-2.5 px-1 py-1">
+                          <span className="w-5 text-center text-[13px] font-bold text-white/40 shrink-0">
+                            {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
+                          </span>
+                          <div className="w-7 h-7 rounded-full bg-white/[0.06] overflow-hidden shrink-0 flex items-center justify-center text-[11px] font-bold text-white/60">
+                            {donor.avatarUrl ? (
+                              <img src={donor.avatarUrl} alt="" className="w-full h-full object-cover" />
+                            ) : (
+                              (donor.displayName || donor.username)[0]?.toUpperCase()
+                            )}
+                          </div>
+                          <span className="flex-1 min-w-0 text-[13px] text-white truncate">{donor.displayName || donor.username}</span>
+                          <span className="text-[12px] font-bold text-[#f59e0b] shrink-0">{donor.totalAmount.toFixed(2)} €</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div className="flex-1 flex flex-col bg-white/[0.03] border border-white/[0.07] rounded-2xl overflow-hidden">
               <div className="flex shrink-0 border-b border-white/[0.06]">
                 <button
                   onClick={() => setSidebarTab('chat')}
@@ -473,7 +560,7 @@ export default function LiveViewerPage() {
                       if (c.isGift) {
                         return (
                           <div key={c.id} className="flex items-center gap-2 text-[13px] leading-snug bg-white/[0.03] rounded-xl px-2 py-1.5">
-                            <span className="text-[18px] leading-none shrink-0">{c.giftEmoji}</span>
+                            {c.giftImage && <img src={c.giftImage} alt="" className="w-6 h-6 object-contain shrink-0" />}
                             <p className="min-w-0">
                               <span className="font-semibold mr-1 text-[#f59e0b]">{c.username}</span>
                               <span className="text-[#f59e0b]/80 break-words font-medium">{c.text}</span>
@@ -582,7 +669,7 @@ export default function LiveViewerPage() {
                                 : 'bg-white/[0.02] border-white/[0.04] opacity-50 cursor-not-allowed'
                             }`}
                           >
-                            <span className="text-[24px] leading-none">{gift.emoji}</span>
+                            <img src={gift.image3d} alt={gift.name} className="w-10 h-10 object-contain" />
                             <p className="text-[11px] font-bold text-white">{gift.name}</p>
                             <span className="text-[10px] font-semibold text-[#f59e0b]">{gift.coins} 🪙</span>
                             <p className="text-[9px] text-white/30">{gift.eur}</p>
@@ -598,6 +685,7 @@ export default function LiveViewerPage() {
                   </div>
                 </div>
               )}
+              </div>
             </div>
           </div>
         </main>

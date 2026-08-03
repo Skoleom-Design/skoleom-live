@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import Head from 'next/head';
 import { Heart, Users, Send, Gift, Wallet, Plus, Gavel, Timer } from 'lucide-react';
 import { AppSidebar } from '../client/components/Layout/Sidebar';
+import { GIFTS, COIN_PACKS, type GiftDef } from '../client/constants/gifts';
 import { api } from '../shared/api/http';
 
 /* ── Auctions config ────────────────────────────────────────── */
@@ -79,41 +80,13 @@ const AUCTIONS: AuctionConfig[] = [
 const COLORS = ['#0066FF', '#22c55e', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4', '#f97316'];
 const BID_STEPS = [5, 10, 20];
 
-/* ── Virtual gifts (identique à /live) ─────────────────────── */
-interface GiftDef {
-  id: string;
-  emoji: string;
-  name: string;
-  coins: number;
-  eur: string;
-  color: string;
-}
-
-const GIFTS: GiftDef[] = [
-  { id: 'rose',     emoji: '🌹', name: 'Rose',     coins: 10,   eur: '0,10€', color: '#ec4899' },
-  { id: 'etoile',   emoji: '⭐', name: 'Étoile',   coins: 50,   eur: '0,50€', color: '#f59e0b' },
-  { id: 'feu',      emoji: '🔥', name: 'Feu',      coins: 150,  eur: '1,50€', color: '#f97316' },
-  { id: 'coeur',    emoji: '💝', name: 'Cœur',     coins: 200,  eur: '2€',    color: '#ec4899' },
-  { id: 'rocket',   emoji: '🚀', name: 'Fusée',    coins: 500,  eur: '5€',    color: '#8b5cf6' },
-  { id: 'diamant',  emoji: '💎', name: 'Diamant',  coins: 1000, eur: '10€',   color: '#06b6d4' },
-  { id: 'trophee',  emoji: '🏆', name: 'Trophée',  coins: 1500, eur: '15€',   color: '#f59e0b' },
-  { id: 'couronne', emoji: '👑', name: 'Couronne', coins: 2000, eur: '20€',   color: '#f59e0b' },
-];
-
-const COIN_PACKS = [
-  { coins: 100,  eur: '1€' },
-  { coins: 500,  eur: '4,50€' },
-  { coins: 1200, eur: '10€' },
-  { coins: 3000, eur: '24€' },
-];
-
 interface Comment {
   id: number;
   user: string;
   text: string;
   color: string;
   isGift?: boolean;
-  giftEmoji?: string;
+  giftImage?: string;
   isBid?: boolean;
 }
 
@@ -192,10 +165,10 @@ function ChatPanel({
     setComments((prev) => [...prev.slice(-40), {
       id: idRef.current++,
       user: 'moi',
-      text: `a envoyé ${gift.emoji} ${gift.name} à ${auction.creator}`,
+      text: `a envoyé ${gift.name} à ${auction.creator}`,
       color: gift.color,
       isGift: true,
-      giftEmoji: gift.emoji,
+      giftImage: gift.image3d,
     }]);
     setTab('chat');
   }
@@ -228,7 +201,7 @@ function ChatPanel({
             {comments.map((c) => (
               <div key={c.id} className={`flex items-start gap-2 animate-fade-in ${c.isGift || c.isBid ? 'bg-white/[0.03] rounded-xl px-2 py-1.5' : ''}`}>
                 {c.isGift ? (
-                  <span className="text-[20px] leading-none shrink-0 mt-0.5">{c.giftEmoji}</span>
+                  c.giftImage && <img src={c.giftImage} alt="" className="w-7 h-7 object-contain shrink-0 mt-0.5" />
                 ) : c.isBid ? (
                   <span className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 mt-0.5 bg-[#a8ff35]/15">
                     <Gavel size={12} className="text-[#a8ff35]" />
@@ -311,7 +284,7 @@ function ChatPanel({
                       'bg-white/[0.02] border-white/[0.04] opacity-50 cursor-not-allowed'
                     }`}
                   >
-                    <span className="text-[28px] leading-none">{gift.emoji}</span>
+                    <img src={gift.image3d} alt={gift.name} className="w-11 h-11 object-contain" />
                     <p className="text-[12px] font-bold text-white">{gift.name}</p>
                     <div className="flex items-center gap-1">
                       <span className="text-[11px] font-semibold text-[#f59e0b]">{gift.coins} 🪙</span>

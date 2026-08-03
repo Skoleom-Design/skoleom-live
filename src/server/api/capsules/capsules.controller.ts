@@ -43,6 +43,12 @@ export class CapsulesController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Post(':id/detach')
+  detach(@Param('id') id: string, @Body() body: { postId: string }, @Request() req) {
+    return this.capsulesService.detachFromPost(id, body.postId, req.user.id);
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Patch(':id')
   update(@Param('id') id: string, @Request() req, @Body() dto: Partial<CreateCapsuleDto>) {
     return this.capsulesService.update(id, req.user.id, dto);

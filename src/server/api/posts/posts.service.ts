@@ -79,7 +79,11 @@ export class PostsService {
     await this.postsRepo.update(id, { status: PostStatus.ARCHIVED });
   }
 
-  async update(id: string, creatorId: string, updates: { caption?: string; tags?: string[] }): Promise<Post> {
+  async update(
+    id: string,
+    creatorId: string,
+    updates: { caption?: string; tags?: string[]; mediaUrl?: string; thumbnailUrl?: string; type?: PostType },
+  ): Promise<Post> {
     const post = await this.postsRepo.findOne({ where: { id, creatorId } });
     if (!post) throw new NotFoundException('Post not found');
     await this.postsRepo.update(id, updates);

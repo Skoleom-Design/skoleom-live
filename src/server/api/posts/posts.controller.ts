@@ -4,7 +4,7 @@ import {
 import { PostsService, CreatePostDto } from './posts.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
-import { UserRole } from '../../../shared/types/entities';
+import { UserRole, PostType } from '../../../shared/types/entities';
 
 @Controller('posts')
 export class PostsController {
@@ -57,7 +57,11 @@ export class PostsController {
 
   @UseGuards(JwtAuthGuard)
   @Patch(':id')
-  update(@Param('id') id: string, @Request() req, @Body() body: { caption?: string; tags?: string[] }) {
+  update(
+    @Param('id') id: string,
+    @Request() req,
+    @Body() body: { caption?: string; tags?: string[]; mediaUrl?: string; thumbnailUrl?: string; type?: PostType },
+  ) {
     return this.postsService.update(id, req.user.id, body);
   }
 

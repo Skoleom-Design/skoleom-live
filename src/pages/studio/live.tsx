@@ -6,10 +6,11 @@ import { io, Socket } from 'socket.io-client';
 import { Room, Track } from 'livekit-client';
 import {
   ArrowLeft, Mic, MicOff, Video, VideoOff, Radio, Loader2, Send, Users, Package, X, ShoppingBag,
-  Crown, Trash2, UserX, Gavel, Timer, ChevronRight, Plus,
+  Crown, Trash2, UserX, Gavel, Timer, ChevronRight, Plus, Trophy,
 } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
+import { GiftBurstOverlay, type ActiveGiftBurst } from '../../client/components/Live/GiftBurstOverlay';
 import { api, ApiError, getToken, getStoredUser } from '../../shared/api/http';
 import { getCapsuleGroupLimit } from '../../client/constants/capsule';
 import { giftById } from '../../client/constants/gifts';
@@ -48,7 +49,15 @@ interface LiveComment {
   createdAt: string;
   isBid?: boolean;
   isGift?: boolean;
-  giftEmoji?: string;
+  giftImage?: string;
+}
+
+interface TopDonor {
+  userId: string;
+  username: string;
+  displayName?: string;
+  avatarUrl?: string;
+  totalAmount: number;
 }
 
 const DURATION_OPTIONS = [2, 5, 10, 30];
@@ -113,6 +122,18 @@ export default function StudioLivePage() {
   const [capsulePickerOpen, setCapsulePickerOpen] = useState(false);
   const [capsuleDrawerOpen, setCapsuleDrawerOpen] = useState(false);
 
+  // Delai minimum apres la fin d'un live avant de pouvoir en relancer un — verifie a l'arrivee
+  // sur la page pour afficher un decompte plutot que de le decouvrir a l'echec du clic "Démarrer".
+  const [cooldownSeconds, setCooldownSeconds] = useState(0);
+
+  // Cadeaux qui "explosent" au-dessus de la video de l'hote — memes composants/animation que
+  // cote spectateur (voir GiftBurstOverlay).
+  const [screenGifts, setScreenGifts] = useState<ActiveGiftBurst[]>([]);
+  const screenGiftTimeouts = useRef<ReturnType<typeof setTimeout>[]>([]);
+
+  const [topDonors, setTopDonors] = useState<TopDonor[]>([]);
+  const [topDonorsOpen, setTopDonorsOpen] = useState(false);
+
   // Mode "live classique" desactive pour l'instant (voir bouton grise ci-dessous) — le studio
   // se concentre sur les enchères, donc on pre-selectionne directement ce mode.
   const [mode, setMode] = useState<LiveMode>('auction');
@@ -160,6 +181,7 @@ export default function StudioLivePage() {
     const mediaKickoffId = setTimeout(() => requestMedia(), 0);
 
     api.get<Capsule[]>('/capsules/mine').then(setMyCapsules).catch(() => {});
+    api.get<{ remainingSeconds: number }>('/lives/cooldown').then((d) => setCooldownSeconds(d.remainingSeconds)).catch(() => {});
 
     api.get<LiveSession | null>('/lives/mine').then((existing) => {
       if (!existing) return;
@@ -259,6 +281,12 @@ export default function StudioLivePage() {
     return () => clearInterval(timer);
   }, [live?.startedAt]);
 
+  useEffect(() => {
+    if (cooldownSeconds <= 0) return;
+    const timer = setInterval(() => setCooldownSeconds((s) => Math.max(0, s - 1)), 1000);
+    return () => clearInterval(timer);
+  }, [cooldownSeconds > 0]);
+
   // Connexion WebSocket pour le chat + compteur de spectateurs, une fois le live demarre.
   // Depend uniquement de live?.id (pas de `live` en entier) : mettre a jour live.capsules /
   // live.featuredCapsule (file de vente) ne doit pas fermer/rouvrir la connexion.
@@ -305,22 +333,46 @@ export default function StudioLivePage() {
     socket.on('giftSent', (d: { giftType: string; username: string; displayName?: string }) => {
       const gift = giftById(d.giftType);
       if (!gift) return;
+      const username = d.displayName || d.username;
+
       setComments((prev) => [...prev, {
         id: `gift-${Date.now()}-${Math.random().toString(36).slice(2)}`,
-        text: `a envoyé ${gift.emoji} ${gift.name}`,
+        text: `a envoyé ${gift.name}`,
         userId: '',
-        username: d.displayName || d.username,
+        username,
         createdAt: new Date().toISOString(),
         isGift: true,
-        giftEmoji: gift.emoji,
+        giftImage: gift.image3d,
       }]);
+
+      const burstId = `burst-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      setScreenGifts((prev) => [...prev, { id: burstId, gift, username }]);
+      screenGiftTimeouts.current.push(
+        setTimeout(() => setScreenGifts((prev) => prev.filter((g) => g.id !== burstId)), 3200),
+      );
+
+      fetchTopDonors(live.id);
     });
 
     return () => {
       socket.emit('leave', { liveId: live.id });
       socket.close();
       socketRef.current = null;
+      screenGiftTimeouts.current.forEach(clearTimeout);
+      screenGiftTimeouts.current = [];
     };
+  }, [live?.id]);
+
+  // Classement des plus gros donateurs de ce live — recharge a l'arrivee, puis periodiquement.
+  function fetchTopDonors(liveId: string) {
+    api.get<TopDonor[]>(`/lives/${liveId}/top-donors`).then(setTopDonors).catch(() => {});
+  }
+
+  useEffect(() => {
+    if (!live?.id) return;
+    fetchTopDonors(live.id);
+    const timer = setInterval(() => fetchTopDonors(live.id), 20000);
+    return () => clearInterval(timer);
   }, [live?.id]);
 
   useEffect(() => {
@@ -674,6 +726,8 @@ export default function StudioLivePage() {
                       </button>
                     </div>
                   )}
+
+                  <GiftBurstOverlay items={screenGifts} />
                 </div>
 
                 {!live ? (
@@ -706,6 +760,12 @@ export default function StudioLivePage() {
                       className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
                     />
 
+                    {cooldownSeconds > 0 && (
+                      <p className="text-amber-300 text-sm bg-amber-400/10 px-4 py-2.5 rounded-xl border border-amber-400/20 text-center">
+                        Tu pourras relancer un live dans {cooldownSeconds}s — un petit délai entre deux directs.
+                      </p>
+                    )}
+
                     {startError && (
                       <p className="text-red-400 text-sm bg-red-400/10 px-4 py-2.5 rounded-xl border border-red-400/20">
                         {startError}
@@ -714,11 +774,23 @@ export default function StudioLivePage() {
 
                     <button
                       onClick={handleStart}
-                      disabled={!mediaReady || starting}
+                      disabled={!mediaReady || starting || cooldownSeconds > 0}
                       className="btn-skoleom w-full py-3.5 rounded-full text-sm shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.98] disabled:opacity-60 flex items-center justify-center gap-2"
                     >
-                      {starting ? <Loader2 size={16} className="animate-spin" /> : mode === 'auction' ? <Gavel size={15} /> : <Radio size={15} />}
-                      {mode === 'auction' ? "Démarrer l'enchère" : 'Démarrer le live'}
+                      {starting ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : cooldownSeconds > 0 ? (
+                        <Timer size={15} />
+                      ) : mode === 'auction' ? (
+                        <Gavel size={15} />
+                      ) : (
+                        <Radio size={15} />
+                      )}
+                      {cooldownSeconds > 0
+                        ? `Patiente encore ${cooldownSeconds}s`
+                        : mode === 'auction'
+                        ? "Démarrer l'enchère"
+                        : 'Démarrer le live'}
                     </button>
 
                     <p className="text-[11px] text-white/25 text-center leading-relaxed">
@@ -946,7 +1018,50 @@ export default function StudioLivePage() {
             </div>
 
             {live && (
-              <div className="w-[320px] shrink-0 flex flex-col bg-white/[0.03] border border-white/[0.07] rounded-2xl overflow-hidden">
+              <div className="w-[320px] shrink-0 flex flex-col gap-2">
+                <button
+                  onClick={() => setTopDonorsOpen((o) => !o)}
+                  className="shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-[#f59e0b]/20 via-[#f59e0b]/10 to-transparent border border-[#f59e0b]/30 hover:border-[#f59e0b]/50 transition-all text-left"
+                >
+                  <span className="w-8 h-8 rounded-full bg-[#f59e0b]/20 flex items-center justify-center shrink-0">
+                    <Trophy size={15} className="text-[#f59e0b]" />
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-[#f59e0b]/80">Top donateur</span>
+                    <span className="block text-[13px] font-semibold text-white truncate">
+                      {topDonors[0] ? `👑 ${topDonors[0].displayName || topDonors[0].username}` : 'Aucun cadeau encore'}
+                    </span>
+                  </span>
+                </button>
+
+                {topDonorsOpen && (
+                  <div className="shrink-0 bg-[#0d0d0f] border border-[#f59e0b]/25 rounded-2xl p-3 max-h-64 overflow-y-auto scrollbar-hide">
+                    {topDonors.length === 0 ? (
+                      <p className="text-white/30 text-xs text-center py-4">Aucun cadeau reçu pour l&apos;instant sur ce live.</p>
+                    ) : (
+                      <div className="space-y-1.5">
+                        {topDonors.map((donor, i) => (
+                          <div key={donor.userId} className="flex items-center gap-2.5 px-1 py-1">
+                            <span className="w-5 text-center text-[13px] font-bold text-white/40 shrink-0">
+                              {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
+                            </span>
+                            <div className="w-7 h-7 rounded-full bg-white/[0.06] overflow-hidden shrink-0 flex items-center justify-center text-[11px] font-bold text-white/60">
+                              {donor.avatarUrl ? (
+                                <img src={donor.avatarUrl} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                (donor.displayName || donor.username)[0]?.toUpperCase()
+                              )}
+                            </div>
+                            <span className="flex-1 min-w-0 text-[13px] text-white truncate">{donor.displayName || donor.username}</span>
+                            <span className="text-[12px] font-bold text-[#f59e0b] shrink-0">{donor.totalAmount.toFixed(2)} €</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex-1 flex flex-col bg-white/[0.03] border border-white/[0.07] rounded-2xl overflow-hidden">
                 <div className="px-4 py-3 border-b border-white/[0.06] text-white/70 text-xs font-bold uppercase tracking-wider">
                   Commentaires
                 </div>
@@ -959,7 +1074,7 @@ export default function StudioLivePage() {
                     if (c.isGift) {
                       return (
                         <div key={c.id} className="flex items-center gap-2 text-[13px] leading-snug bg-white/[0.03] rounded-xl px-2 py-1.5">
-                          <span className="text-[18px] leading-none shrink-0">{c.giftEmoji}</span>
+                          {c.giftImage && <img src={c.giftImage} alt="" className="w-6 h-6 object-contain shrink-0" />}
                           <p className="min-w-0">
                             <span className="font-semibold mr-1 text-[#f59e0b]">{c.username}</span>
                             <span className="text-[#f59e0b]/80 break-words font-medium">{c.text}</span>
@@ -1029,6 +1144,7 @@ export default function StudioLivePage() {
                     <Send size={14} className="text-[#a8ff35]" />
                   </button>
                 </form>
+                </div>
               </div>
             )}
           </div>

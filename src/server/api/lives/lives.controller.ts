@@ -24,6 +24,20 @@ export class LivesController {
   }
 
   @UseGuards(JwtAuthGuard)
+  @Get('mine/count')
+  async getMyLivesCount(@Request() req) {
+    return { count: await this.livesService.countByCreator(req.user.id) };
+  }
+
+  // Consulte cote client avant meme de cliquer "Démarrer" (voir studio/live.tsx) pour afficher
+  // le decompte "Tu pourras relancer un live dans Xs" plutot que de le decouvrir a l'echec.
+  @UseGuards(JwtAuthGuard)
+  @Get('cooldown')
+  async getCooldown(@Request() req) {
+    return { remainingSeconds: await this.livesService.getRestartCooldownSeconds(req.user.id) };
+  }
+
+  @UseGuards(JwtAuthGuard)
   @Post()
   start(@Request() req, @Body() body: { title?: string; mode?: 'live' | 'auction' }) {
     if (body.mode === 'auction') {
@@ -80,6 +94,11 @@ export class LivesController {
   @Get(':id/sales')
   getSales(@Param('id') id: string) {
     return this.livesService.getSales(id);
+  }
+
+  @Get(':id/top-donors')
+  getTopDonors(@Param('id') id: string) {
+    return this.livesService.getTopDonors(id);
   }
 
   @UseGuards(JwtAuthGuard)

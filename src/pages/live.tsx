@@ -123,7 +123,7 @@ interface Comment {
   text: string;
   color: string;
   isGift?: boolean;
-  giftEmoji?: string;
+  giftImage?: string;
 }
 
 /* ── Chat panel ─────────────────────────────────────────────── */
@@ -207,10 +207,10 @@ function ChatPanel({ live, viewers }: { live: LiveConfig; viewers: number }) {
     setComments(prev => [...prev.slice(-40), {
       id: idRef.current++,
       user: 'moi',
-      text: `a envoyé ${gift.emoji} ${gift.name} à ${live.creator}`,
+      text: `a envoyé ${gift.name} à ${live.creator}`,
       color: gift.color,
       isGift: true,
-      giftEmoji: gift.emoji,
+      giftImage: gift.image3d,
     }]);
     setTab('chat');
   }
@@ -246,7 +246,7 @@ function ChatPanel({ live, viewers }: { live: LiveConfig; viewers: number }) {
             {comments.map(c => (
               <div key={c.id} className={`flex items-start gap-2 animate-fade-in ${c.isGift ? 'bg-white/[0.03] rounded-xl px-2 py-1.5' : ''}`}>
                 {c.isGift ? (
-                  <span className="text-[20px] leading-none shrink-0 mt-0.5">{c.giftEmoji}</span>
+                  c.giftImage && <img src={c.giftImage} alt="" className="w-7 h-7 object-contain shrink-0 mt-0.5" />
                 ) : (
                   <div className="w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-bold text-white shrink-0 mt-0.5" style={{ backgroundColor: c.color }}>
                     {c.user[0].toUpperCase()}
@@ -330,7 +330,7 @@ function ChatPanel({ live, viewers }: { live: LiveConfig; viewers: number }) {
                       'bg-white/[0.02] border-white/[0.04] opacity-50 cursor-not-allowed'
                     }`}
                   >
-                    <span className="text-[28px] leading-none">{gift.emoji}</span>
+                    <img src={gift.image3d} alt={gift.name} className="w-11 h-11 object-contain" />
                     <p className="text-[12px] font-bold text-white">{gift.name}</p>
                     <div className="flex items-center gap-1">
                       <span className="text-[11px] font-semibold text-[#f59e0b]">{gift.coins} 🪙</span>
