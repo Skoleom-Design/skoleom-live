@@ -414,6 +414,9 @@ export default function LiveViewerPage() {
                       <div>
                         <p className="text-white/50 text-[10px] uppercase tracking-wider">Mise actuelle</p>
                         <p className="text-[#a8ff35] font-extrabold text-[17px] leading-none">{currentBid.toFixed(2)} €</p>
+                        {currentBidderName && (
+                          <p className="text-white/40 text-[10px] mt-0.5">par {currentBidderName}</p>
+                        )}
                       </div>
                       <div className={`flex items-center gap-1.5 text-[13px] font-bold ${auctionSecondsLeft < 30 ? 'text-red-400' : 'text-white'}`}>
                         <Timer size={14} />
@@ -712,6 +715,9 @@ export default function LiveViewerPage() {
             <div className="bg-white/[0.04] border border-white/[0.08] rounded-2xl p-4 mb-4 text-center">
               <p className="text-[11px] text-white/40 uppercase tracking-wider mb-1">Mise actuelle</p>
               <p className="text-[32px] font-extrabold text-[#a8ff35]">{currentBid.toFixed(2)} €</p>
+              {currentBidderName && (
+                <p className="text-white/40 text-xs mt-1">par <span className="text-white/70 font-medium">{currentBidderName}</span></p>
+              )}
             </div>
 
             {bidError && (

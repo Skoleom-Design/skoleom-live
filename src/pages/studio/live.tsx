@@ -698,6 +698,9 @@ export default function StudioLivePage() {
                       <div>
                         <p className="text-white/50 text-[10px] uppercase tracking-wider">Mise actuelle</p>
                         <p className="text-[#a8ff35] font-extrabold text-[17px] leading-none">{currentBid.toFixed(2)} €</p>
+                        {currentBidderName && (
+                          <p className="text-white/40 text-[10px] mt-0.5">par {currentBidderName}</p>
+                        )}
                       </div>
                       <div className={`flex items-center gap-1.5 text-[13px] font-bold ${auctionSecondsLeft < 30 ? 'text-red-400' : 'text-white'}`}>
                         <Timer size={14} />
