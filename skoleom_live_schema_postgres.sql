@@ -17,20 +17,6 @@ SET client_min_messages = warning;
 SET row_security = off;
 
 --
--- Name: uuid-ossp; Type: EXTENSION; Schema: -; Owner: -
---
-
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
-
-
---
--- Name: EXTENSION "uuid-ossp"; Type: COMMENT; Schema: -; Owner: -
---
-
-COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UUIDs)';
-
-
---
 -- Name: admin_action_logs_action_enum; Type: TYPE; Schema: public; Owner: -
 --
 
@@ -224,7 +210,7 @@ SET default_table_access_method = heap;
 --
 
 CREATE TABLE public.admin_action_logs (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
     action public.admin_action_logs_action_enum NOT NULL,
     "adminId" uuid NOT NULL,
     "targetUserId" character varying NOT NULL,
@@ -238,7 +224,7 @@ CREATE TABLE public.admin_action_logs (
 --
 
 CREATE TABLE public.auction_bids (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
     "liveSessionId" uuid NOT NULL,
     "bidderId" uuid NOT NULL,
     amount numeric(10,2) NOT NULL,
@@ -251,7 +237,7 @@ CREATE TABLE public.auction_bids (
 --
 
 CREATE TABLE public.boosts (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
     status public.boosts_status_enum DEFAULT 'pending'::public.boosts_status_enum NOT NULL,
     objective public.boosts_objective_enum DEFAULT 'views'::public.boosts_objective_enum NOT NULL,
     scope public.boosts_scope_enum DEFAULT 'post'::public.boosts_scope_enum NOT NULL,
@@ -277,7 +263,7 @@ CREATE TABLE public.boosts (
 --
 
 CREATE TABLE public.capsule_groups (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
     name character varying NOT NULL,
     "creatorId" character varying NOT NULL,
     "createdAt" timestamp without time zone DEFAULT now() NOT NULL,
@@ -290,7 +276,7 @@ CREATE TABLE public.capsule_groups (
 --
 
 CREATE TABLE public.capsules (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
     name character varying NOT NULL,
     brand character varying,
     description text,
@@ -320,7 +306,7 @@ CREATE TABLE public.capsules (
 --
 
 CREATE TABLE public.comments (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
     text text NOT NULL,
     "userId" uuid NOT NULL,
     "postId" uuid NOT NULL,
@@ -333,7 +319,7 @@ CREATE TABLE public.comments (
 --
 
 CREATE TABLE public.gifts (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
     "giftType" character varying NOT NULL,
     "senderId" uuid NOT NULL,
     "receiverId" uuid,
@@ -360,7 +346,7 @@ CREATE TABLE public.live_capsules (
 --
 
 CREATE TABLE public.live_comments (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
     text text NOT NULL,
     "userId" uuid NOT NULL,
     "liveSessionId" uuid NOT NULL,
@@ -373,7 +359,7 @@ CREATE TABLE public.live_comments (
 --
 
 CREATE TABLE public.live_sessions (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
     title character varying,
     status public.live_sessions_status_enum DEFAULT 'live'::public.live_sessions_status_enum NOT NULL,
     mode public.live_sessions_mode_enum DEFAULT 'live'::public.live_sessions_mode_enum NOT NULL,
@@ -399,7 +385,7 @@ CREATE TABLE public.live_sessions (
 --
 
 CREATE TABLE public.notifications (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
     type public.notifications_type_enum NOT NULL,
     "recipientId" character varying NOT NULL,
     "actorId" uuid NOT NULL,
@@ -414,7 +400,7 @@ CREATE TABLE public.notifications (
 --
 
 CREATE TABLE public.orders (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
     status public.orders_status_enum DEFAULT 'pending'::public.orders_status_enum NOT NULL,
     amount numeric(10,2) NOT NULL,
     "commissionAmount" numeric(10,2) NOT NULL,
@@ -456,7 +442,7 @@ CREATE TABLE public.post_likes (
 --
 
 CREATE TABLE public.posts (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
     caption text,
     type public.posts_type_enum DEFAULT 'video'::public.posts_type_enum NOT NULL,
     status public.posts_status_enum DEFAULT 'active'::public.posts_status_enum NOT NULL,
@@ -482,7 +468,7 @@ CREATE TABLE public.posts (
 --
 
 CREATE TABLE public.users (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
     email character varying NOT NULL,
     password character varying NOT NULL,
     username character varying NOT NULL,
@@ -511,7 +497,7 @@ CREATE TABLE public.users (
 --
 
 CREATE TABLE public.wallet_transactions (
-    id uuid DEFAULT public.uuid_generate_v4() NOT NULL,
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
     "userId" character varying NOT NULL,
     type public.wallet_transactions_type_enum NOT NULL,
     amount numeric(10,2) NOT NULL,
