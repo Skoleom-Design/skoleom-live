@@ -69,9 +69,6 @@ export const fr = {
       cuisine: 'Cuisine',
     },
   },
-  feed: {
-    backendUnavailable: 'Backend indisponible — affichage de contenu de démonstration.',
-  },
   post: {
     sponsored: 'Sponsorisé',
     capsule: 'Capsule',

@@ -69,9 +69,6 @@ export const en = {
       cuisine: 'Cooking',
     },
   },
-  feed: {
-    backendUnavailable: 'Backend unavailable — showing demo content.',
-  },
   post: {
     sponsored: 'Sponsored',
     capsule: 'Capsule',

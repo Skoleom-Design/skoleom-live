@@ -11,55 +11,6 @@ import { ShareModal } from '../../client/components/Post/ShareModal';
 import type { Post } from '../../shared/types/api';
 import { api, ApiError, getToken } from '../../shared/api/http';
 
-// Demo posts repris du feed pour la démo
-const DEMO_POSTS: Record<string, Post> = {
-  'demo-1': {
-    id: 'demo-1',
-    caption: 'Nouvelle collection été — des pièces légères et colorées pour la saison ☀️',
-    type: 'photo',
-    mediaUrl: 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=720&h=1280&fit=crop',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1469334031218-e382a71b716b?w=720&h=1280&fit=crop',
-    tags: ['mode', 'été', 'collection'],
-    viewCount: 14200,
-    likeCount: 3840,
-    isBoosted: true,
-    musicName: 'Mood — 24kGoldn',
-    creator: { id: 'u1', username: 'stylebylea', displayName: 'Léa Martin', avatarUrl: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=100&h=100&fit=crop', bio: 'Mode & lifestyle', totalEarnings: 0 },
-    capsules: [
-      { id: 'cap-1', name: 'Robe Ibiza', description: "Légère et colorée, parfaite pour l'été. Tissu 100% lin.", price: 89.90, currency: 'EUR', imageUrl: 'https://images.unsplash.com/photo-1515372039744-b8f02a3ae446?w=300&h=300&fit=crop', images: [], stock: 12, soldCount: 5, commissionRate: 0.15, status: 'available' },
-      { id: 'cap-2', name: 'Chapeau paille', description: 'Artisanal, taille unique.', price: 34.50, currency: 'EUR', imageUrl: 'https://images.unsplash.com/photo-1572307480813-ceb0e59d8325?w=300&h=300&fit=crop', images: [], stock: 3, soldCount: 18, commissionRate: 0.15, status: 'available' },
-    ],
-    createdAt: new Date().toISOString(),
-  },
-  'demo-2': {
-    id: 'demo-2',
-    caption: 'Mon setup skincare du matin — routine complète en 5 étapes 🧴',
-    type: 'photo',
-    mediaUrl: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=720&h=1280&fit=crop',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1556228578-8c89e6adf883?w=720&h=1280&fit=crop',
-    tags: ['skincare', 'beauté', 'routine'],
-    viewCount: 8900, likeCount: 2100, isBoosted: false, musicName: 'Good Days — SZA',
-    creator: { id: 'u2', username: 'sophiaglow', displayName: 'Sophia K.', avatarUrl: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=100&h=100&fit=crop', bio: 'Beauty & wellness', totalEarnings: 0 },
-    capsules: [
-      { id: 'cap-3', name: 'Sérum Vitamine C', description: 'Éclat intense, anti-taches, formule concentrée 20%.', price: 42.00, currency: 'EUR', imageUrl: 'https://images.unsplash.com/photo-1620916566398-39f1143ab7be?w=300&h=300&fit=crop', images: [], stock: 0, soldCount: 94, commissionRate: 0.18, status: 'sold_out' },
-      { id: 'cap-4', name: 'Crème hydratante', description: 'Sans parfum, pour peaux sensibles.', price: 28.90, currency: 'EUR', imageUrl: 'https://images.unsplash.com/photo-1611080626919-7cf5a9dbab12?w=300&h=300&fit=crop', images: [], stock: 27, soldCount: 41, commissionRate: 0.15, status: 'available' },
-    ],
-    createdAt: new Date().toISOString(),
-  },
-  'demo-3': {
-    id: 'demo-3',
-    caption: 'Sneakers edition limitée — drop exclusif skoleomLive 🔥',
-    type: 'photo',
-    mediaUrl: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=720&h=1280&fit=crop',
-    thumbnailUrl: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=720&h=1280&fit=crop',
-    tags: ['sneakers', 'streetwear', 'drop'],
-    viewCount: 31000, likeCount: 9200, isBoosted: true,
-    creator: { id: 'u3', username: 'kicksbyomar', displayName: 'Omar B.', avatarUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop', bio: 'Sneakers & culture', totalEarnings: 0 },
-    capsules: [{ id: 'cap-5', name: 'Air Max Exclusif', description: 'Coloris unique, édition limitée à 50 paires.', price: 189.00, currency: 'EUR', imageUrl: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=300&h=300&fit=crop', images: [], stock: 7, soldCount: 43, commissionRate: 0.12, status: 'available', variants: [{ name: 'Pointure', options: ['40', '41', '42', '43', '44', '45'] }] }],
-    createdAt: new Date().toISOString(),
-  },
-};
-
 function formatCount(n: number): string {
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
@@ -92,11 +43,10 @@ export default function PostDetailPage() {
     // ce GET) — cette ref (qui survit au double-montage) garantit une seule requete par post.
     if (fetchedIdRef.current === id) return;
     fetchedIdRef.current = id;
-    // Try API, fall back to demo
     api
       .get<Post>(`/posts/${id}`)
-      .then((data) => setPost(data || DEMO_POSTS[id] || null))
-      .catch(() => setPost(DEMO_POSTS[id] || null))
+      .then((data) => setPost(data || null))
+      .catch(() => setPost(null))
       .finally(() => setLoading(false));
   }, [id]);
 

@@ -23,12 +23,17 @@ interface LiveResult {
   creator: { username: string };
 }
 
+const PAGE_SIZE = 50;
+
 export default function ExplorePage() {
   const router = useRouter();
   const [posts, setPosts] = useState<Post[]>([]);
   const [lives, setLives] = useState<LiveResult[]>([]);
   const [users, setUsers] = useState<UserResult[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
   const [query, setQuery] = useState('');
 
   useEffect(() => {
@@ -37,12 +42,27 @@ export default function ExplorePage() {
     if (typeof q === 'string') setQuery(q);
   }, [router.isReady, router.query.q]);
 
+  async function loadMorePosts() {
+    setLoadingMore(true);
+    try {
+      const data = await api.get<{ posts: Post[]; total: number }>(`/posts/feed?page=${page}&limit=${PAGE_SIZE}`);
+      setPosts((prev) => {
+        const existingIds = new Set(prev.map((p) => p.id));
+        const fresh = (data.posts || []).filter((p) => !existingIds.has(p.id));
+        setHasMore((prev.length + fresh.length) < data.total);
+        return [...prev, ...fresh];
+      });
+      setPage((p) => p + 1);
+    } catch {
+      setHasMore(false);
+    } finally {
+      setLoading(false);
+      setLoadingMore(false);
+    }
+  }
+
   useEffect(() => {
-    api
-      .get<{ posts: Post[] }>('/posts/feed?page=1&limit=50')
-      .then((data) => setPosts(data.posts || []))
-      .catch(() => setPosts([]))
-      .finally(() => setLoading(false));
+    loadMorePosts();
     api.get<LiveResult[]>('/lives/active').then(setLives).catch(() => {});
   }, []);
 
@@ -90,7 +110,15 @@ export default function ExplorePage() {
       <div className="flex h-screen cosmic-bg overflow-hidden">
         <AppSidebar />
 
-        <main className="flex-1 overflow-y-auto scrollbar-hide">
+        <main
+          className="flex-1 overflow-y-auto scrollbar-hide"
+          onScroll={(e) => {
+            if (isSearching || loading || loadingMore || !hasMore) return;
+            const el = e.currentTarget;
+            const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 600;
+            if (nearBottom) loadMorePosts();
+          }}
+        >
           <div className={`mx-auto px-4 py-8 ${isSearching ? 'max-w-[1100px]' : 'max-w-[900px]'}`}>
             <div className="relative mb-6">
               <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
@@ -231,6 +259,11 @@ export default function ExplorePage() {
                     <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors" />
                   </Link>
                 ))}
+              </div>
+            )}
+            {!isSearching && loadingMore && (
+              <div className="flex items-center justify-center h-16 text-white/30 text-sm">
+                <Loader2 className="animate-spin" size={18} />
               </div>
             )}
           </div>
