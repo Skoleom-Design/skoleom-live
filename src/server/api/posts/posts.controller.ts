@@ -10,9 +10,10 @@ import { UserRole, PostType } from '../../../shared/types/entities';
 export class PostsController {
   constructor(private readonly postsService: PostsService) {}
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get('feed')
-  getFeed(@Query() query: { page?: number; limit?: number }) {
-    return this.postsService.getFeed(query);
+  getFeed(@Query() query: { page?: number; limit?: number }, @Request() req) {
+    return this.postsService.getFeed({ ...query, userId: req.user?.id });
   }
 
   @UseGuards(JwtAuthGuard)

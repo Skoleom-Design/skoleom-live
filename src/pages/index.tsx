@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import { InstaPostCard } from '../client/components/Post/InstaPostCard';
 import { AppSidebar } from '../client/components/Layout/Sidebar';
+import { AppGateScreen } from '../client/components/AppGate/AppGateScreen';
 import type { Post } from '../shared/types/api';
 import { api, getToken } from '../shared/api/http';
 import { useLanguage } from '../client/i18n/LanguageContext';
@@ -418,6 +419,8 @@ export default function FeedPage() {
         <title>skoleomLive — Discover & Shop</title>
         <meta name="description" content="Shoppable social feed" />
       </Head>
+
+      <AppGateScreen />
 
       <div className="flex h-screen cosmic-bg overflow-hidden">
         <AppSidebar />

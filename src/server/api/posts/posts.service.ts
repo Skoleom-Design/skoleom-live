@@ -30,22 +30,43 @@ export class PostsService {
     private postsRepo: Repository<Post>,
     @InjectRepository(Comment)
     private commentsRepo: Repository<Comment>,
+    @InjectRepository(User)
+    private usersRepo: Repository<User>,
     private notificationsService: NotificationsService,
   ) {}
 
   async getFeed(query: FeedQuery): Promise<{ posts: Post[]; total: number }> {
-    const { page = 1, limit = 20 } = query;
+    const { page = 1, limit = 20, userId } = query;
 
-    const [posts, total] = await this.postsRepo.findAndCount({
-      where: { status: PostStatus.ACTIVE },
-      relations: ['creator', 'capsules'],
-      order: {
-        boostScore: 'DESC',
-        createdAt: 'DESC',
-      },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+    const interests = userId
+      ? (await this.usersRepo.findOne({ where: { id: userId } }))?.interests?.filter(Boolean) || []
+      : [];
+
+    const qb = this.postsRepo
+      .createQueryBuilder('post')
+      .leftJoinAndSelect('post.creator', 'creator')
+      .leftJoinAndSelect('post.capsules', 'capsules')
+      .where('post.status = :status', { status: PostStatus.ACTIVE });
+
+    if (interests.length) {
+      // Fait remonter les posts dont au moins un tag correspond à un centre d'intérêt choisi
+      // à l'onboarding, sans jamais exclure le reste — le feed reste alimenté même hors match.
+      qb.addSelect(
+        "CASE WHEN post.tags::jsonb ?| array[:...interests] THEN 1 ELSE 0 END",
+        'interestMatch',
+      )
+        .setParameter('interests', interests)
+        .orderBy('"interestMatch"', 'DESC')
+        .addOrderBy('post.boostScore', 'DESC')
+        .addOrderBy('post.createdAt', 'DESC');
+    } else {
+      qb.orderBy('post.boostScore', 'DESC').addOrderBy('post.createdAt', 'DESC');
+    }
+
+    const [posts, total] = await qb
+      .skip((page - 1) * limit)
+      .take(limit)
+      .getManyAndCount();
 
     return { posts, total };
   }

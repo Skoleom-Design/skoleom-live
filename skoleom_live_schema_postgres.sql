@@ -487,6 +487,8 @@ CREATE TABLE public.users (
     "instagramUsername" character varying,
     "instagramAccessToken" character varying,
     "instagramTokenExpiresAt" timestamp without time zone,
+    interests text,
+    "hasOnboarded" boolean DEFAULT false NOT NULL,
     "createdAt" timestamp without time zone DEFAULT now() NOT NULL,
     "updatedAt" timestamp without time zone DEFAULT now() NOT NULL
 );

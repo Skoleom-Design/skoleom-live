@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { api, ApiError, getToken, setSession, getStoredUser } from '../../shared/api/http';
 import { useLanguage } from '../../client/i18n/LanguageContext';
+import { InterestsGate } from '../../client/components/Onboarding/InterestsGate';
 
 type Tab = 'login' | 'register';
 
@@ -26,6 +27,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState<string | null>(null);
+  const [showOnboarding, setShowOnboarding] = useState(false);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -59,7 +61,13 @@ export default function LoginPage() {
           : await api.post('/auth/register', { email, username: username.trim(), password });
 
       setSession(token, user);
-      router.push(user.role === 'admin' ? '/admin' : tab === 'login' ? '/' : '/studio');
+      // Un nouveau compte (hors admin) passe par le choix des centres d'intérêt avant le
+      // Studio — l'onboarding influence ensuite le tri du feed (voir posts.service.ts).
+      if (tab === 'register' && user.role !== 'admin') {
+        setShowOnboarding(true);
+      } else {
+        router.push(user.role === 'admin' ? '/admin' : '/');
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : t('common.genericError'));
     } finally {
@@ -93,6 +101,10 @@ export default function LoginPage() {
     } finally {
       setDemoLoading(null);
     }
+  }
+
+  if (showOnboarding) {
+    return <InterestsGate onDone={() => router.push('/studio')} />;
   }
 
   return (

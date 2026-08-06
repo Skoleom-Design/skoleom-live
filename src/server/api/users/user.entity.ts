@@ -72,6 +72,14 @@ export class User {
   @Column({ nullable: true })
   instagramTokenExpiresAt: Date;
 
+  // Centres d'intérêt choisis à l'onboarding (slugs, voir client/constants/interests.ts) —
+  // utilisés pour faire remonter les posts au tag correspondant dans le feed.
+  @Column({ type: 'simple-array', default: '' })
+  interests: string[];
+
+  @Column({ default: false })
+  hasOnboarded: boolean;
+
   @OneToMany(() => Post, (post) => post.creator)
   posts: Post[];
 
