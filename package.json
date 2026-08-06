@@ -9,6 +9,7 @@
     "build": "nest build && next build",
     "start": "node dist/server/main.js",
     "start:web": "next start -p $PORT",
+    "start:prod": "concurrently \"npm run start\" \"npm run start:web\"",
     "lint": "eslint \"src/**/*.ts\" \"src/**/*.tsx\"",
     "typeorm": "typeorm-ts-node-commonjs"
   },

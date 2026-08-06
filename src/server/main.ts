@@ -31,7 +31,9 @@ async function bootstrap() {
     credentials: true,
   });
 
-  const port = process.env.PORT || 3000;
+  // API_PORT (pas PORT) — sur Render, PORT est le port public assigne au process Next.js ;
+  // Nest doit ecouter sur un port interne distinct pour eviter un conflit de binding.
+  const port = process.env.API_PORT || process.env.PORT || 3000;
   await app.listen(port);
   console.log(`skoleomLive running on :${port}`);
 }
