@@ -12,6 +12,9 @@ import { GIFTS, COIN_PACKS, giftById, type GiftDef } from '../../client/constant
 import { api, ApiError, getToken, getStoredUser } from '../../shared/api/http';
 import type { Capsule } from '../../shared/types/api';
 
+// URL publique du backend — en prod, un serveur Next personnalise (voir server.js) proxie
+// /socket.io/* vers Nest en interne ; NEXT_PUBLIC_API_URL doit alors valoir le domaine public,
+// pas un port interne au conteneur (voir server.js pour le detail du pourquoi).
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 const BID_STEPS = [5, 10, 20];
 

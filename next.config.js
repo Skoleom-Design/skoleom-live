@@ -7,6 +7,8 @@ const nextConfig = {
     ],
     formats: ['image/avif', 'image/webp'],
   },
+  // Ces rewrites gerent le HTTP classique. Les upgrades WebSocket (/socket.io/*) ne passent
+  // PAS par ici — Next ne les proxie pas via rewrites() — voir server.js pour ce cas.
   async rewrites() {
     const apiUrl = process.env.API_URL || 'http://localhost:3000';
     return [
@@ -17,6 +19,10 @@ const nextConfig = {
       {
         source: '/uploads/:path*',
         destination: `${apiUrl}/uploads/:path*`,
+      },
+      {
+        source: '/static/:path*',
+        destination: `${apiUrl}/static/:path*`,
       },
     ];
   },

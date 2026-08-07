@@ -16,6 +16,7 @@ import { getCapsuleGroupLimit } from '../../client/constants/capsule';
 import { giftById } from '../../client/constants/gifts';
 import type { Capsule } from '../../shared/types/api';
 
+// Voir live/[id].tsx pour le detail de pourquoi c'est l'URL publique et non un port interne.
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 type LiveMode = 'live' | 'auction';
