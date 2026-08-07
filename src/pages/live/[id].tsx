@@ -435,7 +435,7 @@ export default function LiveViewerPage() {
                         disabled={sessionEnded || live.creator.id === myId}
                         className="skoleom-capsule-btn skoleom-capsule-btn--breathe disabled:opacity-50"
                       >
-                        <Gavel size={15} />
+                        <img src="/skoleom-mark.png" alt="Skoleom" className="skoleom-capsule-btn-logo" />
                         <span>Enchérir</span>
                       </button>
                       {live.creator.id === myId && (

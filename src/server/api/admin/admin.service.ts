@@ -242,7 +242,7 @@ export class AdminService {
       .addGroupBy('sender.username')
       .addGroupBy('sender.displayName')
       .addGroupBy('sender.avatarUrl')
-      .orderBy('totalSent', 'DESC')
+      .orderBy('"totalSent"', 'DESC')
       .limit(limit)
       .getRawMany();
   }
@@ -260,7 +260,7 @@ export class AdminService {
       .addGroupBy('creator.username')
       .addGroupBy('creator.displayName')
       .addGroupBy('creator.avatarUrl')
-      .orderBy('liveCount', 'DESC')
+      .orderBy('"liveCount"', 'DESC')
       .limit(limit)
       .getRawMany();
   }
@@ -278,7 +278,7 @@ export class AdminService {
       .addGroupBy('creator.username')
       .addGroupBy('creator.displayName')
       .addGroupBy('creator.avatarUrl')
-      .orderBy('postCount', 'DESC')
+      .orderBy('"postCount"', 'DESC')
       .limit(limit)
       .getRawMany();
   }

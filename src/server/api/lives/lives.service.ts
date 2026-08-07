@@ -461,7 +461,7 @@ export class LivesService {
       .addGroupBy('sender.username')
       .addGroupBy('sender.displayName')
       .addGroupBy('sender.avatarUrl')
-      .orderBy('totalAmount', 'DESC')
+      .orderBy('"totalAmount"', 'DESC')
       .limit(10)
       .getRawMany();
 
