@@ -6,7 +6,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
-const LOCAL_BASE_URL = process.env.API_URL || `http://localhost:${process.env.PORT || 3000}`;
+// Chemins relatifs (pas d'URL absolue vers API_URL) — le navigateur les resout contre l'origine
+// publique courante, qui fonctionne aussi bien en local (proxy Next vers :3000/:4000) qu'en prod
+// derriere Render, ou API_URL n'est qu'un port interne au container, injoignable depuis l'exterieur.
 
 @Injectable()
 export class FilesService {
@@ -35,8 +37,8 @@ export class FilesService {
 
     if (!this.s3) {
       return {
-        uploadUrl: `${LOCAL_BASE_URL}/api/files/local-upload/${key}`,
-        fileUrl: `${LOCAL_BASE_URL}/uploads/${key}`,
+        uploadUrl: `/api/files/local-upload/${key}`,
+        fileUrl: `/uploads/${key}`,
         key,
       };
     }
@@ -71,7 +73,7 @@ export class FilesService {
 
     if (!this.s3) {
       this.saveLocalFile(key, data);
-      return { fileUrl: `${LOCAL_BASE_URL}/uploads/${key}`, key };
+      return { fileUrl: `/uploads/${key}`, key };
     }
 
     await this.s3.send(new PutObjectCommand({

@@ -8,10 +8,15 @@ const nextConfig = {
     formats: ['image/avif', 'image/webp'],
   },
   async rewrites() {
+    const apiUrl = process.env.API_URL || 'http://localhost:3000';
     return [
       {
         source: '/api/:path*',
-        destination: `${process.env.API_URL || 'http://localhost:3000'}/api/:path*`,
+        destination: `${apiUrl}/api/:path*`,
+      },
+      {
+        source: '/uploads/:path*',
+        destination: `${apiUrl}/uploads/:path*`,
       },
     ];
   },
