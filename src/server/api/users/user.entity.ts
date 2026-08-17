@@ -17,8 +17,13 @@ export class User {
   email: string;
 
   // select: false — sinon le hash fuite via les relations eager (ex: Post.creator) dans les reponses API.
-  @Column({ select: false })
+  // nullable — un compte cree via "Se connecter avec Google" n'a pas de mot de passe local.
+  @Column({ select: false, nullable: true })
   password: string;
+
+  // Identifiant Google (claim `sub`) — nul pour un compte email/mot de passe classique.
+  @Column({ nullable: true })
+  googleId: string;
 
   @Column()
   username: string;
