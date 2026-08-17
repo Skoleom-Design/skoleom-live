@@ -639,7 +639,7 @@ export default function ProfilePage() {
         <AppSidebar />
 
         <main className="flex-1 overflow-y-auto scrollbar-hide">
-          <div className="max-w-[700px] mx-auto px-4 py-8">
+          <div className="max-w-[700px] mx-auto px-4 py-8 pb-20 md:pb-8">
 
             {/* Profile header */}
             <div className="flex items-center gap-6 mb-8">

@@ -222,7 +222,7 @@ export default function StudioPage() {
             )}
           </div>
 
-          <div className="flex-1 flex flex-col items-center px-4 py-8">
+          <div className="flex-1 flex flex-col items-center px-4 py-8 pb-20 md:pb-8">
           <div className="w-full max-w-sm">
             {notice && (
               <p className="mb-4 text-center text-xs text-amber-300 bg-amber-400/10 border border-amber-400/20 rounded-xl px-4 py-2.5">

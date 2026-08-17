@@ -57,7 +57,7 @@ export default function AuctionPage() {
         <AppSidebar />
 
         <main className="flex-1 overflow-y-auto scrollbar-hide">
-          <div className="max-w-[900px] mx-auto px-4 py-8">
+          <div className="max-w-[900px] mx-auto px-4 py-8 pb-20 md:pb-8">
             <h1 className="text-white text-lg font-bold mb-6">Enchères en direct</h1>
 
             {loading ? (

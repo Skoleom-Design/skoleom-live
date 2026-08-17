@@ -636,7 +636,7 @@ export default function StudioLivePage() {
             )}
           </div>
 
-          <div className="flex-1 flex overflow-hidden px-4 pb-6 gap-4">
+          <div className="flex-1 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden px-4 pb-20 md:pb-6 gap-4">
             <div className="flex-1 flex flex-col items-center overflow-y-auto scrollbar-hide">
               <div className="w-full max-w-md">
                 <div className="relative w-full aspect-[9/16] max-h-[65vh] mx-auto rounded-2xl overflow-hidden bg-black border border-white/[0.08]">
@@ -1022,7 +1022,7 @@ export default function StudioLivePage() {
             </div>
 
             {live && (
-              <div className="w-[320px] shrink-0 flex flex-col gap-2">
+              <div className="w-full md:w-[320px] shrink-0 flex flex-col gap-2">
                 <button
                   onClick={() => setTopDonorsOpen((o) => !o)}
                   className="shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-[#f59e0b]/20 via-[#f59e0b]/10 to-transparent border border-[#f59e0b]/30 hover:border-[#f59e0b]/50 transition-all text-left"
@@ -1065,7 +1065,7 @@ export default function StudioLivePage() {
                   </div>
                 )}
 
-                <div className="flex-1 flex flex-col bg-white/[0.03] border border-white/[0.07] rounded-2xl overflow-hidden">
+                <div className="h-[70vh] md:h-auto md:flex-1 flex flex-col bg-white/[0.03] border border-white/[0.07] rounded-2xl overflow-hidden">
                 <div className="px-4 py-3 border-b border-white/[0.06] text-white/70 text-xs font-bold uppercase tracking-wider">
                   Commentaires
                 </div>

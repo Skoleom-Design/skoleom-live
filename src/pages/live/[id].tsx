@@ -4,7 +4,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { io, Socket } from 'socket.io-client';
 import { Room, RoomEvent, Track } from 'livekit-client';
-import { ArrowLeft, Users, Send, Gavel, Timer, Package, Crown, Gift, Wallet, Plus, Trophy } from 'lucide-react';
+import { ArrowLeft, Users, Send, Gavel, Timer, Package, Crown, Gift, Wallet, Plus, Trophy, VolumeX } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
 import { GiftBurstOverlay, type ActiveGiftBurst } from '../../client/components/Live/GiftBurstOverlay';
@@ -76,6 +76,10 @@ export default function LiveViewerPage() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [videoConnected, setVideoConnected] = useState(false);
+  // La video (sans piste audio) autoplay sans souci, mais les navigateurs bloquent l'autoplay
+  // du son sans geste utilisateur — attach() de LiveKit avale l'echec silencieusement, donc on
+  // detecte nous-memes le rejet pour proposer un bouton "Activer le son".
+  const [soundBlocked, setSoundBlocked] = useState(false);
 
   const [viewerCount, setViewerCount] = useState(0);
   const [comments, setComments] = useState<LiveComment[]>([]);
@@ -243,6 +247,7 @@ export default function LiveViewerPage() {
             setVideoConnected(true);
           } else if (track.kind === Track.Kind.Audio && audioElRef.current) {
             track.attach(audioElRef.current);
+            audioElRef.current.play().catch(() => setSoundBlocked(true));
           }
         });
         room.on(RoomEvent.TrackUnsubscribed, (track) => {
@@ -369,7 +374,7 @@ export default function LiveViewerPage() {
             </div>
           </div>
 
-          <div className="flex-1 flex overflow-hidden px-4 pb-6 gap-4">
+          <div className="flex-1 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden px-4 pb-20 md:pb-6 gap-4">
             <div className="flex-1 flex flex-col items-center overflow-y-auto scrollbar-hide">
               <div className="w-full max-w-md">
                 <div className="relative w-full aspect-[9/16] max-h-[65vh] mx-auto rounded-2xl overflow-hidden bg-black border border-white/[0.08] flex items-center justify-center">
@@ -382,6 +387,16 @@ export default function LiveViewerPage() {
                     className={`absolute inset-0 w-full h-full object-cover ${videoConnected ? '' : 'hidden'}`}
                   />
                   <audio ref={audioElRef} autoPlay className="hidden" />
+
+                  {soundBlocked && (
+                    <button
+                      onClick={() => audioElRef.current?.play().then(() => setSoundBlocked(false)).catch(() => {})}
+                      className="absolute top-3 right-3 z-30 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1.5 text-white text-[12px] font-semibold hover:border-[#a8ff35]/50 transition-all"
+                    >
+                      <VolumeX size={14} />
+                      Activer le son
+                    </button>
+                  )}
 
                   {!videoConnected && (
                     isAuction && roundActive && activeCapsule?.imageUrl ? (
@@ -492,7 +507,7 @@ export default function LiveViewerPage() {
               </div>
             </div>
 
-            <div className="w-[300px] shrink-0 flex flex-col gap-2">
+            <div className="w-full md:w-[300px] shrink-0 flex flex-col gap-2">
               <button
                 onClick={() => setTopDonorsOpen((o) => !o)}
                 className="shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-[#f59e0b]/20 via-[#f59e0b]/10 to-transparent border border-[#f59e0b]/30 hover:border-[#f59e0b]/50 transition-all text-left"
@@ -535,7 +550,7 @@ export default function LiveViewerPage() {
                 </div>
               )}
 
-              <div className="flex-1 flex flex-col bg-white/[0.03] border border-white/[0.07] rounded-2xl overflow-hidden">
+              <div className="h-[70vh] md:h-auto md:flex-1 flex flex-col bg-white/[0.03] border border-white/[0.07] rounded-2xl overflow-hidden">
               <div className="flex shrink-0 border-b border-white/[0.06]">
                 <button
                   onClick={() => setSidebarTab('chat')}

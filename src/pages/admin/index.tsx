@@ -52,7 +52,7 @@ export default function AdminDashboard() {
       <div className="flex h-screen bg-surface text-white overflow-hidden">
         <AdminSidebar />
 
-        <main className="flex-1 overflow-y-auto scrollbar-hide">
+        <main className="flex-1 overflow-y-auto scrollbar-hide pb-16 md:pb-0">
         <header className="border-b border-white/5 px-6 py-4">
           <h1 className="text-lg font-bold">Dashboard Admin</h1>
           <p className="text-xs text-gray-500">skoleomLive v2</p>

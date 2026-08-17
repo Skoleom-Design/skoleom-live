@@ -112,7 +112,7 @@ export default function AdminUsers() {
       <div className="flex h-screen bg-surface text-white overflow-hidden">
         <AdminSidebar />
 
-        <main className="flex-1 overflow-y-auto scrollbar-hide">
+        <main className="flex-1 overflow-y-auto scrollbar-hide pb-16 md:pb-0">
         <header className="border-b border-white/5 px-6 py-4 flex items-center justify-between">
           <h1 className="text-lg font-bold">Utilisateurs ({total})</h1>
           <div className="relative w-64">

@@ -67,7 +67,7 @@ export default function AdminPosts() {
       <div className="flex h-screen bg-surface text-white overflow-hidden">
         <AdminSidebar />
 
-        <main className="flex-1 overflow-y-auto scrollbar-hide">
+        <main className="flex-1 overflow-y-auto scrollbar-hide pb-16 md:pb-0">
         <header className="border-b border-white/5 px-6 py-4">
           <h1 className="text-lg font-bold">Modération des posts ({total})</h1>
         </header>

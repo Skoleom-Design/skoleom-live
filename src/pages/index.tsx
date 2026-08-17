@@ -64,7 +64,7 @@ export default function FeedPage() {
             if (nearBottom && !loading) loadFeed();
           }}
         >
-          <div className="max-w-[470px] mx-auto">
+          <div className="max-w-[470px] mx-auto pb-16 md:pb-0">
             {posts.map((post) => (
               <InstaPostCard key={post.id} post={post} liked={likedIds.has(post.id)} />
             ))}

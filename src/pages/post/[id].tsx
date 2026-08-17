@@ -126,7 +126,7 @@ export default function PostDetailPage() {
       <div className="flex h-screen cosmic-bg overflow-hidden">
         <AppSidebar />
 
-        <main className="flex-1 overflow-y-auto scrollbar-hide px-4 py-6">
+        <main className="flex-1 overflow-y-auto scrollbar-hide px-4 py-6 pb-20 md:pb-6">
           <div className="w-full max-w-md mx-auto">
             <button
               onClick={() => router.back()}

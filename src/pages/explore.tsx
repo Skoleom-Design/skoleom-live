@@ -119,7 +119,7 @@ export default function ExplorePage() {
             if (nearBottom) loadMorePosts();
           }}
         >
-          <div className={`mx-auto px-4 py-8 ${isSearching ? 'max-w-[1100px]' : 'max-w-[900px]'}`}>
+          <div className={`mx-auto px-4 py-8 pb-20 md:pb-8 ${isSearching ? 'max-w-[1100px]' : 'max-w-[900px]'}`}>
             <div className="relative mb-6">
               <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-white/30" />
               <input
@@ -135,9 +135,9 @@ export default function ExplorePage() {
                 <Loader2 className="animate-spin text-white/30" size={24} />
               </div>
             ) : isSearching ? (
-              <div className="flex gap-6">
+              <div className="flex flex-col md:flex-row gap-6">
                 {/* Left column — comptes puis lives */}
-                <div className="w-[280px] shrink-0 space-y-6">
+                <div className="w-full md:w-[280px] shrink-0 space-y-6">
                   <section>
                     <h2 className="text-white/40 text-[11px] font-bold uppercase tracking-wider mb-2.5">Comptes</h2>
                     {users.length === 0 ? (
