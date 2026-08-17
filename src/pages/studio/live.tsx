@@ -12,7 +12,6 @@ import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
 import { GiftBurstOverlay, type ActiveGiftBurst } from '../../client/components/Live/GiftBurstOverlay';
 import { api, ApiError, getToken, getStoredUser } from '../../shared/api/http';
-import { getCapsuleGroupLimit } from '../../client/constants/capsule';
 import { giftById } from '../../client/constants/gifts';
 import type { Capsule } from '../../shared/types/api';
 
@@ -147,7 +146,6 @@ export default function StudioLivePage() {
 
   const myPlan = (getStoredUser()?.plan || 'free') as 'free' | 'premium' | 'ultra';
   const auctionRoundsLimit = AUCTION_ROUNDS_LIMIT_CLIENT[myPlan];
-  const capsuleProductsLimit = getCapsuleGroupLimit(myPlan);
 
   // Lancement d'une manche d'enchere — choisi en plein direct, capsule par capsule.
   const [auctionCapsuleId, setAuctionCapsuleId] = useState('');
@@ -835,7 +833,7 @@ export default function StudioLivePage() {
                                 }`}
                               >
                                 {(live.auctionRoundsCount ?? 0) >= auctionRoundsLimit ? 'Limite atteinte — ' : ''}
-                                Ton offre actuelle te permet {auctionRoundsLimit} manche{auctionRoundsLimit > 1 ? 's' : ''} d&apos;enchère par live, avec jusqu&apos;à {capsuleProductsLimit ?? 'un nombre illimité de'} produit{capsuleProductsLimit !== 1 ? 's' : ''} par capsule.{' '}
+                                Ton offre actuelle te permet {auctionRoundsLimit} manche{auctionRoundsLimit > 1 ? 's' : ''} d&apos;enchère par live.{' '}
                                 <Link href="/profile/me?tab=capsules" className="underline font-semibold hover:brightness-110">
                                   Mettre à jour ton offre
                                 </Link>{' '}
