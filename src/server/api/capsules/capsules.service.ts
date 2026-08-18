@@ -45,6 +45,16 @@ const CAPSULE_GROUP_PRODUCT_LIMITS: Record<UserPlan, number | null> = {
   [UserPlan.ULTRA]: 8,
 };
 
+// Commission prelevee sur chaque vente, selon l'offre du createur au moment ou il cree la
+// capsule — plus l'offre est elevee, moins la plateforme prend de commission. Fige sur la
+// capsule a la creation (voir Capsule.commissionRate) : un changement d'offre plus tard ne
+// modifie pas retroactivement les capsules deja en ligne, seulement les nouvelles.
+const COMMISSION_RATE_BY_PLAN: Record<UserPlan, number> = {
+  [UserPlan.FREE]: 15,
+  [UserPlan.PREMIUM]: 10,
+  [UserPlan.ULTRA]: 5,
+};
+
 @Injectable()
 export class CapsulesService {
   constructor(
@@ -84,8 +94,11 @@ export class CapsulesService {
   async create(creatorId: string, dto: CreateCapsuleDto): Promise<Capsule> {
     if (dto.price < 1) throw new BadRequestException('Le prix minimum est de 1€.');
 
+    const creator = await this.usersRepo.findOne({ where: { id: creatorId } });
+    if (!creator) throw new NotFoundException('User not found');
+
     const { postId, ...rest } = dto;
-    const commissionRate = parseFloat(process.env.COMMISSION_RATE || '0.15') * 100;
+    const commissionRate = COMMISSION_RATE_BY_PLAN[creator.plan];
     const capsule = this.capsulesRepo.create({
       ...rest,
       images: dto.images || [],
@@ -125,7 +138,7 @@ export class CapsulesService {
       }
     }
 
-    const commissionRate = parseFloat(process.env.COMMISSION_RATE || '0.15') * 100;
+    const commissionRate = COMMISSION_RATE_BY_PLAN[creator.plan];
 
     return this.capsulesRepo.manager.transaction(async (manager) => {
       const group = await manager.save(
