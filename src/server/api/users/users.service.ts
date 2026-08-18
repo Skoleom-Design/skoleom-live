@@ -76,4 +76,58 @@ export class UsersService {
     await this.usersRepo.update(userId, { interests, hasOnboarded: true });
     return { interests, hasOnboarded: true };
   }
+
+  // Suppression definitive et complete (pas de soft-delete) — transaction unique : si une
+  // contrainte inattendue bloque une etape (ex: commande en cours sur une de ses capsules,
+  // achetee par quelqu'un d'autre), tout est annule plutot que de laisser des donnees a moitie
+  // supprimees. Nettoie dans l'ordre les tables filles avant les tables parentes pour ne
+  // jamais violer une contrainte de cle etrangere.
+  async deleteAccount(userId: string): Promise<void> {
+    await this.usersRepo.manager.transaction(async (manager) => {
+      const postIds = (await manager.query('SELECT id FROM posts WHERE "creatorId" = $1', [userId])).map((r: { id: string }) => r.id);
+      const liveIds = (await manager.query('SELECT id FROM live_sessions WHERE "creatorId" = $1', [userId])).map((r: { id: string }) => r.id);
+      const capsuleIds = (await manager.query('SELECT id FROM capsules WHERE "creatorId" = $1', [userId])).map((r: { id: string }) => r.id);
+
+      if (postIds.length) {
+        await manager.query('DELETE FROM comments WHERE "postId" = ANY($1)', [postIds]);
+        await manager.query('DELETE FROM boosts WHERE "postId" = ANY($1)', [postIds]);
+        await manager.query('DELETE FROM notifications WHERE "postId" = ANY($1)', [postIds]);
+      }
+
+      if (liveIds.length) {
+        await manager.query('DELETE FROM auction_bids WHERE "liveSessionId" = ANY($1)', [liveIds]);
+        await manager.query('DELETE FROM gifts WHERE "liveSessionId" = ANY($1)', [liveIds]);
+        await manager.query('DELETE FROM live_comments WHERE "liveSessionId" = ANY($1)', [liveIds]);
+      }
+
+      if (capsuleIds.length) {
+        await manager.query('UPDATE live_sessions SET "featuredCapsuleId" = NULL WHERE "featuredCapsuleId" = ANY($1)', [capsuleIds]);
+        await manager.query('UPDATE live_sessions SET "auctionCapsuleId" = NULL WHERE "auctionCapsuleId" = ANY($1)', [capsuleIds]);
+      }
+
+      // Cet utilisateur peut etre le plus offrant sur l'enchere de quelqu'un d'autre au moment
+      // de la suppression — on ne supprime pas ce live (pas le sien), juste la reference.
+      await manager.query('UPDATE live_sessions SET "currentBidderId" = NULL WHERE "currentBidderId" = $1', [userId]);
+
+      await manager.query('DELETE FROM comments WHERE "userId" = $1', [userId]);
+      await manager.query('DELETE FROM boosts WHERE "userId" = $1', [userId]);
+      await manager.query('DELETE FROM gifts WHERE "senderId" = $1 OR "receiverId" = $1', [userId]);
+      await manager.query('DELETE FROM auction_bids WHERE "bidderId" = $1', [userId]);
+      await manager.query('DELETE FROM live_comments WHERE "userId" = $1', [userId]);
+      // actorId est uuid, recipientId est varchar — caster actorId en text pour eviter
+      // "operator does not exist: character varying = uuid" (Postgres ne peut pas typer $1
+      // pour les deux colonnes a la fois sinon).
+      await manager.query('DELETE FROM notifications WHERE "actorId"::text = $1 OR "recipientId" = $1', [userId]);
+      await manager.query('DELETE FROM admin_action_logs WHERE "adminId" = $1', [userId]);
+      await manager.query('DELETE FROM wallet_transactions WHERE "userId" = $1', [userId]);
+      await manager.query('DELETE FROM orders WHERE "buyerId" = $1 OR "creatorId" = $1', [userId]);
+
+      if (liveIds.length) await manager.query('DELETE FROM live_sessions WHERE id = ANY($1)', [liveIds]);
+      if (capsuleIds.length) await manager.query('DELETE FROM capsules WHERE id = ANY($1)', [capsuleIds]);
+      await manager.query('DELETE FROM capsule_groups WHERE "creatorId" = $1', [userId]);
+      if (postIds.length) await manager.query('DELETE FROM posts WHERE id = ANY($1)', [postIds]);
+
+      await manager.query('DELETE FROM users WHERE id = $1', [userId]);
+    });
+  }
 }

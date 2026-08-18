@@ -1,4 +1,4 @@
-import { Controller, Get, Patch, Param, Body, Query, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Patch, Delete, Param, Body, Query, Request, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { UserPlan } from '../../../shared/types/entities';
@@ -20,6 +20,12 @@ export class UsersController {
     @Body() dto: { username?: string; displayName?: string; avatarUrl?: string; bio?: string; plan?: UserPlan },
   ) {
     return this.usersService.updateProfile(req.user.id, dto);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('me')
+  deleteMe(@Request() req) {
+    return this.usersService.deleteAccount(req.user.id);
   }
 
   // Appelé à la fin de l'onboarding (choix des centres d'intérêt) ou au "Passer" — dans les

@@ -183,6 +183,9 @@ export default function ProfilePage() {
   const [withdrawLoading, setWithdrawLoading] = useState(false);
 
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState('');
   const [notice, setNotice] = useState('');
 
   const [walletTransactions, setWalletTransactions] = useState<WalletTransactionData[]>([]);
@@ -518,6 +521,19 @@ export default function ProfilePage() {
   function handleLogout() {
     clearSession();
     router.push('/auth/login');
+  }
+
+  async function handleDeleteAccount() {
+    setDeleting(true);
+    setDeleteError('');
+    try {
+      await api.delete('/users/me');
+      clearSession();
+      router.push('/auth/login');
+    } catch (err) {
+      setDeleteError(err instanceof ApiError ? err.message : t('profile.deleteAccountError'));
+      setDeleting(false);
+    }
   }
 
   function openEdit() {
@@ -1667,7 +1683,7 @@ export default function ProfilePage() {
           <div className="cosmic-modal w-full max-w-sm overflow-hidden border border-white/[0.08] rounded-[20px] p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-white font-bold text-base">{t('profile.settings')}</h2>
-              <button onClick={() => setSettingsOpen(false)}
+              <button onClick={() => { setSettingsOpen(false); setDeleteConfirmOpen(false); setDeleteError(''); }}
                 className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
                 <X size={16} className="text-white" />
               </button>
@@ -1707,10 +1723,44 @@ export default function ProfilePage() {
 
             <button
               onClick={handleLogout}
-              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-full border border-red-500/20 text-red-400 text-[13px] font-semibold hover:bg-red-500/10 transition-all"
+              className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-full border border-red-500/20 text-red-400 text-[13px] font-semibold hover:bg-red-500/10 transition-all mb-3"
             >
               <LogOut size={14} /> {t('profile.logout')}
             </button>
+
+            {deleteConfirmOpen ? (
+              <div className="rounded-2xl border border-red-500/25 bg-red-500/[0.06] p-3.5">
+                <p className="text-red-300/90 text-[12px] leading-relaxed mb-3">
+                  {t('profile.deleteAccountWarning')}
+                </p>
+                {deleteError && (
+                  <p className="text-red-400 text-[12px] mb-3">{deleteError}</p>
+                )}
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => { setDeleteConfirmOpen(false); setDeleteError(''); }}
+                    disabled={deleting}
+                    className="flex-1 py-2.5 rounded-full text-[12px] font-semibold text-white/60 border border-white/[0.1] hover:bg-white/[0.05] transition-all disabled:opacity-50"
+                  >
+                    {t('profile.deleteAccountCancel')}
+                  </button>
+                  <button
+                    onClick={handleDeleteAccount}
+                    disabled={deleting}
+                    className="flex-1 py-2.5 rounded-full text-[12px] font-bold text-white bg-red-500/90 hover:bg-red-500 transition-all disabled:opacity-60 flex items-center justify-center gap-1.5"
+                  >
+                    {deleting ? <Loader2 size={13} className="animate-spin" /> : t('profile.deleteAccountConfirm')}
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <button
+                onClick={() => setDeleteConfirmOpen(true)}
+                className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-full text-white/30 text-[12px] font-medium hover:text-red-400 transition-all"
+              >
+                <Trash2 size={13} /> {t('profile.deleteAccount')}
+              </button>
+            )}
           </div>
         </div>
       )}
