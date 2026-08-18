@@ -8,6 +8,8 @@ import {
   MoreHorizontal,
   VolumeX,
   Volume2,
+  Play,
+  Pause,
 } from 'lucide-react';
 import type { Post } from '../../../shared/types/api';
 import { CapsuleDrawer } from '../Capsule/CapsuleDrawer';
@@ -34,6 +36,8 @@ export function InstaPostCard({ post, liked: likedProp = false }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRef = useRef<HTMLDivElement>(null);
   const [isMuted, setIsMuted] = useState(true);
+  const [musicPlaying, setMusicPlaying] = useState(false);
+  const musicAudioRef = useRef<HTMLAudioElement | null>(null);
   const [liked, setLiked] = useState(likedProp);
   const [likeCount, setLikeCount] = useState(post.likeCount);
   const [likePending, setLikePending] = useState(false);
@@ -74,6 +78,39 @@ export function InstaPostCard({ post, liked: likedProp = false }: Props) {
     observer.observe(mediaRef.current);
     return () => observer.disconnect();
   }, []);
+
+  // Coupe la musique attachee quand le post sort du cadre (scroll) — pas de piste qui continue
+  // a jouer en fond une fois qu'on est passe a autre chose dans le feed.
+  useEffect(() => {
+    if (!mediaRef.current || post.type !== 'photo' || !post.musicUrl) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry.isIntersecting) {
+          musicAudioRef.current?.pause();
+          setMusicPlaying(false);
+        }
+      },
+      { threshold: 0.1 },
+    );
+    observer.observe(mediaRef.current);
+    return () => {
+      observer.disconnect();
+      musicAudioRef.current?.pause();
+    };
+  }, [post.type, post.musicUrl]);
+
+  function toggleMusic() {
+    if (!post.musicUrl) return;
+    if (musicPlaying) {
+      musicAudioRef.current?.pause();
+      setMusicPlaying(false);
+      return;
+    }
+    if (!musicAudioRef.current) musicAudioRef.current = new Audio(post.musicUrl);
+    musicAudioRef.current.loop = true;
+    musicAudioRef.current.play().catch(() => {});
+    setMusicPlaying(true);
+  }
 
   return (
     <article className="cosmic-modal mx-3 my-4 rounded-2xl overflow-hidden border border-white/[0.08]">
@@ -260,10 +297,22 @@ export function InstaPostCard({ post, liked: likedProp = false }: Props) {
         </div>
       )}
 
-      {/* ── Music ── */}
+      {/* ── Music — lecture uniquement pour les photos (une video a deja sa propre piste
+          audio, geree par isMuted ci-dessus, pas de raison de superposer les deux). ── */}
       {post.musicName && (
         <div className="px-3 py-0.5 pb-3">
-          <p className="text-[11px] text-white/35">🎵 {post.musicName}</p>
+          {post.type === 'photo' && post.musicUrl ? (
+            <button
+              type="button"
+              onClick={toggleMusic}
+              className="flex items-center gap-1.5 text-[11px] text-white/35 hover:text-white/60 transition-colors"
+            >
+              {musicPlaying ? <Pause size={11} /> : <Play size={11} />}
+              🎵 {post.musicName}
+            </button>
+          ) : (
+            <p className="text-[11px] text-white/35">🎵 {post.musicName}</p>
+          )}
         </div>
       )}
 

@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
-import { ArrowLeft, Camera, Image as ImageIcon, Loader2, Package, Radio, Gavel, Import, Plus, X } from 'lucide-react';
+import { ArrowLeft, Camera, Image as ImageIcon, Loader2, Package, Radio, Gavel, Import, Plus, X, Music, Play, Pause } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CameraCaptureModal } from '../../client/components/Post/CameraCaptureModal';
 import { InstagramImportModal } from '../../client/components/Post/InstagramImportModal';
@@ -10,6 +10,7 @@ import { CapsuleProductForm, CapsuleProductFormHandle } from '../../client/compo
 import { api, ApiError, getToken, getStoredUser } from '../../shared/api/http';
 import type { Capsule } from '../../shared/types/api';
 import { useLanguage } from '../../client/i18n/LanguageContext';
+import { MUSIC_LIBRARY } from '../../client/constants/music';
 
 type Step = 'form' | 'capsule' | 'done';
 type CapsuleMode = 'existing' | 'new';
@@ -33,6 +34,9 @@ export default function StudioPage() {
   const [caption, setCaption] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
+  const [musicTrackId, setMusicTrackId] = useState<string | null>(null);
+  const [previewingId, setPreviewingId] = useState<string | null>(null);
+  const previewAudioRef = useRef<HTMLAudioElement | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState('');
@@ -45,6 +49,10 @@ export default function StudioPage() {
   const [capsuleError, setCapsuleError] = useState('');
   const [capsuleLoading, setCapsuleLoading] = useState(false);
   const productFormRef = useRef<CapsuleProductFormHandle>(null);
+
+  useEffect(() => {
+    return () => previewAudioRef.current?.pause();
+  }, []);
 
   useEffect(() => {
     if (!getToken()) {
@@ -94,6 +102,24 @@ export default function StudioPage() {
     setTagInput('');
   }
 
+  function togglePreview(trackId: string, url: string) {
+    if (previewingId === trackId) {
+      previewAudioRef.current?.pause();
+      setPreviewingId(null);
+      return;
+    }
+    if (!previewAudioRef.current) previewAudioRef.current = new Audio();
+    const audioEl = previewAudioRef.current;
+    audioEl.src = url;
+    audioEl.currentTime = 0;
+    audioEl.play().catch(() => {});
+    setPreviewingId(trackId);
+  }
+
+  function selectMusic(trackId: string) {
+    setMusicTrackId((prev) => (prev === trackId ? null : trackId));
+  }
+
   function removeTag(t: string) {
     setTags((prev) => prev.filter((x) => x !== t));
   }
@@ -123,12 +149,15 @@ export default function StudioPage() {
       });
       if (!putRes.ok) throw new Error(t('studio.uploadFailed'));
 
+      const selectedTrack = MUSIC_LIBRARY.find((m) => m.id === musicTrackId);
       const type = file.type.startsWith('image/') ? 'photo' : 'video';
       const post = await api.post('/posts', {
         type,
         mediaUrl: fileUrl,
         caption: caption.trim() || undefined,
         tags,
+        musicName: selectedTrack?.name,
+        musicUrl: selectedTrack?.url,
       });
 
       setPostId(post.id);
@@ -377,6 +406,49 @@ export default function StudioPage() {
                       ))}
                     </div>
                   )}
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2 flex items-center gap-1.5">
+                    <Music size={12} /> {t('studio.music')}
+                  </p>
+                  <div className="space-y-1.5">
+                    {MUSIC_LIBRARY.map((track) => {
+                      const selected = musicTrackId === track.id;
+                      const playing = previewingId === track.id;
+                      return (
+                        <div
+                          key={track.id}
+                          className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all ${
+                            selected ? 'border-[#a8ff35]/50 bg-[#a8ff35]/10' : 'border-white/[0.08] bg-white/[0.02]'
+                          }`}
+                        >
+                          <button
+                            type="button"
+                            onClick={() => togglePreview(track.id, track.url)}
+                            className="w-8 h-8 shrink-0 rounded-full bg-white/[0.08] hover:bg-white/[0.14] flex items-center justify-center text-white transition-all"
+                          >
+                            {playing ? <Pause size={13} /> : <Play size={13} />}
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => selectMusic(track.id)}
+                            className="flex-1 min-w-0 text-left"
+                          >
+                            <p className={`text-[13px] font-medium truncate ${selected ? 'text-[#a8ff35]' : 'text-white'}`}>
+                              {track.name}
+                            </p>
+                            <p className="text-[11px] text-white/35 truncate">{track.artist}</p>
+                          </button>
+                          {selected && (
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#a8ff35] shrink-0">
+                              {t('studio.musicSelected')}
+                            </span>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
 
                 <button

@@ -20,6 +20,7 @@ export interface Post {
   commentCount?: number;
   isBoosted: boolean;
   musicName?: string;
+  musicUrl?: string;
   creator: User;
   capsules: Capsule[];
   createdAt: string;

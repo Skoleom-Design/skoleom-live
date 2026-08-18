@@ -98,6 +98,8 @@ export const fr = {
     import: 'Importer',
     captionPlaceholder: 'Légende...',
     addTagPlaceholder: 'Ajouter un tag',
+    music: 'Musique (optionnel)',
+    musicSelected: 'Choisie',
     choosePhotoOrVideo: 'Choisissez une photo ou une vidéo.',
     uploadFailed: "Échec de l'upload vers le stockage.",
     publish: 'Publier',

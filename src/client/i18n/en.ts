@@ -98,6 +98,8 @@ export const en = {
     import: 'Import',
     captionPlaceholder: 'Caption...',
     addTagPlaceholder: 'Add a tag',
+    music: 'Music (optional)',
+    musicSelected: 'Selected',
     choosePhotoOrVideo: 'Choose a photo or a video.',
     uploadFailed: 'Failed to upload to storage.',
     publish: 'Publish',
