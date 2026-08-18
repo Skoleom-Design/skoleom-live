@@ -205,7 +205,7 @@ export default function StudioLivePage() {
     };
   }, []);
 
-  function requestMedia(retriesLeft = 2) {
+  function requestMedia(retriesLeft = 4) {
     setMediaError('');
     setMediaReady(false);
 
@@ -246,11 +246,14 @@ export default function StudioLivePage() {
         // en double-montage StrictMode, ou juste après la fermeture d'un autre onglet/app) peut
         // encore être en train de libérer le handle caméra côté OS au moment où on redemande —
         // ça n'a rien à voir avec une vraie appli tierce qui l'utilise. Un court retry silencieux
-        // résout la grande majorité des cas avant d'afficher une erreur à l'utilisateur.
+        // résout la grande majorité des cas avant d'afficher une erreur à l'utilisateur. Backoff
+        // croissant (500ms/800ms/1200ms/1600ms, ~4s au total) — certains pilotes webcam mettent
+        // plus d'une seconde à relâcher le handle, 2 essais à 500ms fixes ne suffisaient pas toujours.
         if ((name === 'NotReadableError' || name === 'TrackStartError') && retriesLeft > 0) {
+          const delay = 500 + (4 - retriesLeft) * 300;
           setTimeout(() => {
             if (mediaRequestIdRef.current === requestId) requestMedia(retriesLeft - 1);
-          }, 500);
+          }, delay);
           return;
         }
 
