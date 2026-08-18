@@ -23,6 +23,13 @@ export class LivesGateway implements OnGatewayDisconnect {
   private viewers = new Map<string, Set<string>>();
   private socketLive = new Map<string, string>();
   private banned = new Map<string, Set<string>>();
+  // Identite des spectateurs connectes avec un token valide — sert uniquement a construire la
+  // liste "inviter en duo" (voir listViewers) et a router les invitations/reponses vers le bon
+  // socket. Les spectateurs anonymes ne sont jamais invitables (pas d'identite a proposer).
+  private viewerIdentities = new Map<string, { liveId: string; userId: string; username: string; avatarUrl?: string }>();
+  // Une seule invitation de duo en attente a la fois par live — assez pour ce cas d'usage,
+  // pas besoin de gerer une file.
+  private pendingDuoInvites = new Map<string, { targetUserId: string; inviterSocketId: string }>();
 
   constructor(
     private jwtService: JwtService,
@@ -47,7 +54,7 @@ export class LivesGateway implements OnGatewayDisconnect {
   }
 
   @SubscribeMessage('join')
-  async handleJoin(@ConnectedSocket() client: Socket, @MessageBody() data: { liveId: string }) {
+  async handleJoin(@ConnectedSocket() client: Socket, @MessageBody() data: { liveId: string; token?: string }) {
     const { liveId } = data;
     client.join(roomFor(liveId));
     this.socketLive.set(client.id, liveId);
@@ -55,6 +62,18 @@ export class LivesGateway implements OnGatewayDisconnect {
     if (!this.viewers.has(liveId)) this.viewers.set(liveId, new Set());
     this.viewers.get(liveId)!.add(client.id);
     this.broadcastCount(liveId);
+
+    // Identite optionnelle — un spectateur non connecte reste anonyme, simplement non invitable
+    // a un duo (voir listViewers).
+    const user = await this.authenticate(data.token);
+    if (user) {
+      this.viewerIdentities.set(client.id, {
+        liveId,
+        userId: user.id,
+        username: user.username,
+        avatarUrl: user.avatarUrl,
+      });
+    }
 
     const comments = await this.livesService.getComments(liveId);
     client.emit('history', comments.map((c) => ({
@@ -68,19 +87,37 @@ export class LivesGateway implements OnGatewayDisconnect {
   }
 
   @SubscribeMessage('leave')
-  handleLeave(@ConnectedSocket() client: Socket, @MessageBody() data: { liveId: string }) {
-    this.leaveLive(client, data.liveId);
+  async handleLeave(@ConnectedSocket() client: Socket, @MessageBody() data: { liveId: string }) {
+    await this.leaveLive(client, data.liveId);
   }
 
-  handleDisconnect(client: Socket) {
+  async handleDisconnect(client: Socket) {
     const liveId = this.socketLive.get(client.id);
-    if (liveId) this.leaveLive(client, liveId);
+    if (liveId) await this.leaveLive(client, liveId);
   }
 
-  private leaveLive(client: Socket, liveId: string) {
+  private async leaveLive(client: Socket, liveId: string) {
     client.leave(roomFor(liveId));
     this.viewers.get(liveId)?.delete(client.id);
     this.socketLive.delete(client.id);
+
+    // Le partenaire de duo qui quitte (onglet ferme, connexion perdue) met fin au duo tout de
+    // suite, plutot que de laisser l'autre cote publier dans le vide sans que personne le sache.
+    const identity = this.viewerIdentities.get(client.id);
+    this.viewerIdentities.delete(client.id);
+    if (identity) {
+      const stillConnected = [...this.viewerIdentities.values()].some(
+        (v) => v.liveId === liveId && v.userId === identity.userId,
+      );
+      if (!stillConnected) {
+        const live = await this.livesService.getById(liveId).catch(() => null);
+        if (live?.duoPartnerId === identity.userId) {
+          await this.livesService.clearDuoPartner(liveId);
+          this.server.to(roomFor(liveId)).emit('duoEnded', {});
+        }
+      }
+    }
+
     this.broadcastCount(liveId);
   }
 
@@ -134,6 +171,94 @@ export class LivesGateway implements OnGatewayDisconnect {
     if (!this.banned.has(data.liveId)) this.banned.set(data.liveId, new Set());
     this.banned.get(data.liveId)!.add(data.userId);
     this.server.to(roomFor(data.liveId)).emit('userBanned', { userId: data.userId });
+  }
+
+  // Duo façon TikTok — le createur invite un spectateur actuellement connecte (identifie, donc
+  // pas un anonyme) a publier sa propre camera/micro dans la meme room. Voir setDuoPartner/
+  // clearDuoPartner dans lives.service.ts et getLiveKitToken pour la permission qui en decoule.
+
+  @SubscribeMessage('listViewers')
+  async handleListViewers(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { liveId: string; token: string },
+  ) {
+    const user = await this.authenticate(data.token);
+    if (!user || !(await this.livesService.isOwner(data.liveId, user.id))) return;
+
+    const seen = new Map<string, { userId: string; username: string; avatarUrl?: string }>();
+    for (const v of this.viewerIdentities.values()) {
+      if (v.liveId === data.liveId && v.userId !== user.id) {
+        seen.set(v.userId, { userId: v.userId, username: v.username, avatarUrl: v.avatarUrl });
+      }
+    }
+    client.emit('viewersList', [...seen.values()]);
+  }
+
+  @SubscribeMessage('inviteDuo')
+  async handleInviteDuo(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { liveId: string; targetUserId: string; token: string },
+  ) {
+    const user = await this.authenticate(data.token);
+    if (!user || !(await this.livesService.isOwner(data.liveId, user.id))) return;
+
+    const targetSockets = [...this.viewerIdentities.entries()].filter(
+      ([, v]) => v.liveId === data.liveId && v.userId === data.targetUserId,
+    );
+    if (targetSockets.length === 0) {
+      client.emit('duoError', { message: "Ce spectateur n'est plus connecté au live." });
+      return;
+    }
+
+    this.pendingDuoInvites.set(data.liveId, { targetUserId: data.targetUserId, inviterSocketId: client.id });
+    for (const [socketId] of targetSockets) {
+      this.server.to(socketId).emit('duoInvite', {
+        liveId: data.liveId,
+        fromUsername: user.displayName || user.username,
+      });
+    }
+  }
+
+  @SubscribeMessage('respondDuo')
+  async handleRespondDuo(
+    @MessageBody() data: { liveId: string; accept: boolean; token: string },
+  ) {
+    const user = await this.authenticate(data.token);
+    if (!user) return;
+
+    const pending = this.pendingDuoInvites.get(data.liveId);
+    if (!pending || pending.targetUserId !== user.id) return;
+    this.pendingDuoInvites.delete(data.liveId);
+
+    if (!data.accept) {
+      this.server.to(pending.inviterSocketId).emit('duoDeclined', { username: user.username });
+      return;
+    }
+
+    try {
+      await this.livesService.setDuoPartner(data.liveId, user.id);
+      this.server.to(roomFor(data.liveId)).emit('duoStarted', {
+        partnerId: user.id,
+        partnerUsername: user.displayName || user.username,
+        partnerAvatarUrl: user.avatarUrl,
+      });
+    } catch (err) {
+      this.server.to(pending.inviterSocketId).emit('duoError', {
+        message: err instanceof Error ? err.message : 'Duo refusé.',
+      });
+    }
+  }
+
+  @SubscribeMessage('endDuo')
+  async handleEndDuo(@MessageBody() data: { liveId: string; token: string }) {
+    const user = await this.authenticate(data.token);
+    if (!user) return;
+
+    const live = await this.livesService.getById(data.liveId).catch(() => null);
+    if (!live || (live.creatorId !== user.id && live.duoPartnerId !== user.id)) return;
+
+    await this.livesService.clearDuoPartner(data.liveId);
+    this.server.to(roomFor(data.liveId)).emit('duoEnded', {});
   }
 
   @SubscribeMessage('placeBid')

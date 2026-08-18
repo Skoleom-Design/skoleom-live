@@ -3,10 +3,10 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import { io, Socket } from 'socket.io-client';
-import { Room, Track } from 'livekit-client';
+import { Room, RoomEvent, Track } from 'livekit-client';
 import {
   ArrowLeft, Mic, MicOff, Video, VideoOff, Radio, Loader2, Send, Users, Package, X, ShoppingBag,
-  Crown, Trash2, UserX, Gavel, Timer, ChevronRight, Plus, Trophy,
+  Crown, Trash2, UserX, Gavel, Timer, ChevronRight, Plus, Trophy, Users2,
 } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
@@ -133,6 +133,15 @@ export default function StudioLivePage() {
 
   const [topDonors, setTopDonors] = useState<TopDonor[]>([]);
   const [topDonorsOpen, setTopDonorsOpen] = useState(false);
+
+  // Duo façon TikTok — voir LivesGateway (inviteDuo/respondDuo/endDuo) pour le signalement.
+  const [duoPanelOpen, setDuoPanelOpen] = useState(false);
+  const [viewersList, setViewersList] = useState<{ userId: string; username: string; avatarUrl?: string }[]>([]);
+  const [duoPartner, setDuoPartner] = useState<{ id: string; username: string; avatarUrl?: string } | null>(null);
+  const [duoInviteStatus, setDuoInviteStatus] = useState<'idle' | 'inviting' | 'declined' | 'error'>('idle');
+  const [duoErrorMsg, setDuoErrorMsg] = useState('');
+  const duoVideoRef = useRef<HTMLVideoElement>(null);
+  const duoAudioRef = useRef<HTMLAudioElement>(null);
 
   // "Commencer un live" (Studio) renvoie ici sans parametre — mode par defaut "live". "Commencer
   // une enchere" renvoie avec ?mode=auction, voir l'effet ci-dessous.
@@ -355,6 +364,23 @@ export default function StudioLivePage() {
 
       fetchTopDonors(live.id);
     });
+    socket.on('viewersList', (list: { userId: string; username: string; avatarUrl?: string }[]) => {
+      setViewersList(list);
+    });
+    socket.on('duoStarted', (d: { partnerId: string; partnerUsername: string; partnerAvatarUrl?: string }) => {
+      setDuoPartner({ id: d.partnerId, username: d.partnerUsername, avatarUrl: d.partnerAvatarUrl });
+      setDuoInviteStatus('idle');
+      setDuoPanelOpen(false);
+    });
+    socket.on('duoEnded', () => {
+      setDuoPartner(null);
+      duoVideoRef.current?.srcObject && (duoVideoRef.current.srcObject = null);
+    });
+    socket.on('duoDeclined', () => setDuoInviteStatus('declined'));
+    socket.on('duoError', (d: { message: string }) => {
+      setDuoInviteStatus('error');
+      setDuoErrorMsg(d.message);
+    });
 
     return () => {
       socket.emit('leave', { liveId: live.id });
@@ -368,6 +394,24 @@ export default function StudioLivePage() {
   // Classement des plus gros donateurs de ce live — recharge a l'arrivee, puis periodiquement.
   function fetchTopDonors(liveId: string) {
     api.get<TopDonor[]>(`/lives/${liveId}/top-donors`).then(setTopDonors).catch(() => {});
+  }
+
+  function openDuoPanel() {
+    if (!live) return;
+    setDuoPanelOpen(true);
+    setDuoInviteStatus('idle');
+    socketRef.current?.emit('listViewers', { liveId: live.id, token: getToken() });
+  }
+
+  function inviteDuo(targetUserId: string) {
+    if (!live) return;
+    setDuoInviteStatus('inviting');
+    socketRef.current?.emit('inviteDuo', { liveId: live.id, targetUserId, token: getToken() });
+  }
+
+  function endDuo() {
+    if (!live) return;
+    socketRef.current?.emit('endDuo', { liveId: live.id, token: getToken() });
   }
 
   useEffect(() => {
@@ -420,6 +464,16 @@ export default function StudioLivePage() {
         const { token, url } = await api.get<{ token: string; url: string }>(`/lives/${live.id}/livekit-token`);
         if (cancelled) return;
         const room = new Room();
+        // Seul un partenaire de duo peut publier dans cette room a part moi — n'importe quelle
+        // piste reçue d'un autre participant est forcement la sienne.
+        room.on(RoomEvent.TrackSubscribed, (track) => {
+          if (track.kind === Track.Kind.Video && duoVideoRef.current) {
+            track.attach(duoVideoRef.current);
+          } else if (track.kind === Track.Kind.Audio && duoAudioRef.current) {
+            track.attach(duoAudioRef.current);
+          }
+        });
+        room.on(RoomEvent.TrackUnsubscribed, (track) => track.detach());
         await room.connect(url, token);
         if (cancelled) {
           room.disconnect();
@@ -729,11 +783,46 @@ export default function StudioLivePage() {
                       >
                         {camOn ? <Video size={18} className="text-white" /> : <VideoOff size={18} className="text-white" />}
                       </button>
+                      {live && (
+                        <button
+                          onClick={() => (duoPartner ? endDuo() : openDuoPanel())}
+                          className={`w-11 h-11 rounded-full flex items-center justify-center transition-all ${
+                            duoPartner ? 'bg-[#a8ff35] text-black' : 'bg-white/10 hover:bg-white/20 text-white'
+                          }`}
+                          title={duoPartner ? 'Terminer le duo' : 'Inviter en duo'}
+                        >
+                          <Users2 size={18} />
+                        </button>
+                      )}
                     </div>
                   )}
 
+                  {/* Duo — bulle video du partenaire, en incrustation */}
+                  <div
+                    className={`absolute bottom-16 left-3 w-20 h-28 rounded-xl overflow-hidden border-2 border-[#a8ff35]/60 bg-black shadow-lg z-10 ${
+                      duoPartner ? '' : 'hidden'
+                    }`}
+                  >
+                    <video ref={duoVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
+                    <audio ref={duoAudioRef} autoPlay />
+                    {duoPartner && (
+                      <span className="absolute bottom-0.5 inset-x-0 text-center text-[9px] text-white/90 font-semibold truncate px-1 drop-shadow">
+                        @{duoPartner.username}
+                      </span>
+                    )}
+                  </div>
+
                   <GiftBurstOverlay items={screenGifts} />
                 </div>
+
+                {duoPartner && (
+                  <div className="mt-2 flex items-center justify-between bg-[#a8ff35]/10 border border-[#a8ff35]/25 rounded-xl px-3.5 py-2">
+                    <p className="text-[12px] text-[#a8ff35] font-semibold">Duo avec @{duoPartner.username}</p>
+                    <button onClick={endDuo} className="text-[11px] text-white/50 hover:text-white underline">
+                      Terminer
+                    </button>
+                  </div>
+                )}
 
                 {!live ? (
                   <div className="mt-5 space-y-4">
@@ -1209,6 +1298,60 @@ export default function StudioLivePage() {
           open={capsuleDrawerOpen}
           onClose={() => setCapsuleDrawerOpen(false)}
         />
+      )}
+
+      {duoPanelOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-white font-bold text-base flex items-center gap-2">
+                <Users2 size={16} /> Inviter en duo
+              </h2>
+              <button onClick={() => setDuoPanelOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
+                <X size={16} className="text-white" />
+              </button>
+            </div>
+
+            {duoInviteStatus === 'inviting' && (
+              <p className="text-white/50 text-xs text-center py-3 mb-2 bg-white/[0.04] rounded-xl">
+                Invitation envoyée, en attente de réponse…
+              </p>
+            )}
+            {duoInviteStatus === 'declined' && (
+              <p className="text-red-400 text-xs text-center py-3 mb-2 bg-red-400/10 rounded-xl">
+                Invitation refusée.
+              </p>
+            )}
+            {duoInviteStatus === 'error' && (
+              <p className="text-red-400 text-xs text-center py-3 mb-2 bg-red-400/10 rounded-xl">
+                {duoErrorMsg}
+              </p>
+            )}
+
+            {viewersList.length === 0 ? (
+              <p className="text-white/40 text-sm text-center py-6">
+                Aucun spectateur connecté à inviter pour l'instant.
+              </p>
+            ) : (
+              <div className="space-y-1.5 max-h-72 overflow-y-auto scrollbar-hide">
+                {viewersList.map((v) => (
+                  <button
+                    key={v.userId}
+                    onClick={() => inviteDuo(v.userId)}
+                    disabled={duoInviteStatus === 'inviting'}
+                    className="w-full flex items-center gap-3 p-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.06] transition-all disabled:opacity-50"
+                  >
+                    <div className="w-9 h-9 rounded-full bg-white/[0.08] overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold text-white/60">
+                      {v.avatarUrl ? <img src={v.avatarUrl} alt="" className="w-full h-full object-cover" /> : v.username[0]?.toUpperCase()}
+                    </div>
+                    <span className="text-sm font-medium text-white">@{v.username}</span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </>
   );

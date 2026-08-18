@@ -4,7 +4,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { io, Socket } from 'socket.io-client';
 import { Room, RoomEvent, Track } from 'livekit-client';
-import { ArrowLeft, Users, Send, Gavel, Timer, Package, Crown, Gift, Wallet, Plus, Trophy, VolumeX } from 'lucide-react';
+import { ArrowLeft, Users, Send, Gavel, Timer, Package, Crown, Gift, Wallet, Plus, Trophy, VolumeX, Check, X as XIcon } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
 import { GiftBurstOverlay, type ActiveGiftBurst } from '../../client/components/Live/GiftBurstOverlay';
@@ -35,6 +35,8 @@ interface LiveSession {
   featuredCapsuleId?: string | null;
   featuredCapsule?: Capsule | null;
   creator: { id: string; username: string; displayName?: string; avatarUrl?: string };
+  duoPartnerId?: string | null;
+  duoPartner?: { id: string; username: string; displayName?: string; avatarUrl?: string } | null;
 }
 
 interface LiveComment {
@@ -70,6 +72,11 @@ export default function LiveViewerPage() {
   const roomRef = useRef<Room | null>(null);
   const videoElRef = useRef<HTMLVideoElement>(null);
   const audioElRef = useRef<HTMLAudioElement>(null);
+  // Duo — bulle video separee : le flux du partenaire si je regarde, ou mon propre apercu
+  // camera local (pas via LiveKit) si c'est moi qui viens d'accepter le duo.
+  const duoBubbleVideoRef = useRef<HTMLVideoElement>(null);
+  const duoBubbleAudioRef = useRef<HTMLAudioElement>(null);
+  const duoStreamRef = useRef<MediaStream | null>(null);
   const myId = getStoredUser()?.id;
 
   const [live, setLive] = useState<LiveSession | null>(null);
@@ -111,6 +118,12 @@ export default function LiveViewerPage() {
   const [topDonors, setTopDonors] = useState<TopDonor[]>([]);
   const [topDonorsOpen, setTopDonorsOpen] = useState(false);
 
+  // Duo façon TikTok — voir LivesGateway (inviteDuo/respondDuo/endDuo) pour le signalement.
+  const [duoInvite, setDuoInvite] = useState<{ fromUsername: string } | null>(null);
+  const [duoPartnerId, setDuoPartnerId] = useState<string | null>(null);
+  const [duoPartnerInfo, setDuoPartnerInfo] = useState<{ username: string; avatarUrl?: string } | null>(null);
+  const [amDuoHost, setAmDuoHost] = useState(false);
+
   // Le solde de coins reflete le vrai wallet (walletBalance, 100 coins = 1€).
   useEffect(() => {
     if (!getToken()) return;
@@ -124,6 +137,11 @@ export default function LiveViewerPage() {
     api.get<LiveSession>(`/lives/${id}`)
       .then((session) => {
         setLive(session);
+        if (session.duoPartnerId) {
+          setDuoPartnerId(session.duoPartnerId);
+          setDuoPartnerInfo(session.duoPartner ? { username: session.duoPartner.username, avatarUrl: session.duoPartner.avatarUrl } : null);
+          setAmDuoHost(session.duoPartnerId === myId);
+        }
         if (session.mode === 'auction' && session.auctionActive) {
           setRoundActive(true);
           setActiveCapsule(session.auctionCapsule);
@@ -142,6 +160,12 @@ export default function LiveViewerPage() {
     api.get<TopDonor[]>(`/lives/${liveId}/top-donors`).then(setTopDonors).catch(() => {});
   }
 
+  function respondDuo(accept: boolean) {
+    if (typeof id !== 'string') return;
+    socketRef.current?.emit('respondDuo', { liveId: id, accept, token: getToken() });
+    setDuoInvite(null);
+  }
+
   useEffect(() => {
     if (!live?.id) return;
     fetchTopDonors(live.id);
@@ -156,7 +180,7 @@ export default function LiveViewerPage() {
 
     const socket = io(API_URL, { transports: ['websocket'] });
     socketRef.current = socket;
-    socket.emit('join', { liveId: id });
+    socket.emit('join', { liveId: id, token: getToken() });
     socket.on('viewerCount', (d: { count: number }) => setViewerCount(d.count));
     socket.on('history', (h: LiveComment[]) => setComments(h));
     socket.on('comment', (c: LiveComment) => setComments((prev) => [...prev, c]));
@@ -217,6 +241,19 @@ export default function LiveViewerPage() {
 
       if (typeof id === 'string') fetchTopDonors(id);
     });
+    socket.on('duoInvite', (d: { fromUsername: string }) => setDuoInvite(d));
+    socket.on('duoStarted', (d: { partnerId: string; partnerUsername: string; partnerAvatarUrl?: string }) => {
+      setDuoPartnerId(d.partnerId);
+      setDuoPartnerInfo({ username: d.partnerUsername, avatarUrl: d.partnerAvatarUrl });
+      setDuoInvite(null);
+      if (d.partnerId === myId) setAmDuoHost(true);
+    });
+    socket.on('duoEnded', () => {
+      setDuoPartnerId(null);
+      setDuoPartnerInfo(null);
+      setAmDuoHost(false);
+    });
+    socket.on('duoError', () => setDuoInvite(null));
 
     return () => {
       socket.emit('leave', { liveId: id });
@@ -227,9 +264,12 @@ export default function LiveViewerPage() {
     };
   }, [live?.id, id]);
 
-  // Reception de la video en direct (LiveKit) — se connecte a la room en lecture seule et
-  // affiche le flux du createur des qu'il est publie. Si LiveKit n'est pas configure cote
-  // serveur, ou si le createur n'a pas encore publie, le placeholder texte reste affiche.
+  // Reception de la video en direct (LiveKit) — se connecte a la room, en lecture seule sauf si
+  // je suis moi-meme le partenaire de duo accepte (amDuoHost), auquel cas je publie aussi ma
+  // propre camera/micro. Depend de amDuoHost : accepter un duo (ou le voir se terminer) force
+  // une deconnexion/reconnexion avec un jeton different (canPublish change cote serveur — voir
+  // getLiveKitToken dans lives.service.ts, un jeton LiveKit deja emis ne peut pas etre mis a jour
+  // en place). Si LiveKit n'est pas configure cote serveur, le placeholder texte reste affiche.
   useEffect(() => {
     if (!live || typeof id !== 'string' || !getToken()) return;
 
@@ -238,21 +278,31 @@ export default function LiveViewerPage() {
 
     (async () => {
       try {
+        if (amDuoHost) {
+          const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+          if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+          duoStreamRef.current = stream;
+          if (duoBubbleVideoRef.current) duoBubbleVideoRef.current.srcObject = stream;
+        }
+
         const { token, url } = await api.get<{ token: string; url: string }>(`/lives/${id}/livekit-token`);
         if (cancelled) return;
         room = new Room();
-        room.on(RoomEvent.TrackSubscribed, (track) => {
-          if (track.kind === Track.Kind.Video && videoElRef.current) {
-            track.attach(videoElRef.current);
-            setVideoConnected(true);
-          } else if (track.kind === Track.Kind.Audio && audioElRef.current) {
-            track.attach(audioElRef.current);
-            audioElRef.current.play().catch(() => setSoundBlocked(true));
+        room.on(RoomEvent.TrackSubscribed, (track, _pub, participant) => {
+          const fromPartner = participant.identity !== live.creator.id;
+          const videoTarget = fromPartner ? duoBubbleVideoRef.current : videoElRef.current;
+          const audioTarget = fromPartner ? duoBubbleAudioRef.current : audioElRef.current;
+          if (track.kind === Track.Kind.Video && videoTarget) {
+            track.attach(videoTarget);
+            if (!fromPartner) setVideoConnected(true);
+          } else if (track.kind === Track.Kind.Audio && audioTarget) {
+            track.attach(audioTarget);
+            audioTarget.play().catch(() => { if (!fromPartner) setSoundBlocked(true); });
           }
         });
-        room.on(RoomEvent.TrackUnsubscribed, (track) => {
+        room.on(RoomEvent.TrackUnsubscribed, (track, _pub, participant) => {
           track.detach();
-          if (track.kind === Track.Kind.Video) setVideoConnected(false);
+          if (track.kind === Track.Kind.Video && participant.identity === live.creator.id) setVideoConnected(false);
         });
         await room.connect(url, token);
         if (cancelled) {
@@ -260,6 +310,13 @@ export default function LiveViewerPage() {
           return;
         }
         roomRef.current = room;
+
+        if (amDuoHost && duoStreamRef.current) {
+          const videoTrack = duoStreamRef.current.getVideoTracks()[0];
+          const audioTrack = duoStreamRef.current.getAudioTracks()[0];
+          if (videoTrack) await room.localParticipant.publishTrack(videoTrack, { source: Track.Source.Camera });
+          if (audioTrack) await room.localParticipant.publishTrack(audioTrack, { source: Track.Source.Microphone });
+        }
       } catch {
         // Diffusion video indisponible — le placeholder reste affiche, le reste (chat/encheres)
         // continue de fonctionner normalement.
@@ -271,8 +328,10 @@ export default function LiveViewerPage() {
       room?.disconnect();
       if (roomRef.current === room) roomRef.current = null;
       setVideoConnected(false);
+      duoStreamRef.current?.getTracks().forEach((t) => t.stop());
+      duoStreamRef.current = null;
     };
-  }, [live?.id, id]);
+  }, [live?.id, id, amDuoHost]);
 
   useEffect(() => {
     commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -397,6 +456,43 @@ export default function LiveViewerPage() {
                       Activer le son
                     </button>
                   )}
+
+                  {duoInvite && (
+                    <div className="absolute top-14 left-3 right-3 z-30 flex items-center justify-between gap-2 bg-black/80 backdrop-blur-sm border border-[#a8ff35]/40 rounded-2xl px-3.5 py-2.5">
+                      <p className="text-white text-[12px] font-medium min-w-0">
+                        <span className="font-bold text-[#a8ff35]">@{duoInvite.fromUsername}</span> t'invite en duo
+                      </p>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button onClick={() => respondDuo(true)} className="w-8 h-8 rounded-full bg-[#a8ff35] text-black flex items-center justify-center">
+                          <Check size={14} />
+                        </button>
+                        <button onClick={() => respondDuo(false)} className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center">
+                          <XIcon size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Duo — bulle video du partenaire (ou la mienne si j'ai accepte) */}
+                  <div
+                    className={`absolute bottom-3 left-3 w-20 h-28 rounded-xl overflow-hidden border-2 border-[#a8ff35]/60 bg-black shadow-lg z-20 ${
+                      duoPartnerId ? '' : 'hidden'
+                    }`}
+                  >
+                    <video ref={duoBubbleVideoRef} autoPlay muted={amDuoHost} playsInline className="w-full h-full object-cover" />
+                    <audio ref={duoBubbleAudioRef} autoPlay className="hidden" />
+                    <span className="absolute bottom-0.5 inset-x-0 text-center text-[9px] text-white/90 font-semibold truncate px-1 drop-shadow">
+                      {amDuoHost ? 'Toi' : duoPartnerInfo ? `@${duoPartnerInfo.username}` : ''}
+                    </span>
+                    {amDuoHost && (
+                      <button
+                        onClick={() => { if (typeof id === 'string') socketRef.current?.emit('endDuo', { liveId: id, token: getToken() }); }}
+                        className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 flex items-center justify-center"
+                      >
+                        <XIcon size={9} className="text-white" />
+                      </button>
+                    )}
+                  </div>
 
                   {!videoConnected && (
                     isAuction && roundActive && activeCapsule?.imageUrl ? (

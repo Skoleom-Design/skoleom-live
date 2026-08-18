@@ -74,6 +74,15 @@ export class LiveSession {
   @Column({ default: false })
   auctionSettled: boolean;
 
+  // Duo façon TikTok — un deuxième créateur autorisé à publier caméra/micro dans la même room
+  // LiveKit (voir getLiveKitToken dans lives.service.ts). Nul quand aucun duo n'est en cours.
+  @ManyToOne(() => User, { nullable: true, eager: true })
+  @JoinColumn({ name: 'duoPartnerId' })
+  duoPartner: User;
+
+  @Column({ nullable: true })
+  duoPartnerId: string;
+
   // Un live "enchere" peut enchainer plusieurs manches (une par capsule choisie en cours de
   // direct) — true tant qu'une manche est en cours de mise, false entre deux manches.
   @Column({ default: false })

@@ -510,8 +510,9 @@ export class LivesService {
     return { walletBalance: Number(updated!.walletBalance) };
   }
 
-  // Jeton d'acces LiveKit pour la room video de ce live — une room par liveId. Le createur peut
-  // publier (camera/micro), les spectateurs ne peuvent que recevoir le flux (canPublish: false).
+  // Jeton d'acces LiveKit pour la room video de ce live — une room par liveId. Le createur (et
+  // son partenaire de duo, s'il y en a un) peut publier (camera/micro), les autres spectateurs
+  // ne peuvent que recevoir le flux (canPublish: false).
   async getLiveKitToken(liveId: string, userId: string): Promise<{ token: string; url: string }> {
     const apiKey = process.env.LIVEKIT_API_KEY;
     const apiSecret = process.env.LIVEKIT_API_SECRET;
@@ -523,7 +524,7 @@ export class LivesService {
     const live = await this.livesRepo.findOne({ where: { id: liveId } });
     if (!live) throw new NotFoundException('Live introuvable');
 
-    const isPublisher = live.creatorId === userId;
+    const isPublisher = live.creatorId === userId || live.duoPartnerId === userId;
     const at = new AccessToken(apiKey, apiSecret, { identity: userId });
     at.addGrant({
       roomJoin: true,
@@ -534,5 +535,24 @@ export class LivesService {
     });
 
     return { token: await at.toJwt(), url };
+  }
+
+  // Le duo est uniquement du signalement temps reel (voir LivesGateway.inviteDuo/respondDuo) —
+  // ces deux methodes ne font que persister/effacer le partenaire courant, pour que
+  // getLiveKitToken sache qui a le droit de publier et que l'etat survive a un refresh de page.
+  async setDuoPartner(liveId: string, partnerId: string): Promise<LiveSession> {
+    const live = await this.livesRepo.findOne({ where: { id: liveId } });
+    if (!live) throw new NotFoundException('Live introuvable');
+    if (live.creatorId === partnerId) throw new BadRequestException('Tu ne peux pas faire un duo avec toi-même.');
+
+    await this.livesRepo.update(liveId, { duoPartnerId: partnerId });
+    return this.getById(liveId);
+  }
+
+  async clearDuoPartner(liveId: string): Promise<LiveSession> {
+    // `null` explicite, pas `undefined` — TypeORM omet purement et simplement les proprietes
+    // `undefined` du UPDATE genere (ne les mettrait pas a NULL, ne toucherait pas la colonne).
+    await this.livesRepo.update(liveId, { duoPartnerId: null as unknown as string });
+    return this.getById(liveId);
   }
 }
