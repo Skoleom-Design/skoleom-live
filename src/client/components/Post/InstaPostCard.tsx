@@ -8,8 +8,6 @@ import {
   MoreHorizontal,
   VolumeX,
   Volume2,
-  Play,
-  Pause,
 } from 'lucide-react';
 import type { Post } from '../../../shared/types/api';
 import { CapsuleDrawer } from '../Capsule/CapsuleDrawer';
@@ -36,7 +34,7 @@ export function InstaPostCard({ post, liked: likedProp = false }: Props) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const mediaRef = useRef<HTMLDivElement>(null);
   const [isMuted, setIsMuted] = useState(true);
-  const [musicPlaying, setMusicPlaying] = useState(false);
+  const [musicMuted, setMusicMuted] = useState(true);
   const musicAudioRef = useRef<HTMLAudioElement | null>(null);
   const [liked, setLiked] = useState(likedProp);
   const [likeCount, setLikeCount] = useState(post.likeCount);
@@ -79,37 +77,37 @@ export function InstaPostCard({ post, liked: likedProp = false }: Props) {
     return () => observer.disconnect();
   }, []);
 
-  // Coupe la musique attachee quand le post sort du cadre (scroll) — pas de piste qui continue
-  // a jouer en fond une fois qu'on est passe a autre chose dans le feed.
+  // Meme logique que la video : lecture automatique en muet des que le post entre dans le
+  // cadre (autorise par tous les navigateurs, aucun son), coupee en sortant. Un tap sur la
+  // pastille demasque le son — un vrai geste utilisateur, donc jamais bloque par le navigateur.
   useEffect(() => {
     if (!mediaRef.current || post.type !== 'photo' || !post.musicUrl) return;
+    if (!musicAudioRef.current) {
+      musicAudioRef.current = new Audio(post.musicUrl);
+      musicAudioRef.current.loop = true;
+      musicAudioRef.current.muted = true;
+    }
+    const audioEl = musicAudioRef.current;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (!entry.isIntersecting) {
-          musicAudioRef.current?.pause();
-          setMusicPlaying(false);
-        }
+        if (entry.isIntersecting) audioEl.play().catch(() => {});
+        else audioEl.pause();
       },
       { threshold: 0.1 },
     );
     observer.observe(mediaRef.current);
     return () => {
       observer.disconnect();
-      musicAudioRef.current?.pause();
+      audioEl.pause();
     };
   }, [post.type, post.musicUrl]);
 
-  function toggleMusic() {
-    if (!post.musicUrl) return;
-    if (musicPlaying) {
-      musicAudioRef.current?.pause();
-      setMusicPlaying(false);
-      return;
-    }
-    if (!musicAudioRef.current) musicAudioRef.current = new Audio(post.musicUrl);
-    musicAudioRef.current.loop = true;
-    musicAudioRef.current.play().catch(() => {});
-    setMusicPlaying(true);
+  function toggleMusicMute() {
+    if (!musicAudioRef.current) return;
+    const next = !musicAudioRef.current.muted;
+    musicAudioRef.current.muted = next;
+    if (!next) musicAudioRef.current.play().catch(() => {});
+    setMusicMuted(next);
   }
 
   return (
@@ -304,10 +302,10 @@ export function InstaPostCard({ post, liked: likedProp = false }: Props) {
           {post.type === 'photo' && post.musicUrl ? (
             <button
               type="button"
-              onClick={toggleMusic}
+              onClick={toggleMusicMute}
               className="flex items-center gap-1.5 text-[11px] text-white/35 hover:text-white/60 transition-colors"
             >
-              {musicPlaying ? <Pause size={11} /> : <Play size={11} />}
+              {musicMuted ? <VolumeX size={11} /> : <Volume2 size={11} />}
               🎵 {post.musicName}
             </button>
           ) : (
