@@ -10,4 +10,13 @@ export const PRESET_AVATARS = [
   '/avatars/ufo.svg',
   '/avatars/nova.svg',
   '/avatars/astronaut.svg',
+  '/avatars/blackhole.svg',
+  '/avatars/satellite.svg',
+  '/avatars/meteor.svg',
+  '/avatars/aurora.svg',
+  '/avatars/constellation.svg',
+  '/avatars/eclipse.svg',
+  '/avatars/nebula.svg',
+  '/avatars/asteroid.svg',
+  '/avatars/robot.svg',
 ];

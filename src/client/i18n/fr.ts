@@ -55,6 +55,7 @@ export const fr = {
     profileTitle: 'Personnalise ton profil',
     profileSubtitle: 'Choisis ton pseudo et ta photo de profil — tu pourras les changer plus tard.',
     chooseAvatar: 'Photo de profil',
+    avatarSubtitle: 'Choisis ta photo de profil — tu pourras la changer plus tard.',
     usernameTooShort: 'Le pseudo doit faire au moins 3 caractères.',
     title: 'Quels sont tes centres d\'intérêt ?',
     subtitle: 'Choisis-en au moins {{min}} pour personnaliser ton feed — tu pourras les changer plus tard.',

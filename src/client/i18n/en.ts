@@ -55,6 +55,7 @@ export const en = {
     profileTitle: 'Personalize your profile',
     profileSubtitle: 'Pick your username and profile picture — you can change these later.',
     chooseAvatar: 'Profile picture',
+    avatarSubtitle: 'Pick your profile picture — you can change it later.',
     usernameTooShort: 'Username must be at least 3 characters.',
     title: "What are you into?",
     subtitle: 'Pick at least {{min}} to personalize your feed — you can change these later.',

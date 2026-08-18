@@ -6,8 +6,10 @@ import { ArrowLeft } from 'lucide-react';
 import { api, ApiError, getToken, setSession, getStoredUser } from '../../shared/api/http';
 import { useLanguage } from '../../client/i18n/LanguageContext';
 import { InterestsGate } from '../../client/components/Onboarding/InterestsGate';
+import { AvatarPickerGate } from '../../client/components/Onboarding/AvatarPickerGate';
 
 type Tab = 'login' | 'register';
+type OnboardingStep = 'avatar' | 'interests' | null;
 
 const DEMO_PASSWORD = 'Demo1234!';
 
@@ -27,7 +29,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState<string | null>(null);
-  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>(null);
 
   // Redirect if already logged in
   useEffect(() => {
@@ -64,10 +66,11 @@ export default function LoginPage() {
           : await api.post('/auth/register', { email, username: username.trim(), password });
 
       setSession(token, user);
-      // Un nouveau compte (hors admin) passe par le choix des centres d'intérêt avant le
-      // Studio — l'onboarding influence ensuite le tri du feed (voir posts.service.ts).
+      // Un nouveau compte (hors admin) passe par le choix d'une photo de profil puis des
+      // centres d'intérêt avant le Studio — l'onboarding influence ensuite le tri du feed
+      // (voir posts.service.ts).
       if (tab === 'register' && user.role !== 'admin') {
-        setShowOnboarding(true);
+        setOnboardingStep('avatar');
       } else {
         router.push(user.role === 'admin' ? '/admin' : '/');
       }
@@ -106,7 +109,10 @@ export default function LoginPage() {
     }
   }
 
-  if (showOnboarding) {
+  if (onboardingStep === 'avatar') {
+    return <AvatarPickerGate onDone={() => setOnboardingStep('interests')} />;
+  }
+  if (onboardingStep === 'interests') {
     return <InterestsGate onDone={() => router.push('/studio')} />;
   }
 

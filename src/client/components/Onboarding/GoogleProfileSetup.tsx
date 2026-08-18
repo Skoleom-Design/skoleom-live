@@ -1,8 +1,8 @@
 import { useState } from 'react';
-import { Check } from 'lucide-react';
 import { api, ApiError } from '../../../shared/api/http';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { PRESET_AVATARS } from '../../constants/avatars';
+import { AvatarGrid } from './AvatarGrid';
 
 interface GoogleProfileSetupProps {
   initialUsername: string;
@@ -66,27 +66,8 @@ export function GoogleProfileSetup({ initialUsername, googleAvatarUrl, onDone }:
         <p className="text-[11px] text-white/40 mb-2.5 font-medium uppercase tracking-wider">
           {t('onboarding.chooseAvatar')}
         </p>
-        <div className="grid grid-cols-5 gap-2.5 mb-6">
-          {avatarOptions.map((url) => {
-            const active = avatarUrl === url;
-            return (
-              <button
-                key={url}
-                type="button"
-                onClick={() => setAvatarUrl(url)}
-                className={`relative aspect-square rounded-full overflow-hidden border-2 transition-all active:scale-95 ${
-                  active ? 'border-[#a8ff35] shadow-glow-lime-sm' : 'border-white/10 hover:border-white/30'
-                }`}
-              >
-                <img src={url} alt="" className="w-full h-full object-cover" />
-                {active && (
-                  <span className="absolute inset-0 flex items-center justify-center bg-black/30">
-                    <Check size={18} className="text-white drop-shadow" />
-                  </span>
-                )}
-              </button>
-            );
-          })}
+        <div className="mb-6 max-h-64 overflow-y-auto scrollbar-hide pr-1">
+          <AvatarGrid options={avatarOptions} value={avatarUrl} onChange={setAvatarUrl} />
         </div>
 
         {error && (
