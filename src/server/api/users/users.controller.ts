@@ -17,7 +17,7 @@ export class UsersController {
   @Patch('me')
   updateMe(
     @Request() req,
-    @Body() dto: { displayName?: string; avatarUrl?: string; bio?: string; plan?: UserPlan },
+    @Body() dto: { username?: string; displayName?: string; avatarUrl?: string; bio?: string; plan?: UserPlan },
   ) {
     return this.usersService.updateProfile(req.user.id, dto);
   }

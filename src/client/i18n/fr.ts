@@ -52,6 +52,10 @@ export const fr = {
     continueOnWeb: 'Continuer sur le web',
   },
   onboarding: {
+    profileTitle: 'Personnalise ton profil',
+    profileSubtitle: 'Choisis ton pseudo et ta photo de profil — tu pourras les changer plus tard.',
+    chooseAvatar: 'Photo de profil',
+    usernameTooShort: 'Le pseudo doit faire au moins 3 caractères.',
     title: 'Quels sont tes centres d\'intérêt ?',
     subtitle: 'Choisis-en au moins {{min}} pour personnaliser ton feed — tu pourras les changer plus tard.',
     selectedCount: '{{count}} sélectionné(s)',

@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
 import { User } from './user.entity';
@@ -54,10 +54,16 @@ export class UsersService {
 
   async updateProfile(
     userId: string,
-    updates: { displayName?: string; avatarUrl?: string; bio?: string; plan?: UserPlan },
+    updates: { username?: string; displayName?: string; avatarUrl?: string; bio?: string; plan?: UserPlan },
   ): Promise<PublicProfile> {
     const user = await this.usersRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('User not found');
+
+    // Pas de contrainte unique en base sur username (voir register()) — meme verification manuelle ici.
+    if (updates.username && updates.username !== user.username) {
+      const taken = await this.usersRepo.findOne({ where: { username: updates.username } });
+      if (taken) throw new ConflictException('Ce pseudo est déjà pris.');
+    }
 
     Object.assign(user, updates);
     await this.usersRepo.save(user);

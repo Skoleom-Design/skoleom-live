@@ -52,6 +52,10 @@ export const en = {
     continueOnWeb: 'Continue on web',
   },
   onboarding: {
+    profileTitle: 'Personalize your profile',
+    profileSubtitle: 'Pick your username and profile picture — you can change these later.',
+    chooseAvatar: 'Profile picture',
+    usernameTooShort: 'Username must be at least 3 characters.',
     title: "What are you into?",
     subtitle: 'Pick at least {{min}} to personalize your feed — you can change these later.',
     selectedCount: '{{count}} selected',
