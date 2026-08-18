@@ -349,8 +349,8 @@ export const fr = {
     invalidCardCvc: 'CVC invalide (3 chiffres).',
     planPerks: {
       free: ['Commission de 15% sur tes ventes', '2 capsules · 2 produits par capsule', '2 manches d\'enchère par live', 'Fonctionnalités de base'],
-      premium: ['Commission de 10% sur tes ventes', '15 capsules · 5 produits par capsule', '10 manches d\'enchère par live', 'Badge Premium', 'Support prioritaire'],
-      ultra: ['Commission de 5% sur tes ventes', 'Capsules illimitées · 8 produits par capsule', 'Manches d\'enchère illimitées', 'Badge Ultra', 'Mise en avant boostée'],
+      premium: ['Commission de 10% sur tes ventes', '15 capsules · 5 produits par capsule', '10 manches d\'enchère par live', 'Live boosté', 'Badge Premium', 'Support prioritaire'],
+      ultra: ['Commission de 5% sur tes ventes', 'Capsules illimitées · 8 produits par capsule', 'Manches d\'enchère illimitées', 'Live boosté', 'Badge Ultra', 'Mise en avant boostée'],
     },
   },
 } as const;
