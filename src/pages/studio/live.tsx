@@ -134,9 +134,9 @@ export default function StudioLivePage() {
   const [topDonors, setTopDonors] = useState<TopDonor[]>([]);
   const [topDonorsOpen, setTopDonorsOpen] = useState(false);
 
-  // Mode "live classique" desactive pour l'instant (voir bouton grise ci-dessous) — le studio
-  // se concentre sur les enchères, donc on pre-selectionne directement ce mode.
-  const [mode, setMode] = useState<LiveMode>('auction');
+  // "Commencer un live" (Studio) renvoie ici sans parametre — mode par defaut "live". "Commencer
+  // une enchere" renvoie avec ?mode=auction, voir l'effet ci-dessous.
+  const [mode, setMode] = useState<LiveMode>('live');
 
   // Le bouton "Enchere" du Studio renvoie ici avec ?mode=auction pour pre-selectionner le mode.
   useEffect(() => {
@@ -740,9 +740,10 @@ export default function StudioLivePage() {
                     <div className="grid grid-cols-2 gap-2">
                       <button
                         type="button"
-                        disabled
-                        title="Bientôt disponible — le studio se concentre sur les enchères pour le moment."
-                        className="flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold bg-white/[0.02] text-white/25 border-white/[0.06] cursor-not-allowed"
+                        onClick={() => setMode('live')}
+                        className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold transition-all ${
+                          mode === 'live' ? 'bg-[#a8ff35] text-black border-[#a8ff35]' : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08]'
+                        }`}
                       >
                         <Radio size={14} /> Live classique
                       </button>

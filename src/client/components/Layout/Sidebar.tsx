@@ -44,8 +44,7 @@ export function AppSidebar() {
   // Home/loupe/carre+ sont les pictogrammes exacts d'Instagram — Orbit rattache "Explorer" au
   // theme Univers cosmique de la DA, et un rond+ (au lieu d'un carre+) suffit a rompre la ressemblance.
   const NAV = [
-    // Mis en grise — le focus produit est mis sur les enchères pour l'instant.
-    { href: '/live', icon: Video, label: t('sidebar.live'), disabled: true },
+    { href: '/live', icon: Video, label: t('sidebar.live') },
     { href: '/enchere', icon: Gavel, label: t('sidebar.auction') },
     { href: '/', icon: Orbit, label: t('sidebar.explore') },
     { href: '/explore', icon: Search, label: t('sidebar.search') },
