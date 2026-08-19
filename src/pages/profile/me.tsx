@@ -6,12 +6,14 @@ import {
   LogOut, Plus, Trash2, Package, BarChart2, Grid3x3, Loader2, Pencil, Camera, X,
   Heart, Zap, Wallet, ArrowDownToLine, ArrowUpFromLine, Radio, Settings, Check,
   ShoppingBag, Gift, Clock, Truck, MoreVertical, Landmark, CreditCard,
-  Image as ImageIcon, Bell, MessageCircle, UserPlus, Video,
+  Image as ImageIcon, Bell, MessageCircle, UserPlus, Video, Sparkles, Upload,
 } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { BoostModal } from '../../client/components/Boost/BoostModal';
 import { CapsuleProductForm, CapsuleProductFormHandle } from '../../client/components/Capsule/CapsuleProductForm';
 import { CameraCaptureModal } from '../../client/components/Post/CameraCaptureModal';
+import { AvatarGrid } from '../../client/components/Onboarding/AvatarGrid';
+import { PRESET_AVATARS } from '../../client/constants/avatars';
 import { api, ApiError, getToken, getStoredUser, clearSession, uploadFile } from '../../shared/api/http';
 import type { CapsuleCondition, CapsuleCategory, AppNotification } from '../../shared/types/api';
 import { categoryLabel, conditionLabel, subcategoryLabel } from '../../client/constants/capsule';
@@ -140,6 +142,12 @@ export default function ProfilePage() {
   const [editBio, setEditBio] = useState('');
   const [editAvatarFile, setEditAvatarFile] = useState<File | null>(null);
   const [editAvatarPreview, setEditAvatarPreview] = useState('');
+  // Choix d'un avatar preset (gamerpic) — une URL statique, jamais uploadee (voir handleSaveProfile).
+  // Mutuellement exclusif avec editAvatarFile : choisir l'un remet l'autre a zero.
+  const [editAvatarPresetUrl, setEditAvatarPresetUrl] = useState<string | null>(null);
+  const [avatarMenuOpen, setAvatarMenuOpen] = useState(false);
+  const [avatarGridOpen, setAvatarGridOpen] = useState(false);
+  const [avatarCameraOpen, setAvatarCameraOpen] = useState(false);
   const [editError, setEditError] = useState('');
   const [editSaving, setEditSaving] = useState(false);
   const avatarInputRef = useRef<HTMLInputElement>(null);
@@ -551,6 +559,7 @@ export default function ProfilePage() {
     setEditDisplayName(user.displayName || '');
     setEditBio(user.bio || '');
     setEditAvatarFile(null);
+    setEditAvatarPresetUrl(null);
     setEditAvatarPreview(user.avatarUrl || '');
     setEditError('');
     setEditOpen(true);
@@ -560,7 +569,23 @@ export default function ProfilePage() {
     const f = e.target.files?.[0];
     if (!f) return;
     setEditAvatarFile(f);
+    setEditAvatarPresetUrl(null);
     setEditAvatarPreview(URL.createObjectURL(f));
+    setAvatarMenuOpen(false);
+  }
+
+  function pickPresetAvatar(url: string) {
+    setEditAvatarPresetUrl(url);
+    setEditAvatarFile(null);
+    setEditAvatarPreview(url);
+    setAvatarGridOpen(false);
+  }
+
+  function onAvatarCaptured(file: File) {
+    setEditAvatarFile(file);
+    setEditAvatarPresetUrl(null);
+    setEditAvatarPreview(URL.createObjectURL(file));
+    setAvatarCameraOpen(false);
   }
 
   async function handleSaveProfile(e: React.FormEvent) {
@@ -570,7 +595,9 @@ export default function ProfilePage() {
     try {
       let avatarUrl = user?.avatarUrl;
 
-      if (editAvatarFile) {
+      if (editAvatarPresetUrl) {
+        avatarUrl = editAvatarPresetUrl;
+      } else if (editAvatarFile) {
         const extension = editAvatarFile.name.split('.').pop() || 'jpg';
         const { uploadUrl, fileUrl } = await api.post('/files/upload-url', {
           folder: 'avatars',
@@ -1215,7 +1242,7 @@ export default function ProfilePage() {
             </div>
 
             <form onSubmit={handleSaveProfile} className="space-y-4">
-              <div className="flex flex-col items-center gap-2">
+              <div className="relative flex flex-col items-center gap-2">
                 <input
                   ref={avatarInputRef}
                   type="file"
@@ -1225,7 +1252,7 @@ export default function ProfilePage() {
                 />
                 <button
                   type="button"
-                  onClick={() => avatarInputRef.current?.click()}
+                  onClick={() => setAvatarMenuOpen((o) => !o)}
                   className="relative w-20 h-20 rounded-full overflow-hidden bg-gradient-to-br from-[#a8ff35] to-[#6fe600] flex items-center justify-center text-2xl font-extrabold text-black"
                 >
                   {editAvatarPreview ? (
@@ -1242,11 +1269,40 @@ export default function ProfilePage() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => avatarInputRef.current?.click()}
+                  onClick={() => setAvatarMenuOpen((o) => !o)}
                   className="text-xs text-[#a8ff35] font-semibold hover:underline"
                 >
                   {t('profile.changePhoto')}
                 </button>
+
+                {avatarMenuOpen && (
+                  <>
+                    <div className="fixed inset-0 z-20" onClick={() => setAvatarMenuOpen(false)} />
+                    <div className="absolute top-full mt-1 z-30 w-56 bg-[#181818] border border-white/[0.1] rounded-xl shadow-lg overflow-hidden">
+                      <button
+                        type="button"
+                        onClick={() => { setAvatarMenuOpen(false); setAvatarCameraOpen(true); }}
+                        className="w-full flex items-center gap-2.5 px-4 py-3 text-[13px] text-white hover:bg-white/[0.06] transition-colors"
+                      >
+                        <Camera size={15} /> {t('profile.takePhoto')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setAvatarMenuOpen(false); setAvatarGridOpen(true); }}
+                        className="w-full flex items-center gap-2.5 px-4 py-3 text-[13px] text-white hover:bg-white/[0.06] transition-colors"
+                      >
+                        <Sparkles size={15} /> {t('profile.chooseAvatarPreset')}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setAvatarMenuOpen(false); avatarInputRef.current?.click(); }}
+                        className="w-full flex items-center gap-2.5 px-4 py-3 text-[13px] text-white hover:bg-white/[0.06] transition-colors"
+                      >
+                        <Upload size={15} /> {t('profile.importPhoto')}
+                      </button>
+                    </div>
+                  </>
+                )}
               </div>
 
               <div>
@@ -1292,6 +1348,23 @@ export default function ProfilePage() {
           </div>
         </div>
       )}
+
+      {avatarGridOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+          <div className="cosmic-modal w-full max-w-sm overflow-hidden border border-white/[0.08] rounded-[20px] p-5">
+            <div className="flex items-center justify-between mb-5">
+              <h2 className="text-white font-bold text-base">{t('profile.chooseAvatarPreset')}</h2>
+              <button onClick={() => setAvatarGridOpen(false)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
+                <X size={16} className="text-white" />
+              </button>
+            </div>
+            <AvatarGrid options={PRESET_AVATARS} value={editAvatarPresetUrl || ''} onChange={pickPresetAvatar} />
+          </div>
+        </div>
+      )}
+
+      <CameraCaptureModal open={avatarCameraOpen} onClose={() => setAvatarCameraOpen(false)} onCapture={onAvatarCaptured} photoOnly />
 
       {capsuleModalOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
