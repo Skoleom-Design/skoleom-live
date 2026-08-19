@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Cron, CronExpression } from '@nestjs/schedule';
-import { Repository, LessThan } from 'typeorm';
+import { Repository, LessThan, In } from 'typeorm';
 import { Boost } from './boost.entity';
 import { BoostStatus, BoostObjective, BoostScope } from '../../../shared/types/entities';
 import { PostsService } from '../posts/posts.service';
@@ -36,6 +36,23 @@ export class BoostsService {
     const scope = dto.scope || BoostScope.POST;
     if (scope === BoostScope.POST && !dto.postId) {
       throw new BadRequestException('postId requis pour booster un post');
+    }
+
+    // Un post (ou un compte) deja boosté ne doit pas pouvoir etre re-boosté par-dessus tant que
+    // le boost en cours n'est pas termine/annulé — deux boosts actifs superposes sur la meme
+    // cible n'a pas de sens (double incrementation du boostScore pour le meme effet, double
+    // facturation).
+    const existing = await this.boostsRepo.findOne({
+      where: scope === BoostScope.POST
+        ? { postId: dto.postId, status: In([BoostStatus.PENDING, BoostStatus.ACTIVE]) }
+        : { userId, scope: BoostScope.ACCOUNT, status: In([BoostStatus.PENDING, BoostStatus.ACTIVE]) },
+    });
+    if (existing) {
+      throw new BadRequestException(
+        scope === BoostScope.POST
+          ? "Ce post a déjà un boost en cours — attends qu'il se termine avant d'en relancer un."
+          : "Ton compte a déjà un boost en cours — attends qu'il se termine avant d'en relancer un.",
+      );
     }
 
     const price = BOOST_PRICING[scope][dto.durationDays];

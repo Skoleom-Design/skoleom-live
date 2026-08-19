@@ -11,6 +11,12 @@ interface Props {
   onClose: () => void;
 }
 
+interface MyBoost {
+  status: 'pending' | 'active' | 'completed' | 'cancelled';
+  scope: Scope;
+  post?: { id: string };
+}
+
 const DURATIONS = [
   { days: 1, label: '1 jour' },
   { days: 3, label: '3 jours' },
@@ -27,6 +33,7 @@ export function BoostModal({ post, open, onClose }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [confirming, setConfirming] = useState(false);
   const [walletBalance, setWalletBalance] = useState<number | null>(null);
+  const [myBoosts, setMyBoosts] = useState<MyBoost[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -40,7 +47,16 @@ export function BoostModal({ post, open, onClose }: Props) {
     api.get<{ walletBalance: number }>('/auth/me')
       .then((me) => setWalletBalance(Number(me.walletBalance)))
       .catch(() => setWalletBalance(null));
+    // Pour bloquer proactivement le bouton si ce post/ce compte a deja un boost en cours,
+    // plutot que de laisser l'utilisateur aller jusqu'au paiement pour decouvrir l'erreur
+    // (voir la meme regle cote serveur dans BoostsService.create).
+    api.get<MyBoost[]>('/boosts/my').then(setMyBoosts).catch(() => setMyBoosts([]));
   }, [open, post]);
+
+  const hasExistingBoost = myBoosts.some((b) =>
+    (b.status === 'pending' || b.status === 'active')
+    && (scope === 'post' ? b.scope === 'post' && b.post?.id === post?.id : b.scope === 'account'),
+  );
 
   // Un changement de portée/durée invalide la confirmation en cours — on ne veut pas
   // confirmer un montant qui ne correspond plus a ce qui est affiche.
@@ -144,6 +160,14 @@ export function BoostModal({ post, open, onClose }: Props) {
 
         {error && <p className="text-sm text-red-400 mb-3">{error}</p>}
 
+        {hasExistingBoost && (
+          <p className="text-sm text-amber-400 bg-amber-400/10 border border-amber-400/20 rounded-xl px-3.5 py-2.5 mb-3">
+            {scope === 'post'
+              ? 'Ce post a déjà un boost en cours — attends qu\'il se termine avant d\'en relancer un.'
+              : 'Ton compte a déjà un boost en cours — attends qu\'il se termine avant d\'en relancer un.'}
+          </p>
+        )}
+
         {confirming ? (
           <div className="text-center animate-fade-in">
             <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#a8ff35]/25 to-[#22c55e]/10 border border-[#a8ff35]/30 flex items-center justify-center mx-auto mb-4 animate-pulse-glow">
@@ -198,7 +222,7 @@ export function BoostModal({ post, open, onClose }: Props) {
         ) : (
           <button
             onClick={() => setConfirming(true)}
-            disabled={price == null}
+            disabled={price == null || hasExistingBoost}
             className="w-full py-3.5 bg-brand hover:bg-brand-dark text-black font-semibold rounded-2xl transition-colors disabled:opacity-50"
           >
             {price != null ? `Booster pour ${price.toFixed(2)} €` : 'Chargement…'}
