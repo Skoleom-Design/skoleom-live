@@ -174,6 +174,26 @@ export default function LoginPage() {
               ))}
             </div>
 
+            {/* Google — au-dessus du formulaire, la plupart des visiteurs n'ont pas besoin
+                d'aller plus loin */}
+            <a
+              href="/api/auth/google"
+              className="w-full flex items-center justify-center gap-2.5 py-3 rounded-full border border-white/[0.1] bg-white/[0.04] hover:bg-white/[0.08] text-white text-sm font-medium transition-all mb-5"
+            >
+              <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
+                <path fill="#FFC107" d="M43.6 20.5H42V20.5H24v7h11.3C33.7 32 29.3 35 24 35c-6.1 0-11-4.9-11-11s4.9-11 11-11c2.8 0 5.3 1 7.3 2.7l5-5C33.1 7.8 28.8 6 24 6 13.5 6 5 14.5 5 25s8.5 19 19 19 19-8.5 19-19c0-1.2-.1-2.4-.4-3.5z"/>
+                <path fill="#FF3D00" d="M6.3 14.7l5.7 4.2C13.6 15.3 18.4 12 24 12c2.8 0 5.3 1 7.3 2.7l5-5C33.1 7.8 28.8 6 24 6 16.3 6 9.6 10.1 6.3 14.7z"/>
+                <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.5-5.2l-6.2-5.2C29.4 35.4 26.8 36 24 36c-5.2 0-9.6-3-11.3-7.3l-5.8 4.5C10.3 39.8 16.6 44 24 44z"/>
+                <path fill="#1976D2" d="M43.6 20.5H42V20.5H24v7h11.3c-.8 2.3-2.2 4.2-4 5.6l6.2 5.2C41.4 34.6 44 30.1 44 25c0-1.2-.1-2.4-.4-3.5z"/>
+              </svg>
+              {t('auth.continueWithGoogle')}
+            </a>
+            <div className="flex items-center gap-3 mb-5">
+              <div className="h-px flex-1 bg-white/[0.08]" />
+              <span className="text-[11px] text-white/30 uppercase tracking-wider">{t('auth.or')}</span>
+              <div className="h-px flex-1 bg-white/[0.08]" />
+            </div>
+
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-4">
               {/* Grille 0fr/1fr : anime la hauteur du champ username en douceur au lieu de le
@@ -245,27 +265,6 @@ export default function LoginPage() {
                 )}
               </button>
             </form>
-
-            {/* Google */}
-            <div className="mt-5">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="h-px flex-1 bg-white/[0.08]" />
-                <span className="text-[11px] text-white/30 uppercase tracking-wider">{t('auth.or')}</span>
-                <div className="h-px flex-1 bg-white/[0.08]" />
-              </div>
-              <a
-                href="/api/auth/google"
-                className="w-full flex items-center justify-center gap-2.5 py-3 rounded-full border border-white/[0.1] bg-white/[0.04] hover:bg-white/[0.08] text-white text-sm font-medium transition-all"
-              >
-                <svg width="16" height="16" viewBox="0 0 48 48" aria-hidden="true">
-                  <path fill="#FFC107" d="M43.6 20.5H42V20.5H24v7h11.3C33.7 32 29.3 35 24 35c-6.1 0-11-4.9-11-11s4.9-11 11-11c2.8 0 5.3 1 7.3 2.7l5-5C33.1 7.8 28.8 6 24 6 13.5 6 5 14.5 5 25s8.5 19 19 19 19-8.5 19-19c0-1.2-.1-2.4-.4-3.5z"/>
-                  <path fill="#FF3D00" d="M6.3 14.7l5.7 4.2C13.6 15.3 18.4 12 24 12c2.8 0 5.3 1 7.3 2.7l5-5C33.1 7.8 28.8 6 24 6 16.3 6 9.6 10.1 6.3 14.7z"/>
-                  <path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.5-5.2l-6.2-5.2C29.4 35.4 26.8 36 24 36c-5.2 0-9.6-3-11.3-7.3l-5.8 4.5C10.3 39.8 16.6 44 24 44z"/>
-                  <path fill="#1976D2" d="M43.6 20.5H42V20.5H24v7h11.3c-.8 2.3-2.2 4.2-4 5.6l6.2 5.2C41.4 34.6 44 30.1 44 25c0-1.2-.1-2.4-.4-3.5z"/>
-                </svg>
-                {t('auth.continueWithGoogle')}
-              </a>
-            </div>
 
             {/* Demo accounts */}
             <div className="mt-7">
