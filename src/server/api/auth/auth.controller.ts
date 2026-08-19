@@ -2,14 +2,14 @@ import { Controller, Post, Get, Body, Query, Request, Res, UseGuards } from '@ne
 import type { Response } from 'express';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
-import { UserPlan } from '../../../shared/types/entities';
+import { RegisterDto } from './register.dto';
 
 @Controller('auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
 
   @Post('register')
-  register(@Body() body: { email: string; username: string; password: string; plan?: UserPlan }) {
+  register(@Body() body: RegisterDto) {
     return this.authService.register(body.email, body.username, body.password, body.plan);
   }
 

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Eye, EyeOff } from 'lucide-react';
 import { api, ApiError, getToken, setSession, getStoredUser } from '../../shared/api/http';
 import { useLanguage } from '../../client/i18n/LanguageContext';
 import { InterestsGate } from '../../client/components/Onboarding/InterestsGate';
@@ -29,6 +29,7 @@ export default function LoginPage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [demoLoading, setDemoLoading] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const [onboardingStep, setOnboardingStep] = useState<OnboardingStep>(null);
 
   // Redirect if already logged in
@@ -58,6 +59,10 @@ export default function LoginPage() {
     }
     if (tab === 'register' && !username.trim()) {
       setError(t('auth.enterUsername'));
+      return;
+    }
+    if (tab === 'register' && (password.length < 8 || !/\d/.test(password))) {
+      setError(t('auth.passwordRequirements'));
       return;
     }
 
@@ -240,14 +245,27 @@ export default function LoginPage() {
                 <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider">
                   {t('auth.password')}
                 </label>
-                <input
-                  type="password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
-                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="••••••••"
+                    autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
+                    className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 pr-11 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    aria-label={showPassword ? t('auth.hidePassword') : t('auth.showPassword')}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-white/35 hover:text-white/70 transition-colors"
+                  >
+                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                  </button>
+                </div>
+                {tab === 'register' && (
+                  <p className="text-[11px] text-white/30 mt-1.5">{t('auth.passwordRequirements')}</p>
+                )}
               </div>
 
               {error && (
