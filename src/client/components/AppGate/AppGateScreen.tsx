@@ -1,11 +1,13 @@
+import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
-import { QrCode, Sparkles } from 'lucide-react';
+import { QrCode, Sparkles, LogIn } from 'lucide-react';
 import { getToken } from '../../../shared/api/http';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 const DISMISS_KEY = 'skoleom:app-gate-dismissed';
 
 export function AppGateScreen() {
+  const router = useRouter();
   const { t } = useLanguage();
   const [visible, setVisible] = useState(false);
 
@@ -16,7 +18,7 @@ export function AppGateScreen() {
     setVisible(true);
   }, []);
 
-  function dismiss() {
+  function continueAsGuest() {
     localStorage.setItem(DISMISS_KEY, '1');
     setVisible(false);
   }
@@ -24,34 +26,50 @@ export function AppGateScreen() {
   if (!visible) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] cosmic-bg flex flex-col items-center justify-center px-6 animate-fade-in">
-      <div className="w-full max-w-sm text-center">
-        <div className="w-16 h-16 rounded-2xl bg-[#a8ff35]/10 border border-[#a8ff35]/20 flex items-center justify-center mx-auto mb-6">
-          <img src="/skoleom-mark.png" alt="" className="w-9 h-9 object-contain" />
+    <div className="fixed inset-0 z-[100] cosmic-bg flex flex-col items-center justify-center px-6 py-10 overflow-y-auto animate-fade-in">
+      {/* Orbes d'ambiance — meme traitement que le reste de l'app */}
+      <div className="cosmic-orb w-64 h-64 bg-[#a8ff35]/[0.08] -top-16 -left-16 animate-float" style={{ animationDelay: '0s' }} />
+      <div className="cosmic-orb w-56 h-56 bg-[#00ffff]/[0.06] bottom-0 right-0 animate-float" style={{ animationDelay: '-4s' }} />
+
+      <div className="relative w-full max-w-sm text-center my-auto">
+        <div className="relative w-20 h-20 rounded-3xl bg-[#a8ff35]/10 border border-[#a8ff35]/20 flex items-center justify-center mx-auto mb-6">
+          <div className="absolute inset-0 rounded-3xl bg-skoleom-gradient-warm opacity-20 blur-xl animate-pulse-glow" />
+          <img src="/skoleom-mark.png" alt="" className="relative w-11 h-11 object-contain" />
         </div>
 
-        <h1 className="display-text text-gradient text-4xl mb-3">{t('appGate.title')}</h1>
-        <p className="text-white/50 text-sm px-2 mb-8">{t('appGate.subtitle')}</p>
+        <h1 className="display-text text-gradient text-[42px] mb-3">{t('appGate.welcomeTitle')}</h1>
+        <p className="text-white/50 text-sm px-2 mb-10 leading-relaxed">{t('appGate.welcomeSubtitle')}</p>
 
-        <div className="relative inline-block mb-6">
-          <div className="w-40 h-40 rounded-3xl bg-white flex items-center justify-center shadow-glow-lime">
-            <QrCode size={104} strokeWidth={1.2} className="text-black/85" />
-          </div>
-          <div className="absolute -top-2.5 -right-3 flex items-center gap-1 px-2.5 py-1 rounded-full bg-[#a8ff35] text-black text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
-            <Sparkles size={11} />
-            {t('appGate.comingSoon')}
-          </div>
+        <div className="space-y-2.5 mb-10">
+          <button
+            type="button"
+            onClick={() => router.push('/auth/login')}
+            className="btn-skoleom w-full py-3.5 rounded-full text-sm shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.98] gap-2"
+          >
+            <LogIn size={16} /> {t('appGate.login')}
+          </button>
+          <button
+            type="button"
+            onClick={continueAsGuest}
+            className="btn-skoleom-outline w-full py-3.5 rounded-full text-sm active:scale-[0.98]"
+          >
+            {t('appGate.continueAsGuest')}
+          </button>
         </div>
 
-        <p className="text-white/35 text-xs mb-8">{t('appGate.scanHint')}</p>
-
-        <button
-          type="button"
-          onClick={dismiss}
-          className="btn-skoleom-outline w-full py-3.5 rounded-full text-sm active:scale-[0.98]"
-        >
-          {t('appGate.continueOnWeb')}
-        </button>
+        {/* App mobile — teaser secondaire, pas l'action principale de cet ecran */}
+        <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.07]">
+          <div className="relative w-12 h-12 rounded-xl bg-white flex items-center justify-center shrink-0">
+            <QrCode size={30} strokeWidth={1.3} className="text-black/85" />
+            <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#a8ff35] flex items-center justify-center">
+              <Sparkles size={9} className="text-black" />
+            </div>
+          </div>
+          <p className="text-left text-white/40 text-[11.5px] leading-snug">
+            {t('appGate.title')}
+            <span className="block text-white/25">{t('appGate.scanHint')}</span>
+          </p>
+        </div>
       </div>
     </div>
   );

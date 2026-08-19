@@ -46,11 +46,12 @@ export const en = {
     enterUsername: 'Please enter a username.',
   },
   appGate: {
+    welcomeTitle: 'Welcome to skoleomLive',
+    welcomeSubtitle: 'Lives, auctions and shoppable discovery — log in for the full experience, or take a look as a guest.',
+    login: 'Log in',
+    continueAsGuest: 'Continue as guest',
     title: 'skoleomLive in your pocket',
-    subtitle: 'Lives, auctions and shoppable discovery — the full experience is built for mobile.',
-    comingSoon: 'App coming soon',
-    scanHint: 'Scan to get notified at launch',
-    continueOnWeb: 'Continue on web',
+    scanHint: 'Scan to get notified when the mobile app launches',
   },
   onboarding: {
     profileTitle: 'Personalize your profile',
