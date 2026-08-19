@@ -89,6 +89,7 @@ export const en = {
   studio: {
     newPost: 'New post',
     title: 'Create',
+    heroSubtitle: "A live, an auction, or a new post — your call.",
     sectionLive: 'Live',
     sectionPost: 'New post',
     startLive: 'Start a live',

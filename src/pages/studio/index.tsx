@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
-import { ArrowLeft, Camera, Image as ImageIcon, Loader2, Package, Radio, Gavel, Import, Plus, X, Music, Play, Pause } from 'lucide-react';
+import { ArrowLeft, Camera, Image as ImageIcon, Loader2, Package, Radio, Gavel, Import, Plus, X, Music, Play, Pause, Sparkles } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CameraCaptureModal } from '../../client/components/Post/CameraCaptureModal';
 import { InstagramImportModal } from '../../client/components/Post/InstagramImportModal';
@@ -227,8 +227,14 @@ export default function StudioPage() {
       <div className="flex h-screen cosmic-bg overflow-hidden">
         <AppSidebar />
 
-        <main className="flex-1 flex flex-col overflow-y-auto scrollbar-hide">
-          <div className="flex items-center gap-3 px-4 py-4">
+        <main className="relative flex-1 flex flex-col overflow-y-auto overflow-x-hidden scrollbar-hide">
+          {/* Halos d'ambiance — meme esprit que la sidebar, pour que le studio ne soit plus
+              un simple aplat noir autour d'une colonne etroite. */}
+          <div className="cosmic-orb w-64 h-64 bg-[#a8ff35]/[0.07] -top-16 -right-20 animate-float" style={{ animationDelay: '0s' }} />
+          <div className="cosmic-orb w-48 h-48 bg-[#00ffff]/[0.06] top-1/3 -left-24 animate-float" style={{ animationDelay: '-4s' }} />
+          <div className="cosmic-orb w-56 h-56 bg-[#faee21]/[0.04] bottom-0 right-0 animate-float" style={{ animationDelay: '-2s' }} />
+
+          <div className="relative flex items-center gap-3 px-4 py-4">
             <Link
               href="/"
               className="w-9 h-9 rounded-full bg-white/[0.06] hover:bg-white/10 flex items-center justify-center transition-colors"
@@ -251,7 +257,7 @@ export default function StudioPage() {
             )}
           </div>
 
-          <div className="flex-1 flex flex-col items-center px-4 py-8 pb-20 md:pb-8">
+          <div className="relative flex-1 flex flex-col items-center px-4 py-8 pb-20 md:pb-8">
           <div className="w-full max-w-sm">
             {notice && (
               <p className="mb-4 text-center text-xs text-amber-300 bg-amber-400/10 border border-amber-400/20 rounded-xl px-4 py-2.5">
@@ -260,43 +266,54 @@ export default function StudioPage() {
             )}
 
             {step === 'form' && (
-              <>
+              <div className="animate-fade-in">
+                <div className="text-center mb-7">
+                  <h1 className="display-text text-gradient text-3xl mb-1.5">{t('studio.title')}</h1>
+                  <p className="text-white/40 text-[13px]">{t('studio.heroSubtitle')}</p>
+                </div>
+
                 {/* ── Section : Direct ─────────────────────────────── */}
-                <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2.5">
-                  {t('studio.sectionLive')}
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2.5">
+                  <Radio size={11} /> {t('studio.sectionLive')}
                 </p>
-                <div className="grid grid-cols-2 gap-2.5 mb-6">
+                <div className="grid grid-cols-2 gap-3 mb-7">
                   <button
                     type="button"
                     onClick={() => router.push('/studio/live')}
-                    className="flex flex-col items-center gap-2 py-5 rounded-2xl border border-red-400/20 bg-red-400/[0.06] hover:bg-red-400/[0.1] hover:border-red-400/35 transition-all"
+                    className="group relative aspect-square rounded-3xl p-[1.5px] bg-gradient-to-br from-red-400/50 via-red-500/25 to-transparent hover:from-red-400/80 hover:via-red-500/40 transition-all"
                   >
-                    <span className="w-10 h-10 rounded-full bg-red-400/15 flex items-center justify-center">
-                      <Radio size={18} className="text-red-400" />
-                    </span>
-                    <span className="text-white text-sm font-semibold">{t('studio.startLive')}</span>
+                    <div className="relative w-full h-full rounded-3xl bg-[#0d0d0f] overflow-hidden flex flex-col items-center justify-center gap-3">
+                      <div className="absolute w-20 h-20 bg-red-500/25 rounded-full blur-2xl group-hover:bg-red-500/40 transition-all" />
+                      <span className="relative w-12 h-12 rounded-full bg-red-500/15 border border-red-400/30 flex items-center justify-center">
+                        <Radio size={20} className="text-red-400" />
+                      </span>
+                      <span className="relative text-white text-sm font-bold">{t('studio.startLive')}</span>
+                    </div>
                   </button>
                   <button
                     type="button"
                     onClick={() => router.push('/studio/live?mode=auction')}
-                    className="flex flex-col items-center gap-2 py-5 rounded-2xl border border-[#a8ff35]/20 bg-[#a8ff35]/[0.06] hover:bg-[#a8ff35]/[0.1] hover:border-[#a8ff35]/35 transition-all"
+                    className="group relative aspect-square rounded-3xl p-[1.5px] bg-gradient-to-br from-[#a8ff35]/50 via-[#6fe600]/25 to-transparent hover:from-[#a8ff35]/80 hover:via-[#6fe600]/40 transition-all"
                   >
-                    <span className="w-10 h-10 rounded-full bg-[#a8ff35]/15 flex items-center justify-center">
-                      <Gavel size={18} className="text-[#a8ff35]" />
-                    </span>
-                    <span className="text-white text-sm font-semibold">{t('studio.startAuction')}</span>
+                    <div className="relative w-full h-full rounded-3xl bg-[#0d0d0f] overflow-hidden flex flex-col items-center justify-center gap-3">
+                      <div className="absolute w-20 h-20 bg-[#a8ff35]/20 rounded-full blur-2xl group-hover:bg-[#a8ff35]/35 transition-all" />
+                      <span className="relative w-12 h-12 rounded-full bg-[#a8ff35]/15 border border-[#a8ff35]/30 flex items-center justify-center">
+                        <Gavel size={20} className="text-[#a8ff35]" />
+                      </span>
+                      <span className="relative text-white text-sm font-bold">{t('studio.startAuction')}</span>
+                    </div>
                   </button>
                 </div>
 
-                <div className="flex items-center gap-3 mb-6">
-                  <div className="h-px flex-1 bg-white/[0.08]" />
+                <div className="flex items-center gap-3 mb-7">
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent to-white/10" />
                   <span className="text-[11px] text-white/25 uppercase tracking-wider">{t('common.or')}</span>
-                  <div className="h-px flex-1 bg-white/[0.08]" />
+                  <div className="h-px flex-1 bg-gradient-to-l from-transparent to-white/10" />
                 </div>
 
                 {/* ── Section : Nouveau post ───────────────────────── */}
-                <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2.5">
-                  {t('studio.sectionPost')}
+                <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2.5">
+                  <Sparkles size={11} /> {t('studio.sectionPost')}
                 </p>
 
                 <form onSubmit={handlePublish} className="space-y-4">
@@ -309,7 +326,7 @@ export default function StudioPage() {
                 />
 
                 {preview ? (
-                  <div className="relative w-full aspect-square rounded-2xl border border-white/15 overflow-hidden">
+                  <div className="relative w-full aspect-square rounded-3xl border border-white/15 overflow-hidden shadow-glow-lime-sm">
                     {file?.type.startsWith('video/') ? (
                       <video src={preview} className="w-full h-full object-cover" muted />
                     ) : (
@@ -324,31 +341,33 @@ export default function StudioPage() {
                     </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-2 gap-2.5">
+                  <div className="grid grid-cols-2 gap-3">
                     {/* Bordure degradee cyan/lime (meme esprit "cosmique" que le filet de la
                         sidebar) au lieu d'un simple border-white/10 qui se voyait a peine. */}
-                    <div className="aspect-square rounded-2xl p-[1.5px] bg-gradient-to-br from-[#00ffff]/50 via-[#a8ff35]/45 to-[#00ffff]/15 hover:from-[#00ffff]/70 hover:via-[#a8ff35]/65 hover:to-[#00ffff]/25 transition-all">
+                    <div className="group relative aspect-square rounded-3xl p-[1.5px] bg-gradient-to-br from-[#00ffff]/50 via-[#a8ff35]/45 to-[#00ffff]/15 hover:from-[#00ffff]/80 hover:via-[#a8ff35]/65 hover:to-[#00ffff]/30 transition-all">
                       <button
                         type="button"
                         onClick={() => setCameraOpen(true)}
-                        className="w-full h-full rounded-2xl bg-white/[0.04] hover:bg-white/[0.07] flex flex-col items-center justify-center gap-2.5 transition-all"
+                        className="relative w-full h-full rounded-3xl bg-[#0d0d0f] overflow-hidden hover:bg-[#111113] flex flex-col items-center justify-center gap-3 transition-all"
                       >
-                        <span className="w-11 h-11 rounded-full bg-white/[0.06] flex items-center justify-center">
-                          <Camera size={20} className="text-white/70" />
+                        <div className="absolute w-16 h-16 bg-[#00ffff]/15 rounded-full blur-2xl group-hover:bg-[#00ffff]/25 transition-all" />
+                        <span className="relative w-11 h-11 rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center">
+                          <Camera size={20} className="text-white/80" />
                         </span>
-                        <span className="text-white/70 text-sm font-medium">{t('studio.createPost')}</span>
+                        <span className="relative text-white/80 text-sm font-semibold">{t('studio.createPost')}</span>
                       </button>
                     </div>
-                    <div className="aspect-square rounded-2xl p-[1.5px] bg-gradient-to-br from-[#00ffff]/50 via-[#a8ff35]/45 to-[#00ffff]/15 hover:from-[#00ffff]/70 hover:via-[#a8ff35]/65 hover:to-[#00ffff]/25 transition-all">
+                    <div className="group relative aspect-square rounded-3xl p-[1.5px] bg-gradient-to-br from-[#00ffff]/50 via-[#a8ff35]/45 to-[#00ffff]/15 hover:from-[#00ffff]/80 hover:via-[#a8ff35]/65 hover:to-[#00ffff]/30 transition-all">
                       <button
                         type="button"
                         onClick={() => importInputRef.current?.click()}
-                        className="w-full h-full rounded-2xl bg-white/[0.04] hover:bg-white/[0.07] flex flex-col items-center justify-center gap-2.5 transition-all"
+                        className="relative w-full h-full rounded-3xl bg-[#0d0d0f] overflow-hidden hover:bg-[#111113] flex flex-col items-center justify-center gap-3 transition-all"
                       >
-                        <span className="w-11 h-11 rounded-full bg-white/[0.06] flex items-center justify-center">
-                          <ImageIcon size={20} className="text-white/70" />
+                        <div className="absolute w-16 h-16 bg-[#a8ff35]/15 rounded-full blur-2xl group-hover:bg-[#a8ff35]/25 transition-all" />
+                        <span className="relative w-11 h-11 rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center">
+                          <ImageIcon size={20} className="text-white/80" />
                         </span>
-                        <span className="text-white/70 text-sm font-medium">{t('studio.import')}</span>
+                        <span className="relative text-white/80 text-sm font-semibold">{t('studio.import')}</span>
                       </button>
                     </div>
                   </div>
@@ -474,7 +493,7 @@ export default function StudioPage() {
                   {loading ? <Loader2 size={16} className="animate-spin" /> : t('studio.publish')}
                 </button>
                 </form>
-              </>
+              </div>
             )}
 
             {step === 'capsule' && (
