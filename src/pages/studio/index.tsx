@@ -373,6 +373,21 @@ export default function StudioPage() {
                   </div>
                 )}
 
+                {!preview && (
+                  <button
+                    type="button"
+                    onClick={() => setInstagramModalOpen(true)}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 text-white/35 hover:text-white/60 text-[12px] font-medium transition-colors"
+                  >
+                    <Import size={13} className="shrink-0" />
+                    {t('studio.importSocial')}
+                  </button>
+                )}
+
+                {/* Legende/tags/musique/publication — masques tant qu'aucun media n'est
+                    choisi, sinon l'ecran est deja trop long avant meme d'avoir commence. */}
+                {preview && (
+                <>
                 <textarea
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
@@ -470,15 +485,6 @@ export default function StudioPage() {
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setInstagramModalOpen(true)}
-                  className="w-full flex items-center justify-center gap-1.5 py-2 text-white/35 hover:text-white/60 text-[12px] font-medium transition-colors"
-                >
-                  <Import size={13} className="shrink-0" />
-                  {t('studio.importSocial')}
-                </button>
-
                 {error && (
                   <p className="text-red-400 text-sm bg-red-400/10 px-4 py-2.5 rounded-xl border border-red-400/20">
                     {error}
@@ -492,6 +498,8 @@ export default function StudioPage() {
                 >
                   {loading ? <Loader2 size={16} className="animate-spin" /> : t('studio.publish')}
                 </button>
+                </>
+                )}
                 </form>
               </div>
             )}
