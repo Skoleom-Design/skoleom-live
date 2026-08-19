@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api, ApiError } from '../../../shared/api/http';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { PRESET_AVATARS } from '../../constants/avatars';
-import { AvatarGrid } from './AvatarGrid';
+import { AvatarCategoryPicker } from './AvatarCategoryPicker';
 
 interface GoogleProfileSetupProps {
   initialUsername: string;
@@ -66,8 +66,8 @@ export function GoogleProfileSetup({ initialUsername, googleAvatarUrl, onDone }:
         <p className="text-[11px] text-white/40 mb-2.5 font-medium uppercase tracking-wider">
           {t('onboarding.chooseAvatar')}
         </p>
-        <div className="mb-6 max-h-64 overflow-y-auto scrollbar-hide pr-1">
-          <AvatarGrid options={avatarOptions} value={avatarUrl} onChange={setAvatarUrl} />
+        <div className="mb-6 max-h-72 overflow-y-auto scrollbar-hide pr-1">
+          <AvatarCategoryPicker cosmicOptions={avatarOptions} value={avatarUrl} onChange={setAvatarUrl} />
         </div>
 
         {error && (

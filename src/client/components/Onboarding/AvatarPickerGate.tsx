@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { api } from '../../../shared/api/http';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { PRESET_AVATARS } from '../../constants/avatars';
-import { AvatarGrid } from './AvatarGrid';
+import { AvatarCategoryPicker } from './AvatarCategoryPicker';
 
 interface AvatarPickerGateProps {
   onDone: (avatarUrl: string) => void;
@@ -37,8 +37,8 @@ export function AvatarPickerGate({ onDone }: AvatarPickerGateProps) {
           <p className="text-white/45 text-sm px-2">{t('onboarding.avatarSubtitle')}</p>
         </div>
 
-        <div className="mb-6 max-h-64 overflow-y-auto scrollbar-hide pr-1">
-          <AvatarGrid options={PRESET_AVATARS} value={avatarUrl} onChange={setAvatarUrl} />
+        <div className="mb-6 max-h-72 overflow-y-auto scrollbar-hide pr-1">
+          <AvatarCategoryPicker cosmicOptions={PRESET_AVATARS} value={avatarUrl} onChange={setAvatarUrl} />
         </div>
 
         <button

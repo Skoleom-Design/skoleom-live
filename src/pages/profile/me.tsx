@@ -12,7 +12,7 @@ import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { BoostModal } from '../../client/components/Boost/BoostModal';
 import { CapsuleProductForm, CapsuleProductFormHandle } from '../../client/components/Capsule/CapsuleProductForm';
 import { CameraCaptureModal } from '../../client/components/Post/CameraCaptureModal';
-import { AvatarGrid } from '../../client/components/Onboarding/AvatarGrid';
+import { AvatarCategoryPicker } from '../../client/components/Onboarding/AvatarCategoryPicker';
 import { PRESET_AVATARS } from '../../client/constants/avatars';
 import { api, ApiError, getToken, getStoredUser, clearSession, uploadFile } from '../../shared/api/http';
 import type { CapsuleCondition, CapsuleCategory, AppNotification } from '../../shared/types/api';
@@ -1359,7 +1359,7 @@ export default function ProfilePage() {
                 <X size={16} className="text-white" />
               </button>
             </div>
-            <AvatarGrid options={PRESET_AVATARS} value={editAvatarPresetUrl || ''} onChange={pickPresetAvatar} />
+            <AvatarCategoryPicker cosmicOptions={PRESET_AVATARS} value={editAvatarPresetUrl || ''} onChange={pickPresetAvatar} />
           </div>
         </div>
       )}
