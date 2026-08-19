@@ -68,16 +68,20 @@ export class AuthService {
     await this.usersRepo.update(userId, { currentSessionId: null as unknown as string });
   }
 
+  // GOOGLE_REDIRECT_URI est exige explicitement (pas de fallback localhost) — un ancien bug
+  // envoyait silencieusement Google vers "http://localhost:3000/..." quand cette variable
+  // n'etait pas configuree sur Render, redirigeant le navigateur de vrais utilisateurs vers la
+  // machine locale de dev au lieu du domaine public. Mieux vaut echouer bruyamment ici.
   private assertGoogleConfigured() {
-    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET) {
+    if (!process.env.GOOGLE_CLIENT_ID || !process.env.GOOGLE_CLIENT_SECRET || !process.env.GOOGLE_REDIRECT_URI) {
       throw new ServiceUnavailableException(
-        "La connexion Google n'est pas configurée sur ce serveur (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET manquants).",
+        "La connexion Google n'est pas configurée sur ce serveur (GOOGLE_CLIENT_ID / GOOGLE_CLIENT_SECRET / GOOGLE_REDIRECT_URI manquants).",
       );
     }
   }
 
   private googleRedirectUri(): string {
-    return process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/api/auth/google/callback';
+    return process.env.GOOGLE_REDIRECT_URI!;
   }
 
   getGoogleAuthUrl(): string {
@@ -131,18 +135,21 @@ export class AuthService {
     return candidate;
   }
 
+  // Chemins RELATIFS (pas d'URL absolue construite depuis FRONTEND_URL) — cette route est
+  // toujours atteinte via le domaine public (Google y redirige directement), donc le navigateur
+  // resout deja "/auth/..." par rapport a ce meme domaine. Un ancien bug utilisait
+  // `${process.env.FRONTEND_URL || 'http://localhost:3001'}/...` : si FRONTEND_URL etait mal
+  // configuree (ou absente) sur Render, ca renvoyait de vrais utilisateurs prod vers localhost.
   async handleGoogleCallback(code: string | undefined, state: string | undefined, oauthError: string | undefined): Promise<string> {
-    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-
     if (oauthError || !code || !state) {
-      return `${frontendUrl}/auth/login?googleError=1`;
+      return '/auth/login?googleError=1';
     }
 
     try {
       const payload = this.stateJwt.verify(state) as { purpose: string };
       if (payload.purpose !== 'google_oauth') throw new Error('invalid purpose');
     } catch {
-      return `${frontendUrl}/auth/login?googleError=1`;
+      return '/auth/login?googleError=1';
     }
 
     try {
@@ -165,16 +172,16 @@ export class AuthService {
         headers: { Authorization: `Bearer ${accessToken}` },
       });
       const { sub, email, name, picture } = userinfo.data as { sub: string; email: string; name?: string; picture?: string };
-      if (!email) return `${frontendUrl}/auth/login?googleError=1`;
+      if (!email) return '/auth/login?googleError=1';
 
       const user = await this.findOrCreateGoogleUser({ googleId: sub, email, name, picture });
       const { password: _, ...result } = user;
       const token = await this.issueSession(user.id, user.role);
       const payloadB64 = Buffer.from(JSON.stringify({ user: result, token })).toString('base64url');
 
-      return `${frontendUrl}/auth/google-callback?data=${payloadB64}`;
+      return `/auth/google-callback?data=${payloadB64}`;
     } catch {
-      return `${frontendUrl}/auth/login?googleError=1`;
+      return '/auth/login?googleError=1';
     }
   }
 
