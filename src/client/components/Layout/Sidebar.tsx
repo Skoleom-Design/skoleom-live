@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Orbit, Search, Video, User, PlusCircle, ShieldAlert, Gavel } from 'lucide-react';
+import { Orbit, Video, User, PlusCircle, ShieldAlert, Gavel, Send } from 'lucide-react';
 import { GuideButton } from '../Guide/GuideModal';
 import { api, getStoredUser, getToken } from '../../../shared/api/http';
+import { getRealtimeSocket } from '../../../shared/api/realtime';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 const NOTIFICATIONS_POLL_MS = 30_000;
@@ -14,6 +15,7 @@ export function AppSidebar() {
   const [isAdmin, setIsAdmin] = useState(false);
   const [avatarUrl, setAvatarUrl] = useState<string | undefined>(undefined);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   useEffect(() => {
     const user = getStoredUser();
@@ -21,18 +23,35 @@ export function AppSidebar() {
     setAvatarUrl(user?.avatarUrl);
   }, []);
 
-  // Petit badge sur "Profil" pour les likes/commentaires reçus — un polling simple suffit,
-  // pas besoin d'un canal temps reel dedie pour un compteur qu'on consulte de toute façon
-  // en changeant de page.
+  // Le polling reste le filet de securite (fonctionne meme si le socket temps reel a rate un
+  // evenement) ; le socket ci-dessous rend juste le badge instantane au lieu d'attendre le
+  // prochain intervalle.
   useEffect(() => {
     if (!getToken()) return;
-    function fetchUnreadCount() {
+    function fetchCounts() {
       api.get<{ count: number }>('/notifications/unread-count').then((res) => setUnreadCount(res.count)).catch(() => {});
+      api.get<{ count: number }>('/messages/unread-count').then((res) => setUnreadMessages(res.count)).catch(() => {});
     }
-    fetchUnreadCount();
-    const interval = setInterval(fetchUnreadCount, NOTIFICATIONS_POLL_MS);
+    fetchCounts();
+    const interval = setInterval(fetchCounts, NOTIFICATIONS_POLL_MS);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const socket = getRealtimeSocket();
+    if (!socket) return;
+    const onNotification = () => setUnreadCount((c) => c + 1);
+    const onMessage = () => {
+      if (router.pathname.startsWith('/messages')) return;
+      setUnreadMessages((c) => c + 1);
+    };
+    socket.on('notification', onNotification);
+    socket.on('dm:message', onMessage);
+    return () => {
+      socket.off('notification', onNotification);
+      socket.off('dm:message', onMessage);
+    };
+  }, [router.pathname]);
 
   // Visiter son profil marque les notifications comme lues — le badge disparaît.
   useEffect(() => {
@@ -41,23 +60,31 @@ export function AppSidebar() {
     }
   }, [router.pathname, unreadCount]);
 
+  // Visiter la messagerie remet a zero le badge — chaque conversation ouverte marque ses
+  // propres messages comme lus (voir pages/messages/[id].tsx), ce badge ne fait que suivre.
+  useEffect(() => {
+    if (router.pathname.startsWith('/messages') && unreadMessages > 0) {
+      setUnreadMessages(0);
+    }
+  }, [router.pathname, unreadMessages]);
+
   // Home/loupe/carre+ sont les pictogrammes exacts d'Instagram — Orbit rattache "Explorer" au
   // theme Univers cosmique de la DA, et un rond+ (au lieu d'un carre+) suffit a rompre la ressemblance.
   const NAV = [
     { href: '/live', icon: Video, label: t('sidebar.live') },
     { href: '/enchere', icon: Gavel, label: t('sidebar.auction') },
     { href: '/', icon: Orbit, label: t('sidebar.explore') },
-    { href: '/explore', icon: Search, label: t('sidebar.search') },
+    ...(isAdmin ? [] : [{ href: '/messages', icon: Send, label: t('sidebar.messages'), badge: unreadMessages }]),
     ...(isAdmin ? [] : [{ href: '/studio', icon: PlusCircle, label: t('sidebar.studio') }]),
     isAdmin
       ? { href: '/admin', icon: ShieldAlert, label: t('sidebar.profile') }
-      : { href: '/profile/me', icon: User, label: t('sidebar.profile'), avatarUrl },
+      : { href: '/profile/me', icon: User, label: t('sidebar.profile'), avatarUrl, badge: unreadCount },
   ];
 
   return (
     <>
-      <DesktopSidebar NAV={NAV} router={router} unreadCount={unreadCount} />
-      <MobileNavBar NAV={NAV} router={router} unreadCount={unreadCount} />
+      <DesktopSidebar NAV={NAV} router={router} />
+      <MobileNavBar NAV={NAV} router={router} />
     </>
   );
 }
@@ -68,16 +95,15 @@ type NavItem = {
   label: string;
   disabled?: boolean;
   avatarUrl?: string;
+  badge?: number;
 };
 
 function DesktopSidebar({
   NAV,
   router,
-  unreadCount,
 }: {
   NAV: NavItem[];
   router: ReturnType<typeof useRouter>;
-  unreadCount: number;
 }) {
   return (
     <aside className="cosmic-bg relative hidden md:flex flex-col w-[244px] h-full px-3 py-5 shrink-0 overflow-hidden">
@@ -122,7 +148,7 @@ function DesktopSidebar({
                     fillOpacity={isActive ? 0.18 : undefined}
                   />
                 )}
-                {item.href === '/profile/me' && unreadCount > 0 && (
+                {(item.badge ?? 0) > 0 && (
                   <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-black/80" />
                 )}
               </span>
@@ -169,11 +195,9 @@ function DesktopSidebar({
 function MobileNavBar({
   NAV,
   router,
-  unreadCount,
 }: {
   NAV: NavItem[];
   router: ReturnType<typeof useRouter>;
-  unreadCount: number;
 }) {
   return (
     <nav className="cosmic-bg md:hidden fixed bottom-0 inset-x-0 z-40 flex items-center justify-around border-t border-white/10 px-1 pt-2 pb-[max(8px,env(safe-area-inset-bottom))]">
@@ -197,7 +221,7 @@ function MobileNavBar({
                 className={disabled ? 'text-white/25' : isActive ? 'text-[#a8ff35]' : 'text-white/70'}
               />
             )}
-            {item.href === '/profile/me' && unreadCount > 0 && (
+            {(item.badge ?? 0) > 0 && (
               <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-red-500 border-2 border-black/80" />
             )}
           </span>

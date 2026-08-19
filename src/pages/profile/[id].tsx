@@ -2,10 +2,11 @@ import { useRouter } from 'next/router';
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { ArrowLeft, Eye, Heart } from 'lucide-react';
+import { ArrowLeft, Eye, Heart, Send } from 'lucide-react';
 import type { Post, User } from '../../shared/types/api';
 import { api, getToken } from '../../shared/api/http';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
+import { useLanguage } from '../../client/i18n/LanguageContext';
 
 function fmt(n: number): string {
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
@@ -15,12 +16,16 @@ function fmt(n: number): string {
 
 export default function ProfilePage() {
   const router = useRouter();
+  const { t } = useLanguage();
   const { id } = router.query as { id: string };
 
   const [user, setUser] = useState<(User & { bio?: string; plan?: string }) | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [checkingSelf, setCheckingSelf] = useState(true);
+  const [following, setFollowing] = useState(false);
+  const [followPending, setFollowPending] = useState(false);
+  const [messagePending, setMessagePending] = useState(false);
 
   // On redirige vers /profile/me si l'utilisateur consulte son propre profil — cette page
   // ne doit montrer que ce qu'un visiteur externe a le droit de voir.
@@ -43,12 +48,43 @@ export default function ProfilePage() {
       api.get<Post[]>(`/posts/creator/${id}`).catch(() => []),
     ]).then(([userData, postsData]) => {
       setUser(userData);
+      setFollowing(!!userData?.isFollowing);
       setPosts(postsData || []);
     }).finally(() => setLoading(false));
   }, [id, checkingSelf]);
 
-  const totalViews = posts.reduce((s, p) => s + p.viewCount, 0);
-  const totalLikes = posts.reduce((s, p) => s + p.likeCount, 0);
+  async function toggleFollow() {
+    if (!getToken()) { router.push('/auth/login'); return; }
+    if (followPending || !user) return;
+    setFollowPending(true);
+    try {
+      if (following) {
+        await api.delete(`/follows/${id}`);
+        setFollowing(false);
+        setUser((u) => u && { ...u, followersCount: Math.max(0, (u.followersCount ?? 1) - 1) });
+      } else {
+        await api.post(`/follows/${id}`);
+        setFollowing(true);
+        setUser((u) => u && { ...u, followersCount: (u.followersCount ?? 0) + 1 });
+      }
+    } catch {
+      // Echec silencieux — l'etat local n'a pas changé, le bouton reste dans son etat precedent.
+    } finally {
+      setFollowPending(false);
+    }
+  }
+
+  async function sendMessage() {
+    if (!getToken()) { router.push('/auth/login'); return; }
+    if (messagePending) return;
+    setMessagePending(true);
+    try {
+      const conv = await api.post<{ id: string }>(`/messages/conversations/with/${id}`);
+      router.push(`/messages/${conv.id}`);
+    } catch {
+      setMessagePending(false);
+    }
+  }
 
   if (loading || checkingSelf) {
     return (
@@ -100,22 +136,39 @@ export default function ProfilePage() {
                 {user.bio && <p className="text-[13px] text-white/45 mb-3 leading-relaxed">{user.bio}</p>}
                 <div className="flex gap-5">
                   <div>
-                    <span className="text-white font-bold text-[14px]">{fmt(totalViews)}</span>{' '}
-                    <span className="text-white/40 text-[12px]">vues</span>
-                  </div>
-                  <div>
-                    <span className="text-white font-bold text-[14px]">{fmt(totalLikes)}</span>{' '}
-                    <span className="text-white/40 text-[12px]">likes</span>
-                  </div>
-                  <div>
                     <span className="text-white font-bold text-[14px]">{posts.length}</span>{' '}
                     <span className="text-white/40 text-[12px]">post{posts.length > 1 ? 's' : ''}</span>
                   </div>
+                  <div>
+                    <span className="text-white font-bold text-[14px]">{fmt(user.followersCount ?? 0)}</span>{' '}
+                    <span className="text-white/40 text-[12px]">{t('profile.followers')}</span>
+                  </div>
+                  <div>
+                    <span className="text-white font-bold text-[14px]">{fmt(user.followingCount ?? 0)}</span>{' '}
+                    <span className="text-white/40 text-[12px]">{t('profile.followingCount')}</span>
+                  </div>
                 </div>
               </div>
-              <button className="btn-skoleom px-5 py-2 rounded-full text-[13px] shrink-0 hover:shadow-glow-lime-sm transition-all">
-                Suivre
-              </button>
+              <div className="flex flex-col items-stretch gap-2 shrink-0">
+                <button
+                  onClick={toggleFollow}
+                  disabled={followPending}
+                  className={`px-5 py-2 rounded-full text-[13px] font-semibold transition-all disabled:opacity-60 ${
+                    following
+                      ? 'border border-white/15 text-white hover:bg-white/5'
+                      : 'btn-skoleom hover:shadow-glow-lime-sm'
+                  }`}
+                >
+                  {following ? t('profile.following') : t('profile.follow')}
+                </button>
+                <button
+                  onClick={sendMessage}
+                  disabled={messagePending}
+                  className="flex items-center justify-center gap-1.5 px-5 py-2 rounded-full text-[13px] font-semibold border border-white/15 text-white hover:bg-white/5 transition-all disabled:opacity-60"
+                >
+                  <Send size={13} /> {t('profile.sendMessage')}
+                </button>
+              </div>
             </div>
 
             {/* ── Posts grid ── */}

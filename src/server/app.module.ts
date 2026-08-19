@@ -16,6 +16,9 @@ import { AuctionBid } from './api/lives/auction-bid.entity';
 import { WalletTransaction } from './api/payments/wallet-transaction.entity';
 import { AdminActionLog } from './api/admin/admin-action-log.entity';
 import { Notification } from './api/notifications/notification.entity';
+import { Follow } from './api/follows/follow.entity';
+import { Conversation } from './api/messages/conversation.entity';
+import { Message } from './api/messages/message.entity';
 import { PostsModule } from './api/posts/posts.module';
 import { NotificationsModule } from './api/notifications/notifications.module';
 import { CapsulesModule } from './api/capsules/capsules.module';
@@ -28,6 +31,8 @@ import { UsersModule } from './api/users/users.module';
 import { FilesModule } from './api/files/files.module';
 import { LivesModule } from './api/lives/lives.module';
 import { InstagramModule } from './api/instagram/instagram.module';
+import { FollowsModule } from './api/follows/follows.module';
+import { MessagesModule } from './api/messages/messages.module';
 
 @Module({
   imports: [
@@ -44,14 +49,14 @@ import { InstagramModule } from './api/instagram/instagram.module';
           // Supabase (et la plupart des hebergeurs Postgres geres) exige TLS sur la connexion ;
           // rejectUnauthorized: false accepte leur certificat auto-signe / chaine non verifiee.
           ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
-          entities: [User, Post, Comment, Capsule, CapsuleGroup, Order, Boost, LiveSession, LiveComment, Gift, AuctionBid, WalletTransaction, AdminActionLog, Notification],
+          entities: [User, Post, Comment, Capsule, CapsuleGroup, Order, Boost, LiveSession, LiveComment, Gift, AuctionBid, WalletTransaction, AdminActionLog, Notification, Follow, Conversation, Message],
           synchronize: process.env.NODE_ENV !== 'production',
           logging: process.env.NODE_ENV === 'development',
         })
       : TypeOrmModule.forRoot({
           type: 'better-sqlite3',
           database: 'skoleom-live.sqlite',
-          entities: [User, Post, Comment, Capsule, CapsuleGroup, Order, Boost, LiveSession, LiveComment, Gift, AuctionBid, WalletTransaction, AdminActionLog, Notification],
+          entities: [User, Post, Comment, Capsule, CapsuleGroup, Order, Boost, LiveSession, LiveComment, Gift, AuctionBid, WalletTransaction, AdminActionLog, Notification, Follow, Conversation, Message],
           synchronize: true,
         }),
     AuthModule,
@@ -66,6 +71,8 @@ import { InstagramModule } from './api/instagram/instagram.module';
     LivesModule,
     InstagramModule,
     NotificationsModule,
+    FollowsModule,
+    MessagesModule,
   ],
 })
 export class AppModule {}

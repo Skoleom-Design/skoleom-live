@@ -4,9 +4,10 @@ import {
 import { NotificationType } from '../../../shared/types/entities';
 import { User } from '../users/user.entity';
 import { Post } from '../posts/post.entity';
+import { LiveSession } from '../lives/live-session.entity';
 
-// Notification legere (like/commentaire reçu) — pas de canal temps reel dedie pour l'instant,
-// le badge cote profil se base sur un simple GET du compteur non-lu.
+// Notification (like/commentaire/follow/nouveau post/live demarre) — pousse en temps reel via
+// RealtimeGateway en plus d'etre persistee ; le badge cote profil se base sur le compteur non-lu.
 @Entity('notifications')
 export class Notification {
   @PrimaryGeneratedColumn('uuid')
@@ -32,6 +33,13 @@ export class Notification {
 
   @Column({ nullable: true })
   postId: string | null;
+
+  @ManyToOne(() => LiveSession, { nullable: true })
+  @JoinColumn({ name: 'liveId' })
+  live: LiveSession | null;
+
+  @Column({ nullable: true })
+  liveId: string | null;
 
   @Column({ default: false })
   read: boolean;

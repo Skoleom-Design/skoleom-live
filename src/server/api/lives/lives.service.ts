@@ -11,7 +11,9 @@ import { Order } from '../orders/order.entity';
 import { User } from '../users/user.entity';
 import { WalletTransaction } from '../payments/wallet-transaction.entity';
 import { PaymentsService } from '../payments/payments.service';
-import { LiveStatus, LiveMode, OrderStatus, WalletTransactionType, UserPlan } from '../../../shared/types/entities';
+import { NotificationsService } from '../notifications/notifications.service';
+import { FollowsService } from '../follows/follows.service';
+import { LiveStatus, LiveMode, OrderStatus, WalletTransactionType, UserPlan, NotificationType } from '../../../shared/types/entities';
 
 // Nombre de manches d'enchère autorisées par live selon l'offre — même principe que les
 // limites de capsules par offre (voir CAPSULE_GROUP_COUNT_LIMITS dans capsules.service.ts).
@@ -70,7 +72,17 @@ export class LivesService {
     @InjectRepository(AuctionBid)
     private bidsRepo: Repository<AuctionBid>,
     private paymentsService: PaymentsService,
+    private notificationsService: NotificationsService,
+    private followsService: FollowsService,
   ) {}
+
+  // Previent les abonnes qu'un createur vient de passer en live — jamais bloquant pour le
+  // demarrage du live lui-meme si le fan-out echoue.
+  private notifyFollowersLiveStarted(creatorId: string, liveId: string): void {
+    this.followsService.getFollowerIds(creatorId)
+      .then((followerIds) => this.notificationsService.notifyMany(followerIds, creatorId, NotificationType.LIVE_STARTED, { liveId }))
+      .catch(() => {});
+  }
 
   async start(creatorId: string, title?: string): Promise<LiveSession> {
     const existing = await this.livesRepo.findOne({ where: { creatorId, status: LiveStatus.LIVE } });
@@ -84,7 +96,9 @@ export class LivesService {
       mode: LiveMode.LIVE,
       startedAt: new Date(),
     });
-    return this.livesRepo.save(live);
+    const saved = await this.livesRepo.save(live);
+    this.notifyFollowersLiveStarted(creatorId, saved.id);
+    return saved;
   }
 
   async startAuction(creatorId: string, title?: string): Promise<LiveSession> {
@@ -100,7 +114,9 @@ export class LivesService {
       startedAt: new Date(),
       auctionActive: false,
     });
-    return this.livesRepo.save(live);
+    const saved = await this.livesRepo.save(live);
+    this.notifyFollowersLiveStarted(creatorId, saved.id);
+    return saved;
   }
 
   // Delai minimum entre la fin d'un live et le suivant — evite de pouvoir relancer un live

@@ -92,4 +92,7 @@ export enum LiveMode {
 export enum NotificationType {
   LIKE = 'like',
   COMMENT = 'comment',
+  FOLLOW = 'follow',
+  NEW_POST = 'new_post',
+  LIVE_STARTED = 'live_started',
 }

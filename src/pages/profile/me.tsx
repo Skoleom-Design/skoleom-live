@@ -5,15 +5,15 @@ import { useRouter } from 'next/router';
 import {
   LogOut, Plus, Trash2, Package, BarChart2, Grid3x3, Loader2, Pencil, Camera, X,
   Heart, Zap, Wallet, ArrowDownToLine, ArrowUpFromLine, Radio, Settings, Check,
-  Receipt, ShoppingBag, Gift, Clock, Truck, MoreVertical, Landmark, CreditCard,
-  Image as ImageIcon,
+  ShoppingBag, Gift, Clock, Truck, MoreVertical, Landmark, CreditCard,
+  Image as ImageIcon, Bell, MessageCircle, UserPlus, Video,
 } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { BoostModal } from '../../client/components/Boost/BoostModal';
 import { CapsuleProductForm, CapsuleProductFormHandle } from '../../client/components/Capsule/CapsuleProductForm';
 import { CameraCaptureModal } from '../../client/components/Post/CameraCaptureModal';
 import { api, ApiError, getToken, getStoredUser, clearSession, uploadFile } from '../../shared/api/http';
-import type { CapsuleCondition, CapsuleCategory } from '../../shared/types/api';
+import type { CapsuleCondition, CapsuleCategory, AppNotification } from '../../shared/types/api';
 import { categoryLabel, conditionLabel, subcategoryLabel } from '../../client/constants/capsule';
 import { useLanguage } from '../../client/i18n/LanguageContext';
 
@@ -122,7 +122,7 @@ interface BuyerStats {
   giftsSentAmount: number;
 }
 
-type Tab = 'posts' | 'capsules' | 'favoris' | 'wallet' | 'transactions' | 'stats';
+type Tab = 'posts' | 'capsules' | 'favoris' | 'wallet' | 'stats' | 'notifications';
 type StatsView = 'creator' | 'buyer';
 
 export default function ProfilePage() {
@@ -219,6 +219,15 @@ export default function ProfilePage() {
   const [editCapsuleError, setEditCapsuleError] = useState('');
 
   const [livesCount, setLivesCount] = useState(0);
+
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [notifLoading, setNotifLoading] = useState(false);
+
+  useEffect(() => {
+    if (tab !== 'notifications') return;
+    setNotifLoading(true);
+    api.get<AppNotification[]>('/notifications').then(setNotifications).catch(() => {}).finally(() => setNotifLoading(false));
+  }, [tab]);
 
   function showComingSoon(label: string) {
     setNotice(t('profile.comingSoon', { label }));
@@ -519,6 +528,7 @@ export default function ProfilePage() {
   }
 
   function handleLogout() {
+    api.post('/auth/logout').catch(() => {});
     clearSession();
     router.push('/auth/login');
   }
@@ -644,8 +654,8 @@ export default function ProfilePage() {
     { key: 'capsules' as Tab, label: t('profile.capsules'), icon: Package },
     { key: 'favoris' as Tab, label: t('profile.favorites'), icon: Heart },
     { key: 'wallet' as Tab, label: t('profile.wallet'), icon: Wallet },
-    { key: 'transactions' as Tab, label: t('profile.transactions'), icon: Receipt },
     { key: 'stats' as Tab, label: t('profile.stats'), icon: BarChart2 },
+    { key: 'notifications' as Tab, label: t('profile.notifications'), icon: Bell },
   ];
 
   return (
@@ -967,33 +977,6 @@ export default function ProfilePage() {
                 </div>
 
                 <div>
-                  <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2">
-                    {t('profile.transactionHistory')}
-                  </p>
-                  {walletTransactions.length === 0 ? (
-                    <p className="text-[13px] text-white/30">{t('profile.noTransactions')}</p>
-                  ) : (
-                    <div className="space-y-1.5">
-                      {walletTransactions.map((wtx) => (
-                        <div key={wtx.id} className="flex items-center justify-between bg-white/[0.02] border border-white/[0.05] rounded-xl px-3.5 py-2.5">
-                          <div className="min-w-0">
-                            <p className="text-[13px] text-white/80 truncate">{wtx.description || t(`profile.txType.${wtx.type}`)}</p>
-                            <p className="text-[11px] text-white/30">{new Date(wtx.createdAt).toLocaleDateString()}</p>
-                          </div>
-                          <p className={`text-[13px] font-bold shrink-0 ${wtx.amount >= 0 ? 'text-green-400' : 'text-white/60'}`}>
-                            {wtx.amount >= 0 ? '+' : ''}{wtx.amount.toFixed(2)} €
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {tab === 'transactions' && (
-              <div className="space-y-6 max-w-sm">
-                <div>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2 flex items-center gap-1.5">
                     <ShoppingBag size={12} /> {t('profile.myPurchases')}
                   </p>
@@ -1054,6 +1037,29 @@ export default function ProfilePage() {
                           ) : (
                             <StatusBadge status={o.status} t={t} />
                           )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2">
+                    {t('profile.transactionHistory')}
+                  </p>
+                  {walletTransactions.length === 0 ? (
+                    <p className="text-[13px] text-white/30">{t('profile.noTransactions')}</p>
+                  ) : (
+                    <div className="space-y-1.5">
+                      {walletTransactions.map((wtx) => (
+                        <div key={wtx.id} className="flex items-center justify-between bg-white/[0.02] border border-white/[0.05] rounded-xl px-3.5 py-2.5">
+                          <div className="min-w-0">
+                            <p className="text-[13px] text-white/80 truncate">{wtx.description || t(`profile.txType.${wtx.type}`)}</p>
+                            <p className="text-[11px] text-white/30">{new Date(wtx.createdAt).toLocaleDateString()}</p>
+                          </div>
+                          <p className={`text-[13px] font-bold shrink-0 ${wtx.amount >= 0 ? 'text-green-400' : 'text-white/60'}`}>
+                            {wtx.amount >= 0 ? '+' : ''}{wtx.amount.toFixed(2)} €
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -1142,6 +1148,55 @@ export default function ProfilePage() {
                   </div>
                 )}
               </div>
+            )}
+
+            {tab === 'notifications' && (
+              notifLoading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="animate-spin text-white/40" size={24} />
+                </div>
+              ) : notifications.length === 0 ? (
+                <EmptyState text={t('profile.noNotificationsYet')} />
+              ) : (
+                <div className="space-y-1.5">
+                  {notifications.map((n) => {
+                    const Icon = { like: Heart, comment: MessageCircle, follow: UserPlus, new_post: Grid3x3, live_started: Video }[n.type] || Bell;
+                    const href = n.type === 'follow'
+                      ? `/profile/${n.actor.id}`
+                      : n.type === 'live_started' && n.live
+                        ? `/live/${n.live.id}`
+                        : n.post
+                          ? `/post/${n.post.id}`
+                          : `/profile/${n.actor.id}`;
+                    return (
+                      <Link
+                        key={n.id}
+                        href={href}
+                        className={`flex items-center gap-3 rounded-2xl px-3 py-2.5 transition-colors ${n.read ? 'hover:bg-white/[0.03]' : 'bg-white/[0.04] hover:bg-white/[0.06]'}`}
+                      >
+                        <div className="relative w-9 h-9 rounded-full bg-white/10 flex items-center justify-center overflow-hidden shrink-0">
+                          {n.actor.avatarUrl ? (
+                            <img src={n.actor.avatarUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <span className="text-white/70 text-xs font-bold">{n.actor.username[0]?.toUpperCase()}</span>
+                          )}
+                          <span className="absolute -bottom-1 -right-1 w-4.5 h-4.5 rounded-full bg-[#0d0d0f] border border-white/10 flex items-center justify-center">
+                            <Icon size={9} className="text-[#a8ff35]" />
+                          </span>
+                        </div>
+                        <p className="flex-1 text-[13px] text-white/85 leading-snug">
+                          <span className="font-semibold text-white">{n.actor.displayName || n.actor.username}</span>{' '}
+                          {t(`profile.notifText.${n.type}`)}
+                        </p>
+                        {(n.post?.thumbnailUrl || n.post?.mediaUrl) && (
+                          <img src={n.post.thumbnailUrl || n.post.mediaUrl} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />
+                        )}
+                        {!n.read && <span className="w-2 h-2 rounded-full bg-[#a8ff35] shrink-0" />}
+                      </Link>
+                    );
+                  })}
+                </div>
+              )
             )}
 
           </div>

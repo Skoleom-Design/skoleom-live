@@ -1,6 +1,7 @@
 import { Controller, Get, Patch, Delete, Param, Body, Query, Request, UseGuards } from '@nestjs/common';
 import { UsersService } from './users.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { UserPlan } from '../../../shared/types/entities';
 
 @Controller('users')
@@ -37,8 +38,9 @@ export class UsersController {
     return this.usersService.updateInterests(req.user.id, dto.interests || []);
   }
 
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
-  getPublicProfile(@Param('id') id: string) {
-    return this.usersService.findPublicProfile(id);
+  getPublicProfile(@Param('id') id: string, @Request() req) {
+    return this.usersService.findPublicProfile(id, req.user?.id);
   }
 }

@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { ILike, Repository } from 'typeorm';
 import { User } from './user.entity';
 import { UserPlan } from '../../../shared/types/entities';
+import { FollowsService } from '../follows/follows.service';
 
 export interface UserSearchResult {
   id: string;
@@ -22,6 +23,9 @@ export interface PublicProfile {
   isVerified: boolean;
   plan: UserPlan;
   createdAt: Date;
+  followersCount?: number;
+  followingCount?: number;
+  isFollowing?: boolean;
 }
 
 @Injectable()
@@ -29,6 +33,7 @@ export class UsersService {
   constructor(
     @InjectRepository(User)
     private usersRepo: Repository<User>,
+    private followsService: FollowsService,
   ) {}
 
   async search(q: string): Promise<UserSearchResult[]> {
@@ -44,12 +49,21 @@ export class UsersService {
     }));
   }
 
-  async findPublicProfile(id: string): Promise<PublicProfile> {
+  async findPublicProfile(id: string, viewerId?: string): Promise<PublicProfile> {
     const user = await this.usersRepo.findOne({ where: { id } });
     if (!user) throw new NotFoundException('User not found');
 
     const { id: userId, username, displayName, avatarUrl, bio, isVerified, plan, createdAt } = user;
-    return { id: userId, username, displayName, avatarUrl, bio, isVerified, plan, createdAt };
+    const [counts, isFollowing] = await Promise.all([
+      this.followsService.getCounts(userId),
+      viewerId && viewerId !== userId ? this.followsService.getStatus(viewerId, userId).then((s) => s.following) : Promise.resolve(undefined),
+    ]);
+    return {
+      id: userId, username, displayName, avatarUrl, bio, isVerified, plan, createdAt,
+      followersCount: counts.followers,
+      followingCount: counts.following,
+      isFollowing,
+    };
   }
 
   async updateProfile(
@@ -87,6 +101,7 @@ export class UsersService {
       const postIds = (await manager.query('SELECT id FROM posts WHERE "creatorId" = $1', [userId])).map((r: { id: string }) => r.id);
       const liveIds = (await manager.query('SELECT id FROM live_sessions WHERE "creatorId" = $1', [userId])).map((r: { id: string }) => r.id);
       const capsuleIds = (await manager.query('SELECT id FROM capsules WHERE "creatorId" = $1', [userId])).map((r: { id: string }) => r.id);
+      const conversationIds = (await manager.query('SELECT id FROM conversations WHERE "userAId" = $1 OR "userBId" = $1', [userId])).map((r: { id: string }) => r.id);
 
       if (postIds.length) {
         await manager.query('DELETE FROM comments WHERE "postId" = ANY($1)', [postIds]);
@@ -98,7 +113,14 @@ export class UsersService {
         await manager.query('DELETE FROM auction_bids WHERE "liveSessionId" = ANY($1)', [liveIds]);
         await manager.query('DELETE FROM gifts WHERE "liveSessionId" = ANY($1)', [liveIds]);
         await manager.query('DELETE FROM live_comments WHERE "liveSessionId" = ANY($1)', [liveIds]);
+        await manager.query('DELETE FROM notifications WHERE "liveId" = ANY($1)', [liveIds]);
       }
+
+      if (conversationIds.length) {
+        await manager.query('DELETE FROM messages WHERE "conversationId" = ANY($1)', [conversationIds]);
+        await manager.query('DELETE FROM conversations WHERE id = ANY($1)', [conversationIds]);
+      }
+      await manager.query('DELETE FROM follows WHERE "followerId" = $1 OR "followingId" = $1', [userId]);
 
       if (capsuleIds.length) {
         await manager.query('UPDATE live_sessions SET "featuredCapsuleId" = NULL WHERE "featuredCapsuleId" = ANY($1)', [capsuleIds]);

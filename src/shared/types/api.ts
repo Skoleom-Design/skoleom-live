@@ -6,6 +6,39 @@ export interface User {
   bio: string;
   totalEarnings: number;
   email?: string;
+  followersCount?: number;
+  followingCount?: number;
+  isFollowing?: boolean;
+}
+
+export type NotificationType = 'like' | 'comment' | 'follow' | 'new_post' | 'live_started';
+
+export interface AppNotification {
+  id: string;
+  type: NotificationType;
+  actor: { id: string; username: string; displayName?: string; avatarUrl?: string };
+  post?: { id: string; thumbnailUrl?: string; mediaUrl?: string } | null;
+  live?: { id: string } | null;
+  read: boolean;
+  createdAt: string;
+}
+
+export interface ConversationSummary {
+  id: string;
+  otherUser: { id: string; username: string; displayName?: string; avatarUrl?: string };
+  lastMessageText: string | null;
+  lastMessageAt: string | null;
+  unreadCount: number;
+}
+
+export interface DirectMessage {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  sender: { id: string; username: string; displayName?: string; avatarUrl?: string };
+  text: string;
+  read: boolean;
+  createdAt: string;
 }
 
 export interface Post {

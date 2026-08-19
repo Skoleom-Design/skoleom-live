@@ -10,6 +10,8 @@ import { Order } from '../orders/order.entity';
 import { User } from '../users/user.entity';
 import { WalletTransaction } from '../payments/wallet-transaction.entity';
 import { PaymentsModule } from '../payments/payments.module';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { FollowsModule } from '../follows/follows.module';
 import { LivesService } from './lives.service';
 import { LivesController } from './lives.controller';
 import { LivesGateway } from './lives.gateway';
@@ -22,6 +24,8 @@ import { LivesGateway } from './lives.gateway';
       signOptions: { expiresIn: process.env.JWT_EXPIRES_IN || '7d' },
     }),
     PaymentsModule,
+    NotificationsModule,
+    FollowsModule,
   ],
   providers: [LivesService, LivesGateway],
   controllers: [LivesController],

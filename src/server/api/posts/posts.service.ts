@@ -5,6 +5,7 @@ import { Post } from './post.entity';
 import { Comment } from './comment.entity';
 import { User } from '../users/user.entity';
 import { NotificationsService } from '../notifications/notifications.service';
+import { FollowsService } from '../follows/follows.service';
 import { PostStatus, PostType, NotificationType } from '../../../shared/types/entities';
 
 export interface CreatePostDto {
@@ -33,6 +34,7 @@ export class PostsService {
     @InjectRepository(User)
     private usersRepo: Repository<User>,
     private notificationsService: NotificationsService,
+    private followsService: FollowsService,
   ) {}
 
   async getFeed(query: FeedQuery): Promise<{ posts: Post[]; total: number }> {
@@ -89,7 +91,14 @@ export class PostsService {
 
   async create(creatorId: string, dto: CreatePostDto): Promise<Post> {
     const post = this.postsRepo.create({ ...dto, creatorId });
-    return this.postsRepo.save(post);
+    const saved = await this.postsRepo.save(post);
+
+    // Fan-out vers les abonnes — jamais bloquant pour la publication elle-meme si ca echoue.
+    this.followsService.getFollowerIds(creatorId)
+      .then((followerIds) => this.notificationsService.notifyMany(followerIds, creatorId, NotificationType.NEW_POST, { postId: saved.id }))
+      .catch(() => {});
+
+    return saved;
   }
 
   async delete(id: string, requesterId: string, isAdmin = false): Promise<void> {
@@ -150,7 +159,7 @@ export class PostsService {
     } else {
       await relation.add(userId);
       post.likeCount += 1;
-      await this.notificationsService.notify(post.creatorId, userId, NotificationType.LIKE, postId);
+      await this.notificationsService.notify(post.creatorId, userId, NotificationType.LIKE, { postId });
     }
     await this.postsRepo.update(postId, { likeCount: post.likeCount });
     return { liked: !alreadyLiked, likeCount: post.likeCount };
@@ -167,7 +176,7 @@ export class PostsService {
       this.commentsRepo.create({ postId, userId, text: trimmed.slice(0, 1000) }),
     );
     await this.postsRepo.increment({ id: postId }, 'commentCount', 1);
-    await this.notificationsService.notify(post.creatorId, userId, NotificationType.COMMENT, postId);
+    await this.notificationsService.notify(post.creatorId, userId, NotificationType.COMMENT, { postId });
 
     // save() ne recharge pas la relation eager "user" sur l'entité retournée — seul un
     // find/findOne le fait — donc on la recharge explicitement pour renvoyer un objet complet.
