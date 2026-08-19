@@ -272,6 +272,10 @@ export class AdminService {
     return this.postsRepo
       .createQueryBuilder('post')
       .leftJoin('post.creator', 'creator')
+      // Un post supprimé par son auteur passe en ARCHIVED (soft-delete, voir PostsService.delete)
+      // plutôt que d'être retiré de la base — sans ce filtre, il continuait à compter dans le
+      // classement alors qu'il n'existe plus pour personne.
+      .where('post.status = :status', { status: PostStatus.ACTIVE })
       .select('creator.id', 'id')
       .addSelect('creator.username', 'username')
       .addSelect('creator.displayName', 'displayName')
