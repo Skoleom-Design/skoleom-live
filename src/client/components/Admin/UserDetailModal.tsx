@@ -23,6 +23,7 @@ interface DetailBoost {
   budget: number;
   durationDays: number;
   createdAt: string;
+  grantedByAdminId?: string | null;
 }
 
 interface DetailLog {
@@ -143,7 +144,7 @@ export function UserDetailModal({ userId, onClose }: { userId: string; onClose: 
 
             <div>
               <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
-                <Zap size={13} /> Boosts pris ({detail.boosts.length})
+                <Zap size={13} /> Boosts ({detail.boosts.length})
               </div>
               {detail.boosts.length === 0 ? (
                 <p className="text-gray-500 text-xs">Aucun boost pour le moment.</p>
@@ -151,8 +152,17 @@ export function UserDetailModal({ userId, onClose }: { userId: string; onClose: 
                 <div className="space-y-1.5">
                   {detail.boosts.map((b) => (
                     <div key={b.id} className="flex items-center justify-between bg-black/30 rounded-lg px-3 py-2 border border-white/5 text-xs">
-                      <span className="text-gray-300">{fmt(b.createdAt)} · {b.objective} · {b.durationDays}j</span>
-                      <span className="text-brand font-semibold">{Number(b.budget).toFixed(2)} €</span>
+                      <span className="text-gray-300 flex items-center gap-1.5">
+                        {fmt(b.createdAt)} · {b.objective} · {b.durationDays}j
+                        {b.grantedByAdminId && (
+                          <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-[#f59e0b]/15 text-[#f59e0b]">
+                            Offert
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-brand font-semibold">
+                        {Number(b.budget).toFixed(2)} €{b.grantedByAdminId && <span className="text-gray-500 font-normal"> (offert)</span>}
+                      </span>
                     </div>
                   ))}
                 </div>

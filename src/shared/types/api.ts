@@ -146,6 +146,7 @@ export interface Boost {
   startedAt?: string;
   endedAt?: string;
   createdAt: string;
+  grantedByAdminId?: string | null;
 }
 
 export interface AdminStats {

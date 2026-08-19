@@ -139,18 +139,25 @@ export default function AdminBoosts() {
                         </div>
                       )}
                       <div>
-                        <p className="text-sm font-semibold text-white">
+                        <p className="text-sm font-semibold text-white flex items-center gap-1.5">
                           {boost.user?.displayName || boost.user?.username || 'Utilisateur inconnu'}
+                          {boost.grantedByAdminId && (
+                            <span className="text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-full bg-[#f59e0b]/15 text-[#f59e0b]">
+                              Offert
+                            </span>
+                          )}
                         </p>
                         <p className="text-xs text-gray-400 mt-0.5">
-                          @{boost.user?.username} · Pris le {fmt(boost.createdAt)} · {boost.durationDays}j · {boost.objective}
+                          @{boost.user?.username} · {boost.grantedByAdminId ? 'Offert le' : 'Pris le'} {fmt(boost.createdAt)} · {boost.durationDays}j · {boost.objective}
                         </p>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-6 text-right">
                       <div>
-                        <p className="text-sm font-bold text-brand">{Number(boost.budget).toFixed(2)} €</p>
+                        <p className="text-sm font-bold text-brand">
+                          {Number(boost.budget).toFixed(2)} €{boost.grantedByAdminId && <span className="text-gray-500 font-normal"> (offert)</span>}
+                        </p>
                         <p className="text-xs text-gray-400">{boost.impressions} impressions</p>
                       </div>
                       <span className={`text-xs font-semibold ${s.color}`}>{s.label}</span>

@@ -32,7 +32,7 @@ export class BoostsService {
     return BOOST_PRICING;
   }
 
-  async create(userId: string, dto: CreateBoostDto): Promise<Boost> {
+  async create(userId: string, dto: CreateBoostDto, grantedByAdminId?: string): Promise<Boost> {
     const scope = dto.scope || BoostScope.POST;
     if (scope === BoostScope.POST && !dto.postId) {
       throw new BadRequestException('postId requis pour booster un post');
@@ -66,6 +66,7 @@ export class BoostsService {
       budget: price,
       currency: dto.currency || 'EUR',
       userId,
+      grantedByAdminId: grantedByAdminId ?? undefined,
     });
     return this.boostsRepo.save(boost);
   }

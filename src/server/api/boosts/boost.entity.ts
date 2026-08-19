@@ -65,6 +65,12 @@ export class Boost {
   @Column({ nullable: true })
   postId: string;
 
+  // Non-nul si ce boost a été offert gratuitement par un admin (voir AdminService.grantBoost)
+  // plutôt qu'acheté par le créateur lui-même — permet à l'affichage (liste admin, détail
+  // utilisateur) de ne pas laisser croire que le créateur a payé de sa poche.
+  @Column({ nullable: true })
+  grantedByAdminId: string;
+
   @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 

@@ -342,11 +342,13 @@ export class AdminService {
 
     // Boost offert par un admin : créé puis activé immédiatement, sans passer par Stripe —
     // contrairement à un boost payé par le créateur lui-même (voir BoostsService.create/activate).
+    // grantedByAdminId marque ce boost comme gratuit, pour que l'affichage (liste admin, détail
+    // utilisateur) ne le confonde jamais avec un achat réel du créateur.
     const boost = await this.boostsService.create(userId, {
       scope: BoostScope.ACCOUNT,
       objective,
       durationDays,
-    });
+    }, adminId);
     await this.boostsService.activate(boost.id);
 
     await this.logsRepo.save(this.logsRepo.create({
