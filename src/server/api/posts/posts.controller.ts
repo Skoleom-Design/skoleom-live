@@ -39,11 +39,6 @@ export class PostsController {
     return this.postsService.getAnalytics(req.user.id);
   }
 
-  @Get('creator/:creatorId/analytics')
-  getCreatorAnalytics(@Param('creatorId') creatorId: string) {
-    return this.postsService.getAnalytics(creatorId);
-  }
-
   @UseGuards(JwtAuthGuard)
   @Post()
   create(@Request() req, @Body() dto: CreatePostDto) {
