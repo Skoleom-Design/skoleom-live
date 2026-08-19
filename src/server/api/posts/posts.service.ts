@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Post } from './post.entity';
 import { Comment } from './comment.entity';
 import { User } from '../users/user.entity';
@@ -44,16 +44,20 @@ export class PostsService {
       ? (await this.usersRepo.findOne({ where: { id: userId } }))?.interests?.filter(Boolean) || []
       : [];
 
-    const qb = this.postsRepo
+    // Requete en deux temps (ids d'abord, entites completes ensuite) plutot qu'un seul
+    // qb.leftJoinAndSelect('post.capsules', ...) + skip/take + orderBy sur une colonne calculee
+    // (interestMatch) : TypeORM genere alors une sous-requete DISTINCT pour paginer correctement
+    // les jointures one-to-many, et ne sait pas y reporter un addSelect() brut — SQL invalide
+    // ("column interestMatch does not exist" / erreur de syntaxe), 500 silencieux cote client.
+    const idQb = this.postsRepo
       .createQueryBuilder('post')
-      .leftJoinAndSelect('post.creator', 'creator')
-      .leftJoinAndSelect('post.capsules', 'capsules')
+      .select('post.id', 'id')
       .where('post.status = :status', { status: PostStatus.ACTIVE });
 
     if (interests.length) {
       // Fait remonter les posts dont au moins un tag correspond à un centre d'intérêt choisi
       // à l'onboarding, sans jamais exclure le reste — le feed reste alimenté même hors match.
-      qb.addSelect(
+      idQb.addSelect(
         "CASE WHEN post.tags::jsonb ?| array[:...interests] THEN 1 ELSE 0 END",
         'interestMatch',
       )
@@ -62,15 +66,21 @@ export class PostsService {
         .addOrderBy('post.boostScore', 'DESC')
         .addOrderBy('post.createdAt', 'DESC');
     } else {
-      qb.orderBy('post.boostScore', 'DESC').addOrderBy('post.createdAt', 'DESC');
+      idQb.orderBy('post.boostScore', 'DESC').addOrderBy('post.createdAt', 'DESC');
     }
 
-    const [posts, total] = await qb
-      .skip((page - 1) * limit)
-      .take(limit)
-      .getManyAndCount();
+    const total = await idQb.getCount();
+    const rows = await idQb.skip((page - 1) * limit).take(limit).getRawMany();
+    const ids: string[] = rows.map((r) => r.id);
+    if (!ids.length) return { posts: [], total };
 
-    return { posts, total };
+    const posts = await this.postsRepo.find({
+      where: { id: In(ids) },
+      relations: ['creator', 'capsules'],
+    });
+    // .find() avec In() ne garantit pas l'ordre — on reapplique l'ordre calcule ci-dessus.
+    const byId = new Map(posts.map((p) => [p.id, p]));
+    return { posts: ids.map((id) => byId.get(id)).filter((p): p is Post => !!p), total };
   }
 
   async getById(id: string, viewerId?: string): Promise<Post> {
