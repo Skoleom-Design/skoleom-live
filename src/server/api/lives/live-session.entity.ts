@@ -28,10 +28,10 @@ export class LiveSession {
   @Column()
   creatorId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   startedAt: Date;
 
-  @Column({ nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   endedAt: Date;
 
   @ManyToMany(() => Capsule)
@@ -68,7 +68,7 @@ export class LiveSession {
   @Column({ nullable: true })
   currentBidderId: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   auctionEndsAt: Date;
 
   @Column({ default: false })
@@ -93,9 +93,9 @@ export class LiveSession {
   @Column({ default: 0 })
   auctionRoundsCount: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 }

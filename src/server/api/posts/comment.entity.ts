@@ -26,6 +26,6 @@ export class Comment {
   @Column()
   postId: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 }

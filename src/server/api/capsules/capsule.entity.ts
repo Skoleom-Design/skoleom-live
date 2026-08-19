@@ -90,9 +90,9 @@ export class Capsule {
   @OneToMany(() => Order, (order) => order.capsule)
   orders: Order[];
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 }

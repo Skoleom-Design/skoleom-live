@@ -45,6 +45,6 @@ export class Gift {
   @Column({ type: 'decimal', precision: 10, scale: 2, transformer: DecimalColumnTransformer })
   platformAmount: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 }

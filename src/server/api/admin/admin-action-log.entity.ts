@@ -33,6 +33,6 @@ export class AdminActionLog {
   @Column({ type: 'json', nullable: true })
   details: Record<string, unknown>;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 }

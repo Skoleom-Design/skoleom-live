@@ -26,6 +26,6 @@ export class LiveComment {
   @Column()
   liveSessionId: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 }

@@ -20,9 +20,9 @@ export class CapsuleGroup {
   @OneToMany(() => Capsule, (capsule) => capsule.group)
   products: Capsule[];
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 }

@@ -36,10 +36,10 @@ export class Boost {
   @Column({ type: 'int' })
   durationDays: number;
 
-  @Column({ nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   startedAt: Date;
 
-  @Column({ nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   endedAt: Date;
 
   @Column({ default: 0 })
@@ -65,9 +65,9 @@ export class Boost {
   @Column({ nullable: true })
   postId: string;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 }

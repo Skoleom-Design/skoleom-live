@@ -31,9 +31,9 @@ export class Conversation {
   @Column({ type: 'text', nullable: true })
   lastMessageText: string | null;
 
-  @Column({ type: 'timestamp', nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   lastMessageAt: Date | null;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 }

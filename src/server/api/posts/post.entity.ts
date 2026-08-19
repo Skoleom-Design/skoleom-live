@@ -72,9 +72,9 @@ export class Post {
   @OneToMany(() => Boost, (boost) => boost.post)
   boosts: Boost[];
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 }

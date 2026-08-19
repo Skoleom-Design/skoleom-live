@@ -80,7 +80,7 @@ export class User {
   @Column({ nullable: true, select: false })
   instagramAccessToken: string;
 
-  @Column({ nullable: true })
+  @Column({ type: 'timestamptz', nullable: true })
   instagramTokenExpiresAt: Date;
 
   // Centres d'intérêt choisis à l'onboarding (slugs, voir client/constants/interests.ts) —
@@ -100,9 +100,9 @@ export class User {
   @OneToMany(() => Boost, (boost) => boost.user)
   boosts: Boost[];
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 
-  @UpdateDateColumn()
+  @UpdateDateColumn({ type: 'timestamptz' })
   updatedAt: Date;
 }

@@ -29,6 +29,6 @@ export class AuctionBid {
   @Column({ type: 'decimal', precision: 10, scale: 2, transformer: DecimalColumnTransformer })
   amount: number;
 
-  @CreateDateColumn()
+  @CreateDateColumn({ type: 'timestamptz' })
   createdAt: Date;
 }
