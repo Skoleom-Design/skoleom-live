@@ -30,6 +30,9 @@ export class LivesGateway implements OnGatewayDisconnect {
   // Une seule invitation de duo en attente a la fois par live — assez pour ce cas d'usage,
   // pas besoin de gerer une file.
   private pendingDuoInvites = new Map<string, { targetUserId: string; inviterSocketId: string }>();
+  // Spectateurs expulses par le createur — empeche de rejoindre le meme live une seconde fois
+  // (voir handleJoin), en plus d'etre deconnectes immediatement (voir handleKickUser).
+  private kicked = new Map<string, Set<string>>();
 
   constructor(
     private jwtService: JwtService,
@@ -56,6 +59,15 @@ export class LivesGateway implements OnGatewayDisconnect {
   @SubscribeMessage('join')
   async handleJoin(@ConnectedSocket() client: Socket, @MessageBody() data: { liveId: string; token?: string }) {
     const { liveId } = data;
+
+    // Identite optionnelle — un spectateur non connecte reste anonyme, simplement non invitable
+    // a un duo et non expulsable (voir listViewers/kickUser).
+    const user = await this.authenticate(data.token);
+    if (user && this.kicked.get(liveId)?.has(user.id)) {
+      client.emit('joinError', { message: 'Tu as été exclu de ce live par le créateur.' });
+      return;
+    }
+
     client.join(roomFor(liveId));
     this.socketLive.set(client.id, liveId);
 
@@ -63,9 +75,6 @@ export class LivesGateway implements OnGatewayDisconnect {
     this.viewers.get(liveId)!.add(client.id);
     this.broadcastCount(liveId);
 
-    // Identite optionnelle — un spectateur non connecte reste anonyme, simplement non invitable
-    // a un duo (voir listViewers).
-    const user = await this.authenticate(data.token);
     if (user) {
       this.viewerIdentities.set(client.id, {
         liveId,
@@ -161,34 +170,66 @@ export class LivesGateway implements OnGatewayDisconnect {
     this.server.to(roomFor(data.liveId)).emit('commentDeleted', { commentId: data.commentId });
   }
 
-  @SubscribeMessage('banUser')
-  async handleBanUser(
-    @MessageBody() data: { liveId: string; userId: string; token: string },
+  // Bascule le mute (muted: true = ne peut plus commenter, false = reactive) — remplace l'ancien
+  // banUser (irreversible) par un etat qu'on peut annuler depuis le panneau spectateurs.
+  @SubscribeMessage('setMuted')
+  async handleSetMuted(
+    @MessageBody() data: { liveId: string; userId: string; muted: boolean; token: string },
   ) {
     const user = await this.authenticate(data.token);
     if (!user || !(await this.livesService.isOwner(data.liveId, user.id))) return;
 
     if (!this.banned.has(data.liveId)) this.banned.set(data.liveId, new Set());
-    this.banned.get(data.liveId)!.add(data.userId);
-    this.server.to(roomFor(data.liveId)).emit('userBanned', { userId: data.userId });
+    if (data.muted) this.banned.get(data.liveId)!.add(data.userId);
+    else this.banned.get(data.liveId)!.delete(data.userId);
+
+    this.server.to(roomFor(data.liveId)).emit('userMuteChanged', { userId: data.userId, muted: data.muted });
+  }
+
+  // Exclusion definitive du live — coupe le chat/compteur (socket.io) et le flux video (LiveKit,
+  // best-effort), et empeche de rejoindre a nouveau (voir handleJoin).
+  @SubscribeMessage('kickUser')
+  async handleKickUser(
+    @MessageBody() data: { liveId: string; userId: string; token: string },
+  ) {
+    const user = await this.authenticate(data.token);
+    if (!user || !(await this.livesService.isOwner(data.liveId, user.id))) return;
+    if (data.userId === user.id) return;
+
+    if (!this.kicked.has(data.liveId)) this.kicked.set(data.liveId, new Set());
+    this.kicked.get(data.liveId)!.add(data.userId);
+
+    const targetSockets = [...this.viewerIdentities.entries()].filter(
+      ([, v]) => v.liveId === data.liveId && v.userId === data.userId,
+    );
+    for (const [socketId] of targetSockets) {
+      this.server.to(socketId).emit('kicked', {});
+      const sock = this.server.sockets.sockets.get(socketId);
+      setTimeout(() => sock?.disconnect(true), 300);
+    }
+
+    await this.livesService.removeLiveKitParticipant(data.liveId, data.userId);
   }
 
   // Duo façon TikTok — le createur invite un spectateur actuellement connecte (identifie, donc
   // pas un anonyme) a publier sa propre camera/micro dans la meme room. Voir setDuoPartner/
   // clearDuoPartner dans lives.service.ts et getLiveKitToken pour la permission qui en decoule.
 
+  // Ouvert a tout spectateur identifie (pas seulement le createur) — TikTok montre aussi qui
+  // regarde a tout le monde ; seul le createur voit en plus le menu moderation cote client.
   @SubscribeMessage('listViewers')
   async handleListViewers(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { liveId: string; token: string },
   ) {
     const user = await this.authenticate(data.token);
-    if (!user || !(await this.livesService.isOwner(data.liveId, user.id))) return;
+    if (!user) return;
 
-    const seen = new Map<string, { userId: string; username: string; avatarUrl?: string }>();
+    const banned = this.banned.get(data.liveId);
+    const seen = new Map<string, { userId: string; username: string; avatarUrl?: string; muted: boolean }>();
     for (const v of this.viewerIdentities.values()) {
       if (v.liveId === data.liveId && v.userId !== user.id) {
-        seen.set(v.userId, { userId: v.userId, username: v.username, avatarUrl: v.avatarUrl });
+        seen.set(v.userId, { userId: v.userId, username: v.username, avatarUrl: v.avatarUrl, muted: banned?.has(v.userId) ?? false });
       }
     }
     client.emit('viewersList', [...seen.values()]);

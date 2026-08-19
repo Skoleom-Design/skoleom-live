@@ -4,7 +4,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { io, Socket } from 'socket.io-client';
 import { Room, RoomEvent, Track } from 'livekit-client';
-import { ArrowLeft, Users, Send, Gavel, Timer, Package, Crown, Gift, Wallet, Plus, Trophy, VolumeX, Check, X as XIcon } from 'lucide-react';
+import { ArrowLeft, Users, Send, Gavel, Timer, Package, Crown, Gift, Wallet, Plus, Trophy, VolumeX, Check, X as XIcon, MoreVertical, UserX, AlertTriangle } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
 import { GiftBurstOverlay, type ActiveGiftBurst } from '../../client/components/Live/GiftBurstOverlay';
@@ -124,6 +124,15 @@ export default function LiveViewerPage() {
   const [duoPartnerInfo, setDuoPartnerInfo] = useState<{ username: string; avatarUrl?: string } | null>(null);
   const [amDuoHost, setAmDuoHost] = useState(false);
 
+  // Liste des spectateurs — visible par tout le monde ; le createur voit en plus un menu de
+  // moderation par spectateur (exclure/muter), voir isOwner ci-dessous.
+  const [viewersPanelOpen, setViewersPanelOpen] = useState(false);
+  const [viewersList, setViewersList] = useState<{ userId: string; username: string; avatarUrl?: string; muted: boolean }[]>([]);
+  const [openViewerMenuId, setOpenViewerMenuId] = useState<string | null>(null);
+  const [iAmMuted, setIAmMuted] = useState(false);
+  const [kickedMessage, setKickedMessage] = useState('');
+  const isOwner = !!live && live.creator.id === myId;
+
   // Le solde de coins reflete le vrai wallet (walletBalance, 100 coins = 1€).
   useEffect(() => {
     if (!getToken()) return;
@@ -164,6 +173,27 @@ export default function LiveViewerPage() {
     if (typeof id !== 'string') return;
     socketRef.current?.emit('respondDuo', { liveId: id, accept, token: getToken() });
     setDuoInvite(null);
+  }
+
+  function openViewersPanel() {
+    if (typeof id !== 'string') return;
+    setViewersPanelOpen(true);
+    socketRef.current?.emit('listViewers', { liveId: id, token: getToken() });
+  }
+
+  function setViewerMuted(userId: string, muted: boolean) {
+    if (typeof id !== 'string' || !isOwner) return;
+    setViewersList((prev) => prev.map((v) => (v.userId === userId ? { ...v, muted } : v)));
+    socketRef.current?.emit('setMuted', { liveId: id, userId, muted, token: getToken() });
+    setOpenViewerMenuId(null);
+  }
+
+  function kickViewer(userId: string) {
+    if (typeof id !== 'string' || !isOwner) return;
+    if (!window.confirm('Exclure ce spectateur de ce live ? Il ne pourra pas le rejoindre.')) return;
+    socketRef.current?.emit('kickUser', { liveId: id, userId, token: getToken() });
+    setViewersList((prev) => prev.filter((v) => v.userId !== userId));
+    setOpenViewerMenuId(null);
   }
 
   useEffect(() => {
@@ -254,6 +284,27 @@ export default function LiveViewerPage() {
       setAmDuoHost(false);
     });
     socket.on('duoError', () => setDuoInvite(null));
+    socket.on('viewersList', (list: { userId: string; username: string; avatarUrl?: string; muted: boolean }[]) => {
+      setViewersList(list);
+    });
+    socket.on('userMuteChanged', (d: { userId: string; muted: boolean }) => {
+      setViewersList((prev) => prev.map((v) => (v.userId === d.userId ? { ...v, muted: d.muted } : v)));
+      if (d.userId === myId) setIAmMuted(d.muted);
+    });
+    socket.on('kicked', () => {
+      setKickedMessage('Tu as été exclu de ce live par le créateur.');
+      socket.close();
+      roomRef.current?.disconnect();
+      setTimeout(() => router.push('/live'), 2500);
+    });
+    socket.on('joinError', (d: { message: string }) => {
+      setKickedMessage(d.message);
+      socket.close();
+      setTimeout(() => router.push('/live'), 2500);
+    });
+    socket.on('commentError', (d: { message: string }) => {
+      if (d.message?.toLowerCase().includes('banni')) setIAmMuted(true);
+    });
 
     return () => {
       socket.emit('leave', { liveId: id });
@@ -428,9 +479,12 @@ export default function LiveViewerPage() {
               <ArrowLeft size={16} className="text-white/70" />
             </Link>
             <span className="text-white font-bold text-sm">{live.title || (isAuction ? 'Enchère' : 'Live')}</span>
-            <div className="ml-auto flex items-center gap-2 text-white/60 text-xs font-semibold">
+            <button
+              onClick={openViewersPanel}
+              className="ml-auto flex items-center gap-2 text-white/60 hover:text-white text-xs font-semibold transition-colors"
+            >
               <Users size={13} /> {viewerCount}
-            </div>
+            </button>
           </div>
 
           <div className="flex-1 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden px-4 pb-20 md:pb-6 gap-4">
@@ -708,18 +762,24 @@ export default function LiveViewerPage() {
                     })}
                     <div ref={commentsEndRef} />
                   </div>
-                  <form onSubmit={sendComment} className="p-3 border-t border-white/[0.06] flex items-center gap-2">
-                    <input
-                      type="text"
-                      value={commentInput}
-                      onChange={(e) => setCommentInput(e.target.value)}
-                      placeholder="Commenter…"
-                      className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-full px-3.5 py-2 text-white placeholder:text-white/25 text-[13px] focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 transition-all"
-                    />
-                    <button type="submit" className="w-9 h-9 rounded-full bg-white/[0.06] hover:bg-white/10 flex items-center justify-center shrink-0 transition-all">
-                      <Send size={14} className="text-[#a8ff35]" />
-                    </button>
-                  </form>
+                  {iAmMuted ? (
+                    <p className="p-3 border-t border-white/[0.06] text-center text-[12px] text-red-400/80">
+                      Tu as été mis en sourdine par le créateur — tu ne peux plus commenter.
+                    </p>
+                  ) : (
+                    <form onSubmit={sendComment} className="p-3 border-t border-white/[0.06] flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={commentInput}
+                        onChange={(e) => setCommentInput(e.target.value)}
+                        placeholder="Commenter…"
+                        className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-full px-3.5 py-2 text-white placeholder:text-white/25 text-[13px] focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 transition-all"
+                      />
+                      <button type="submit" className="w-9 h-9 rounded-full bg-white/[0.06] hover:bg-white/10 flex items-center justify-center shrink-0 transition-all">
+                        <Send size={14} className="text-[#a8ff35]" />
+                      </button>
+                    </form>
+                  )}
                 </>
               ) : (
                 <div className="flex flex-col flex-1 overflow-hidden">
@@ -883,6 +943,82 @@ export default function LiveViewerPage() {
           open={capsuleDrawerOpen}
           onClose={() => setCapsuleDrawerOpen(false)}
         />
+      )}
+
+      {viewersPanelOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+          onClick={() => { setViewersPanelOpen(false); setOpenViewerMenuId(null); }}>
+          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-white font-bold text-base flex items-center gap-2">
+                <Users size={16} /> Spectateurs
+              </h2>
+              <button onClick={() => { setViewersPanelOpen(false); setOpenViewerMenuId(null); }}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
+                <XIcon size={16} className="text-white" />
+              </button>
+            </div>
+
+            {viewersList.length === 0 ? (
+              <p className="text-white/40 text-sm text-center py-6">
+                Aucun autre spectateur connecté pour l&apos;instant.
+              </p>
+            ) : (
+              <div className="space-y-1.5 max-h-72 overflow-y-auto scrollbar-hide">
+                {viewersList.map((v) => (
+                  <div
+                    key={v.userId}
+                    className="relative w-full flex items-center gap-3 p-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02]"
+                  >
+                    <div className="w-9 h-9 rounded-full bg-white/[0.08] overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold text-white/60">
+                      {v.avatarUrl ? <img src={v.avatarUrl} alt="" className="w-full h-full object-cover" /> : v.username[0]?.toUpperCase()}
+                    </div>
+                    <span className="text-sm font-medium text-white flex-1 truncate">@{v.username}</span>
+                    {v.muted && (
+                      <span className="text-[10px] text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded-full shrink-0">muet</span>
+                    )}
+                    {isOwner && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setOpenViewerMenuId((id) => (id === v.userId ? null : v.userId)); }}
+                        className="w-7 h-7 rounded-full hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all shrink-0"
+                      >
+                        <MoreVertical size={14} />
+                      </button>
+                    )}
+
+                    {isOwner && openViewerMenuId === v.userId && (
+                      <div className="absolute right-0 top-full mt-1 z-10 w-48 bg-[#181818] border border-white/[0.1] rounded-xl shadow-lg overflow-hidden">
+                        <button
+                          onClick={() => setViewerMuted(v.userId, !v.muted)}
+                          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-white hover:bg-white/[0.06] transition-colors"
+                        >
+                          <UserX size={14} /> {v.muted ? 'Réactiver le son' : 'Mettre en sourdine'}
+                        </button>
+                        <button
+                          onClick={() => kickViewer(v.userId)}
+                          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-red-400 hover:bg-red-500/10 transition-colors"
+                        >
+                          <XIcon size={14} /> Exclure du live
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {kickedMessage && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-sm px-4">
+          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-6 text-center">
+            <div className="w-11 h-11 mx-auto rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center mb-3">
+              <AlertTriangle size={18} className="text-red-400" />
+            </div>
+            <p className="text-white text-sm">{kickedMessage}</p>
+          </div>
+        </div>
       )}
     </>
   );

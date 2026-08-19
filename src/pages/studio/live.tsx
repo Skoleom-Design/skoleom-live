@@ -6,7 +6,7 @@ import { io, Socket } from 'socket.io-client';
 import { Room, RoomEvent, Track } from 'livekit-client';
 import {
   ArrowLeft, Mic, MicOff, Video, VideoOff, Radio, Loader2, Send, Users, Package, X, ShoppingBag,
-  Crown, Trash2, UserX, Gavel, Timer, ChevronRight, Plus, Trophy, Users2, AlertTriangle,
+  Crown, Trash2, UserX, Gavel, Timer, ChevronRight, Plus, Trophy, Users2, AlertTriangle, MoreVertical,
 } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
@@ -139,11 +139,14 @@ export default function StudioLivePage() {
   const [topDonorsOpen, setTopDonorsOpen] = useState(false);
 
   // Duo façon TikTok — voir LivesGateway (inviteDuo/respondDuo/endDuo) pour le signalement.
+  // Le meme panneau sert aussi de liste des spectateurs avec moderation (exclure/muter) —
+  // voir openDuoPanel, kickUser, setMuted.
   const [duoPanelOpen, setDuoPanelOpen] = useState(false);
-  const [viewersList, setViewersList] = useState<{ userId: string; username: string; avatarUrl?: string }[]>([]);
+  const [viewersList, setViewersList] = useState<{ userId: string; username: string; avatarUrl?: string; muted: boolean }[]>([]);
   const [duoPartner, setDuoPartner] = useState<{ id: string; username: string; avatarUrl?: string } | null>(null);
   const [duoInviteStatus, setDuoInviteStatus] = useState<'idle' | 'inviting' | 'declined' | 'error'>('idle');
   const [duoErrorMsg, setDuoErrorMsg] = useState('');
+  const [openViewerMenuId, setOpenViewerMenuId] = useState<string | null>(null);
   const duoVideoRef = useRef<HTMLVideoElement>(null);
   const duoAudioRef = useRef<HTMLAudioElement>(null);
 
@@ -368,8 +371,11 @@ export default function StudioLivePage() {
 
       fetchTopDonors(live.id);
     });
-    socket.on('viewersList', (list: { userId: string; username: string; avatarUrl?: string }[]) => {
+    socket.on('viewersList', (list: { userId: string; username: string; avatarUrl?: string; muted: boolean }[]) => {
       setViewersList(list);
+    });
+    socket.on('userMuteChanged', (d: { userId: string; muted: boolean }) => {
+      setViewersList((prev) => prev.map((v) => (v.userId === d.userId ? { ...v, muted: d.muted } : v)));
     });
     socket.on('duoStarted', (d: { partnerId: string; partnerUsername: string; partnerAvatarUrl?: string }) => {
       setDuoPartner({ id: d.partnerId, username: d.partnerUsername, avatarUrl: d.partnerAvatarUrl });
@@ -666,10 +672,19 @@ export default function StudioLivePage() {
     socketRef.current.emit('deleteComment', { liveId: live.id, commentId, token: getToken() });
   }
 
-  function banUser(userId: string) {
+  function setMuted(userId: string, muted: boolean) {
     if (!live || !socketRef.current) return;
-    if (!window.confirm('Bannir cet utilisateur du chat de ce live ?')) return;
-    socketRef.current.emit('banUser', { liveId: live.id, userId, token: getToken() });
+    setViewersList((prev) => prev.map((v) => (v.userId === userId ? { ...v, muted } : v)));
+    socketRef.current.emit('setMuted', { liveId: live.id, userId, muted, token: getToken() });
+    setOpenViewerMenuId(null);
+  }
+
+  function kickUser(userId: string) {
+    if (!live || !socketRef.current) return;
+    if (!window.confirm('Exclure cet utilisateur de ce live ? Il ne pourra pas le rejoindre.')) return;
+    socketRef.current.emit('kickUser', { liveId: live.id, userId, token: getToken() });
+    setViewersList((prev) => prev.filter((v) => v.userId !== userId));
+    setOpenViewerMenuId(null);
   }
 
   // Met en avant un produit — file de vente façon Whatnot. `setFeatured` persiste le choix
@@ -734,9 +749,13 @@ export default function StudioLivePage() {
 
             {live && (
               <div className="ml-auto flex items-center gap-3 text-white/60 text-xs font-semibold">
-                <span className="flex items-center gap-1.5">
+                <button
+                  onClick={openDuoPanel}
+                  className="flex items-center gap-1.5 hover:text-white transition-colors"
+                  title="Voir les spectateurs"
+                >
                   <Users size={13} /> {viewerCount}
-                </span>
+                </button>
                 <span className="flex items-center gap-1.5 text-[#a8ff35]">
                   <ShoppingBag size={13} /> {sales.count} vente{sales.count > 1 ? 's' : ''} · {sales.revenue.toFixed(2)} €
                 </span>
@@ -1264,8 +1283,12 @@ export default function StudioLivePage() {
                               <Trash2 size={12} />
                             </button>
                             <button
-                              onClick={() => banUser(c.userId)}
-                              title="Bannir cet utilisateur"
+                              onClick={() => {
+                                if (window.confirm('Mettre cet utilisateur en sourdine (il ne pourra plus commenter) ?')) {
+                                  setMuted(c.userId, true);
+                                }
+                              }}
+                              title="Mettre en sourdine"
                               className="w-6 h-6 rounded-full hover:bg-red-500/20 flex items-center justify-center text-white/40 hover:text-red-400 transition-all"
                             >
                               <UserX size={12} />
@@ -1354,13 +1377,14 @@ export default function StudioLivePage() {
       )}
 
       {duoPanelOpen && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
-          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5">
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
+          onClick={() => setOpenViewerMenuId(null)}>
+          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-white font-bold text-base flex items-center gap-2">
-                <Users2 size={16} /> Inviter en duo
+                <Users size={16} /> Spectateurs
               </h2>
-              <button onClick={() => setDuoPanelOpen(false)}
+              <button onClick={() => { setDuoPanelOpen(false); setOpenViewerMenuId(null); }}
                 className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
                 <X size={16} className="text-white" />
               </button>
@@ -1384,22 +1408,55 @@ export default function StudioLivePage() {
 
             {viewersList.length === 0 ? (
               <p className="text-white/40 text-sm text-center py-6">
-                Aucun spectateur connecté à inviter pour l'instant.
+                Aucun spectateur connecté pour l'instant.
               </p>
             ) : (
               <div className="space-y-1.5 max-h-72 overflow-y-auto scrollbar-hide">
                 {viewersList.map((v) => (
-                  <button
+                  <div
                     key={v.userId}
-                    onClick={() => inviteDuo(v.userId)}
-                    disabled={duoInviteStatus === 'inviting'}
-                    className="w-full flex items-center gap-3 p-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.06] transition-all disabled:opacity-50"
+                    className="relative w-full flex items-center gap-3 p-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02]"
                   >
                     <div className="w-9 h-9 rounded-full bg-white/[0.08] overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold text-white/60">
                       {v.avatarUrl ? <img src={v.avatarUrl} alt="" className="w-full h-full object-cover" /> : v.username[0]?.toUpperCase()}
                     </div>
-                    <span className="text-sm font-medium text-white">@{v.username}</span>
-                  </button>
+                    <span className="text-sm font-medium text-white flex-1 truncate">@{v.username}</span>
+                    {v.muted && (
+                      <span className="text-[10px] text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded-full shrink-0">muet</span>
+                    )}
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setOpenViewerMenuId((id) => (id === v.userId ? null : v.userId)); }}
+                      className="w-7 h-7 rounded-full hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all shrink-0"
+                    >
+                      <MoreVertical size={14} />
+                    </button>
+
+                    {openViewerMenuId === v.userId && (
+                      <div className="absolute right-0 top-full mt-1 z-10 w-48 bg-[#181818] border border-white/[0.1] rounded-xl shadow-lg overflow-hidden">
+                        {!duoPartner && (
+                          <button
+                            onClick={() => { inviteDuo(v.userId); setOpenViewerMenuId(null); }}
+                            disabled={duoInviteStatus === 'inviting'}
+                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-white hover:bg-white/[0.06] transition-colors disabled:opacity-50"
+                          >
+                            <Users2 size={14} /> Inviter en duo
+                          </button>
+                        )}
+                        <button
+                          onClick={() => setMuted(v.userId, !v.muted)}
+                          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-white hover:bg-white/[0.06] transition-colors"
+                        >
+                          <UserX size={14} /> {v.muted ? 'Réactiver le son' : 'Mettre en sourdine'}
+                        </button>
+                        <button
+                          onClick={() => kickUser(v.userId)}
+                          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-red-400 hover:bg-red-500/10 transition-colors"
+                        >
+                          <X size={14} /> Exclure du live
+                        </button>
+                      </div>
+                    )}
+                  </div>
                 ))}
               </div>
             )}

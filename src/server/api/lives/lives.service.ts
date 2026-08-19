@@ -1,7 +1,7 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, LessThanOrEqual, Repository } from 'typeorm';
-import { AccessToken } from 'livekit-server-sdk';
+import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
 import { LiveSession } from './live-session.entity';
 import { LiveComment } from './live-comment.entity';
 import { Gift } from './gift.entity';
@@ -551,6 +551,20 @@ export class LivesService {
     });
 
     return { token: await at.toJwt(), url };
+  }
+
+  // Coupe egalement le flux video LiveKit d'un spectateur expulse — le socket.io (chat/compteur)
+  // est deja ferme par LivesGateway.handleKickUser, ceci empeche en plus de continuer a recevoir
+  // la video/audio si le client ne reagit pas a l'evenement 'kicked' (ex: JS deja plante).
+  // Echoue silencieusement si LiveKit n'est pas configure ou si le participant n'est plus connecte.
+  async removeLiveKitParticipant(liveId: string, userId: string): Promise<void> {
+    const apiKey = process.env.LIVEKIT_API_KEY;
+    const apiSecret = process.env.LIVEKIT_API_SECRET;
+    const url = process.env.LIVEKIT_URL || process.env.NEXT_PUBLIC_LIVEKIT_URL;
+    if (!apiKey || !apiSecret || !url) return;
+
+    const roomService = new RoomServiceClient(url.replace(/^wss:/, 'https:').replace(/^ws:/, 'http:'), apiKey, apiSecret);
+    await roomService.removeParticipant(liveId, userId).catch(() => {});
   }
 
   // Le duo est uniquement du signalement temps reel (voir LivesGateway.inviteDuo/respondDuo) —
