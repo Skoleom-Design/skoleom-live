@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, Calendar, Wallet, TrendingUp, Zap, History, CreditCard, Gift as GiftIcon } from 'lucide-react';
+import { X, Calendar, Wallet, TrendingUp, Zap, History, CreditCard, Gift as GiftIcon, MessageCircle } from 'lucide-react';
 import { api } from '../../../shared/api/http';
 
 interface DetailUser {
@@ -41,11 +41,19 @@ interface DetailGiftSent {
   createdAt: string;
 }
 
+interface DetailMessageSent {
+  id: string;
+  text: string;
+  createdAt: string;
+  recipient: { id: string; username: string; displayName?: string };
+}
+
 interface UserDetail {
   user: DetailUser;
   boosts: DetailBoost[];
   logs: DetailLog[];
   giftsSent: DetailGiftSent[];
+  messagesSent: DetailMessageSent[];
 }
 
 function fmt(date: string) {
@@ -186,6 +194,29 @@ export function UserDetailModal({ userId, onClose }: { userId: string; onClose: 
                         {fmt(g.createdAt)} · {g.giftType} → @{g.receiver?.username ?? '?'}
                       </span>
                       <span className="text-[#f59e0b] font-semibold">{Number(g.amount).toFixed(2)} €</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div>
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                <MessageCircle size={13} /> Messages envoyés ({detail.messagesSent.length})
+              </div>
+              {detail.messagesSent.length === 0 ? (
+                <p className="text-gray-500 text-xs">Aucun message envoyé pour le moment.</p>
+              ) : (
+                <div className="space-y-1.5 max-h-56 overflow-y-auto scrollbar-hide">
+                  {detail.messagesSent.map((m) => (
+                    <div key={m.id} className="bg-black/30 rounded-lg px-3 py-2 border border-white/5 text-xs">
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="text-gray-400">
+                          à <span className="text-white font-medium">@{m.recipient.username}</span>
+                        </span>
+                        <span className="text-gray-500 shrink-0 ml-2">{fmt(m.createdAt)}</span>
+                      </div>
+                      <p className="text-gray-300 break-words">{m.text}</p>
                     </div>
                   ))}
                 </div>

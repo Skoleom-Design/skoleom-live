@@ -8,6 +8,7 @@ import { Post } from '../posts/post.entity';
 import { Gift } from '../lives/gift.entity';
 import { LiveSession } from '../lives/live-session.entity';
 import { WalletTransaction } from '../payments/wallet-transaction.entity';
+import { Message } from '../messages/message.entity';
 import { BoostsService } from '../boosts/boosts.service';
 import { AdminActionLog, AdminActionType } from './admin-action-log.entity';
 import { OrderStatus, BoostStatus, PostStatus, UserPlan, BoostScope, BoostObjective, WalletTransactionType } from '../../../shared/types/entities';
@@ -31,6 +32,8 @@ export class AdminService {
     private logsRepo: Repository<AdminActionLog>,
     @InjectRepository(WalletTransaction)
     private walletTxRepo: Repository<WalletTransaction>,
+    @InjectRepository(Message)
+    private messagesRepo: Repository<Message>,
     private boostsService: BoostsService,
   ) {}
 
@@ -392,7 +395,7 @@ export class AdminService {
     const user = await this.usersRepo.findOne({ where: { id: userId } });
     if (!user) throw new BadRequestException('Utilisateur introuvable');
 
-    const [boosts, logs, giftsSent] = await Promise.all([
+    const [boosts, logs, giftsSent, messagesSentRaw] = await Promise.all([
       this.boostsRepo.find({
         where: { userId },
         order: { createdAt: 'DESC' },
@@ -408,8 +411,26 @@ export class AdminService {
         order: { createdAt: 'DESC' },
         take: 50,
       }),
+      // Modération : les messages ENVOYÉS par ce compte, avec le destinataire de chaque
+      // conversation (userA/userB de Conversation sont eager, pas besoin de les recharger).
+      this.messagesRepo.find({
+        where: { senderId: userId },
+        relations: ['conversation'],
+        order: { createdAt: 'DESC' },
+        take: 100,
+      }),
     ]);
 
-    return { user, boosts, logs, giftsSent };
+    const messagesSent = messagesSentRaw.map((m) => {
+      const recipient = m.conversation.userAId === userId ? m.conversation.userB : m.conversation.userA;
+      return {
+        id: m.id,
+        text: m.text,
+        createdAt: m.createdAt,
+        recipient: { id: recipient.id, username: recipient.username, displayName: recipient.displayName },
+      };
+    });
+
+    return { user, boosts, logs, giftsSent, messagesSent };
   }
 }
