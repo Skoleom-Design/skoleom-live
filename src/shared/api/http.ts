@@ -58,11 +58,14 @@ async function request<T = any>(path: string, options: RequestInit & { body?: an
     const payload = await res.json().catch(() => ({}));
     const message = Array.isArray(payload.message) ? payload.message.join(', ') : payload.message;
     if (res.status === 401 && token) {
-      // Le token était valide côté client mais rejeté par le serveur — compte suspendu ou
-      // supprimé par un admin. On force la sortie immédiatement, sur n'importe quelle page.
+      // Le token était valide côté client mais rejeté par le serveur — soit un autre appareil
+      // vient de se connecter sur ce compte (un seul appareil actif à la fois), soit le compte
+      // a été suspendu/supprimé par un admin. On force la sortie immédiatement, sur n'importe
+      // quelle page.
+      const reason = message === 'SESSION_SUPERSEDED' ? 'sessionExpired' : 'suspended';
       clearSession();
       if (typeof window !== 'undefined' && !window.location.pathname.startsWith('/auth/login')) {
-        window.location.href = '/auth/login?suspended=1';
+        window.location.href = `/auth/login?${reason}=1`;
       }
     }
     throw new ApiError(message || `Request failed (${res.status})`, res.status);

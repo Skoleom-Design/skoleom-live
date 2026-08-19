@@ -286,7 +286,7 @@ export function InstaPostCard({ post, liked: likedProp = false }: Props) {
           {post.tags.map((tag) => (
             <Link
               key={tag}
-              href={`/explore?q=${encodeURIComponent(tag)}`}
+              href={`/?q=${encodeURIComponent(tag)}`}
               className="text-[12px] text-[#a8ff35]/80 font-medium hover:text-[#a8ff35] hover:underline"
             >
               #{tag}

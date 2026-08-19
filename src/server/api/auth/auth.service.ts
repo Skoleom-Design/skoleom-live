@@ -4,6 +4,7 @@ import { Repository } from 'typeorm';
 import { JwtService } from '@nestjs/jwt';
 import * as bcrypt from 'bcryptjs';
 import axios from 'axios';
+import { randomUUID } from 'crypto';
 import { User } from '../users/user.entity';
 import { UserPlan } from '../../../shared/types/entities';
 
@@ -29,6 +30,15 @@ export class AuthService {
     });
   }
 
+  // Un seul appareil connecté a la fois : chaque login regenere ce marqueur et l'embarque dans
+  // le JWT — voir JwtStrategy.validate, qui rejette tout jeton dont le sessionId ne correspond
+  // plus (superseded par une connexion plus recente sur un autre appareil).
+  private async issueSession(userId: string, role: string): Promise<string> {
+    const sessionId = randomUUID();
+    await this.usersRepo.update(userId, { currentSessionId: sessionId });
+    return this.jwtService.sign({ sub: userId, role, sessionId });
+  }
+
   async register(email: string, username: string, password: string, plan?: UserPlan) {
     const exists = await this.usersRepo.findOne({ where: [{ email }, { username }] });
     if (exists) throw new ConflictException('Email or username already taken');
@@ -37,7 +47,7 @@ export class AuthService {
     const user = this.usersRepo.create({ email, username, password: hashed, plan });
     const saved = await this.usersRepo.save(user);
     const { password: _, ...result } = saved;
-    return { user: result, token: this.jwtService.sign({ sub: saved.id, role: saved.role }) };
+    return { user: result, token: await this.issueSession(saved.id, saved.role) };
   }
 
   async login(identifier: string, password: string) {
@@ -51,7 +61,11 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
     const { password: _, ...result } = user;
-    return { user: result, token: this.jwtService.sign({ sub: user.id, role: user.role }) };
+    return { user: result, token: await this.issueSession(user.id, user.role) };
+  }
+
+  async logout(userId: string): Promise<void> {
+    await this.usersRepo.update(userId, { currentSessionId: null as unknown as string });
   }
 
   private assertGoogleConfigured() {
@@ -155,7 +169,7 @@ export class AuthService {
 
       const user = await this.findOrCreateGoogleUser({ googleId: sub, email, name, picture });
       const { password: _, ...result } = user;
-      const token = this.jwtService.sign({ sub: user.id, role: user.role });
+      const token = await this.issueSession(user.id, user.role);
       const payloadB64 = Buffer.from(JSON.stringify({ user: result, token })).toString('base64url');
 
       return `${frontendUrl}/auth/google-callback?data=${payloadB64}`;

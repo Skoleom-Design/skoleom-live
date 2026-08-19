@@ -25,6 +25,12 @@ export class User {
   @Column({ nullable: true })
   googleId: string;
 
+  // Un seul appareil connecté à la fois : chaque login (re)génère cet identifiant et l'embarque
+  // dans le JWT — un ancien jeton dont le `sessionId` ne correspond plus est rejeté (voir
+  // JwtStrategy.validate). select: false, jamais exposé via les relations eager.
+  @Column({ nullable: true, select: false })
+  currentSessionId: string;
+
   @Column()
   username: string;
 

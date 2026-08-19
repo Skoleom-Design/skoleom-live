@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, Film, Zap, DollarSign, Trophy, Gift, Video, Home,
   LogOut, ArrowLeft, ShieldAlert,
 } from 'lucide-react';
-import { clearSession, getToken, getStoredUser } from '../../../shared/api/http';
+import { api, clearSession, getToken, getStoredUser } from '../../../shared/api/http';
 
 const NAV = [
   { href: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
@@ -33,6 +33,7 @@ export function AdminSidebar() {
   }, []);
 
   function handleLogout() {
+    api.post('/auth/logout').catch(() => {});
     clearSession();
     router.push('/auth/login');
   }

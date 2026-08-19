@@ -6,7 +6,7 @@ import { io, Socket } from 'socket.io-client';
 import { Room, RoomEvent, Track } from 'livekit-client';
 import {
   ArrowLeft, Mic, MicOff, Video, VideoOff, Radio, Loader2, Send, Users, Package, X, ShoppingBag,
-  Crown, Trash2, UserX, Gavel, Timer, ChevronRight, Plus, Trophy, Users2,
+  Crown, Trash2, UserX, Gavel, Timer, ChevronRight, Plus, Trophy, Users2, AlertTriangle,
 } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
@@ -112,6 +112,10 @@ export default function StudioLivePage() {
   const [ending, setEnding] = useState(false);
   const [live, setLive] = useState<LiveSession | null>(null);
   const [elapsed, setElapsed] = useState(0);
+
+  const [leaveConfirmOpen, setLeaveConfirmOpen] = useState(false);
+  const pendingUrlRef = useRef<string | null>(null);
+  const allowNavRef = useRef(false);
 
   const [viewerCount, setViewerCount] = useState(0);
   const [comments, setComments] = useState<LiveComment[]>([]);
@@ -429,7 +433,10 @@ export default function StudioLivePage() {
   // live" laissait le live actif indefiniment cote serveur (bloquant tout nouveau lancement —
   // voir LivesService.start/startAuction) alors que la camera/le flux s'arretent bel et bien
   // localement. On termine donc le live cote serveur des qu'on part, comme le ferait "Terminer
-  // le live" — rester "en direct" est desormais lie au fait de rester sur cette page.
+  // le live" — rester "en direct" est desormais lie au fait de rester sur cette page. Une
+  // navigation interne (clic sur un lien/la sidebar) passe d'abord par une confirmation — voir
+  // handleRouteChangeStart — la fermeture d'onglet/rechargement (pagehide) ne peut proposer que
+  // le prompt générique du navigateur (beforeunload), donc reste immédiate une fois confirmée.
   useEffect(() => {
     function endOnLeave() {
       if (liveEndedRef.current || !liveIdRef.current) return;
@@ -441,10 +448,31 @@ export default function StudioLivePage() {
         keepalive: true,
       }).catch(() => {});
     }
-    router.events.on('routeChangeStart', endOnLeave);
+
+    function handleRouteChangeStart(url: string) {
+      if (allowNavRef.current) return;
+      if (liveEndedRef.current || !liveIdRef.current) return;
+      pendingUrlRef.current = url;
+      setLeaveConfirmOpen(true);
+      router.events.emit('routeChangeError');
+      // Seul moyen (non-officiel mais standard sur Next Pages Router) d'annuler une navigation
+      // déjà déclenchée depuis un handler routeChangeStart — laisse une trace en console, sans
+      // impact fonctionnel.
+      throw 'routeChange aborted — confirmation de sortie de live requise';
+    }
+
+    function handleBeforeUnload(e: BeforeUnloadEvent) {
+      if (liveEndedRef.current || !liveIdRef.current) return;
+      e.preventDefault();
+      e.returnValue = '';
+    }
+
+    router.events.on('routeChangeStart', handleRouteChangeStart);
+    window.addEventListener('beforeunload', handleBeforeUnload);
     window.addEventListener('pagehide', endOnLeave);
     return () => {
-      router.events.off('routeChangeStart', endOnLeave);
+      router.events.off('routeChangeStart', handleRouteChangeStart);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
       window.removeEventListener('pagehide', endOnLeave);
     };
   }, [router]);
@@ -582,6 +610,31 @@ export default function StudioLivePage() {
     } finally {
       setLaunching(false);
     }
+  }
+
+  // Le clic "Quitter et éteindre" de la modale de confirmation — même logique que la garde
+  // pagehide (fetch keepalive fire-and-forget), puis on laisse la navigation initialement
+  // demandée reprendre son cours.
+  function confirmLeave() {
+    if (!liveEndedRef.current && liveIdRef.current) {
+      liveEndedRef.current = true;
+      const token = getToken();
+      fetch(`/api/lives/${liveIdRef.current}/end`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+        keepalive: true,
+      }).catch(() => {});
+    }
+    setLeaveConfirmOpen(false);
+    allowNavRef.current = true;
+    const url = pendingUrlRef.current;
+    pendingUrlRef.current = null;
+    if (url) router.push(url);
+  }
+
+  function cancelLeave() {
+    setLeaveConfirmOpen(false);
+    pendingUrlRef.current = null;
   }
 
   async function handleEnd() {
@@ -1350,6 +1403,34 @@ export default function StudioLivePage() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {leaveConfirmOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5">
+            <div className="w-11 h-11 rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center mb-3">
+              <AlertTriangle size={18} className="text-red-400" />
+            </div>
+            <h2 className="text-white font-bold text-base mb-1.5">Quitter le live en cours ?</h2>
+            <p className="text-white/50 text-[13px] leading-relaxed mb-5">
+              Si tu changes de page ou navigues ailleurs, ton live sera immédiatement éteint pour tous les spectateurs.
+            </p>
+            <div className="flex gap-2">
+              <button
+                onClick={cancelLeave}
+                className="flex-1 py-2.5 rounded-full border border-white/10 text-white/70 text-[13px] font-semibold hover:text-white hover:border-white/25 transition-all"
+              >
+                Rester sur le live
+              </button>
+              <button
+                onClick={confirmLeave}
+                className="flex-1 py-2.5 rounded-full bg-red-500 text-white text-[13px] font-semibold hover:bg-red-600 transition-all"
+              >
+                Quitter et éteindre
+              </button>
+            </div>
           </div>
         </div>
       )}

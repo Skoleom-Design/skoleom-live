@@ -40,10 +40,13 @@ export default function LoginPage() {
     if (router.query.suspended === '1') {
       setError(t('auth.suspended'));
     }
+    if (router.query.sessionExpired === '1') {
+      setError(t('auth.sessionExpired'));
+    }
     if (router.query.googleError === '1') {
       setError(t('auth.googleError'));
     }
-  }, [router.query.suspended, router.query.googleError]);
+  }, [router.query.suspended, router.query.sessionExpired, router.query.googleError]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
