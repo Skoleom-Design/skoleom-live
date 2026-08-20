@@ -618,11 +618,11 @@ export function GuideButton() {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <div className="px-3 py-1.5">
+      <div className="px-3 py-2">
         <button
           onClick={() => setOpen(true)}
           title="Comment ça marche ?"
-          className="w-9 h-9 rounded-full border border-white/20 flex items-center justify-center text-[14px] font-bold text-white/45 hover:text-white hover:border-white/55 hover:bg-white/[0.06] transition-all duration-200"
+          className="w-10 h-10 rounded-full border border-white/20 flex items-center justify-center text-[15px] font-bold text-white/45 hover:text-white hover:border-white/55 hover:bg-white/[0.06] transition-all duration-200"
         >
           ?
         </button>

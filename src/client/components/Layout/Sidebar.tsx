@@ -106,7 +106,7 @@ function DesktopSidebar({
   router: ReturnType<typeof useRouter>;
 }) {
   return (
-    <aside className="cosmic-bg relative hidden md:flex flex-col w-[244px] h-full px-3 py-5 shrink-0 overflow-hidden">
+    <aside className="cosmic-bg relative hidden md:flex flex-col w-[272px] h-full px-3 py-5 shrink-0 overflow-hidden">
       {/* Bordure droite en filet degrade, au lieu d'un trait plat */}
       <div className="absolute top-0 right-0 bottom-0 w-px bg-gradient-to-b from-transparent via-[#a8ff35]/25 to-transparent" />
 
@@ -114,12 +114,12 @@ function DesktopSidebar({
       <div className="cosmic-orb w-24 h-24 bg-[#00ffff]/10 -top-6 -right-10 animate-float" style={{ animationDelay: '0s' }} />
       <div className="cosmic-orb w-20 h-20 bg-[#faee21]/[0.06] bottom-16 -left-8 animate-float" style={{ animationDelay: '-3s' }} />
 
-      <div className="relative px-3 pb-6 pt-2">
-        <div className="absolute left-1 top-0 w-11 h-11 rounded-full bg-skoleom-gradient-warm opacity-25 blur-xl animate-pulse-glow" />
-        <img src="/skoleom-mark.png" alt="skoleomLive" className="relative h-7 object-contain" />
+      <div className="relative px-3 pb-7 pt-2">
+        <div className="absolute left-1 top-0 w-16 h-16 rounded-full bg-skoleom-gradient-warm opacity-25 blur-xl animate-pulse-glow" />
+        <img src="/skoleom-mark.png" alt="skoleomLive" className="relative h-11 object-contain" />
       </div>
 
-      <nav className="relative flex-1 space-y-0.5">
+      <nav className="relative flex-1 space-y-1">
         {NAV.map((item) => {
           const Icon = item.icon;
           const isActive =
@@ -132,7 +132,7 @@ function DesktopSidebar({
               {/* Chaque icone vit dans sa propre pastille — pas un glyphe nu flottant a cote
                   du libelle comme sur Insta/X/LinkedIn. */}
               <span
-                className={`relative w-8 h-8 rounded-full flex items-center justify-center shrink-0 transition-all ${
+                className={`relative w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-all ${
                   disabled ? 'bg-white/[0.03] border border-white/[0.06]' : isActive ? 'bg-black/15' : 'bg-white/[0.06] border border-white/10'
                 }`}
               >
@@ -142,7 +142,7 @@ function DesktopSidebar({
                   </span>
                 ) : (
                   <Icon
-                    size={17}
+                    size={20}
                     strokeWidth={isActive ? 2.5 : 1.75}
                     fill={isActive ? 'currentColor' : 'none'}
                     fillOpacity={isActive ? 0.18 : undefined}
@@ -161,7 +161,7 @@ function DesktopSidebar({
               <span
                 key={item.label}
                 aria-disabled="true"
-                className="flex items-center gap-3 pl-1.5 pr-4 py-1.5 rounded-full text-[15px] font-normal text-white/25 cursor-not-allowed select-none"
+                className="flex items-center gap-3.5 pl-2 pr-5 py-2 rounded-full text-base font-normal text-white/25 cursor-not-allowed select-none"
               >
                 {content}
               </span>
@@ -172,7 +172,7 @@ function DesktopSidebar({
             <Link
               key={item.label}
               href={item.href}
-              className={`flex items-center gap-3 pl-1.5 pr-4 py-1.5 rounded-full text-[15px] transition-all ${
+              className={`flex items-center gap-3.5 pl-2 pr-5 py-2 rounded-full text-base transition-all ${
                 isActive
                   ? 'font-bold text-black bg-skoleom-gradient-warm shadow-glow-lime-sm'
                   : 'font-normal text-white/80 hover:bg-white/[0.05] hover:text-white'
