@@ -33,6 +33,10 @@ export function AvatarPickerGate({ onDone }: AvatarPickerGateProps) {
           <div className="w-14 h-14 rounded-2xl bg-[#a8ff35]/10 border border-[#a8ff35]/20 flex items-center justify-center mx-auto mb-4">
             <img src="/skoleom-mark.png" alt="" className="w-8 h-8 object-contain" />
           </div>
+          <p className="text-lg leading-none mb-2">
+            <span className="font-semibold text-white">skoleom</span>
+            <span className="font-extrabold text-[#a8ff35]">Live</span>
+          </p>
           <h1 className="text-2xl font-bold text-white mb-2">{t('onboarding.chooseAvatar')}</h1>
           <p className="text-white/45 text-sm px-2">{t('onboarding.avatarSubtitle')}</p>
         </div>
