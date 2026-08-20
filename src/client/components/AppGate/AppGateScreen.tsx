@@ -32,12 +32,16 @@ export function AppGateScreen() {
       <div className="cosmic-orb w-56 h-56 bg-[#00ffff]/[0.06] bottom-0 right-0 animate-float" style={{ animationDelay: '-4s' }} />
 
       <div className="relative w-full max-w-sm text-center my-auto">
-        <div className="relative w-20 h-20 rounded-3xl bg-[#a8ff35]/10 border border-[#a8ff35]/20 flex items-center justify-center mx-auto mb-6">
-          <div className="absolute inset-0 rounded-3xl bg-skoleom-gradient-warm opacity-20 blur-xl animate-pulse-glow" />
-          <img src="/skoleom-mark.png" alt="" className="relative w-11 h-11 object-contain" />
+        <div className="relative w-28 h-28 rounded-[28px] bg-[#a8ff35]/10 border border-[#a8ff35]/20 flex items-center justify-center mx-auto mb-5">
+          <div className="absolute inset-0 rounded-[28px] bg-skoleom-gradient-warm opacity-20 blur-xl animate-pulse-glow" />
+          <img src="/skoleom-mark.png" alt="" className="relative w-16 h-16 object-contain" />
         </div>
 
-        <h1 className="display-text text-gradient text-[42px] mb-3">{t('appGate.welcomeTitle')}</h1>
+        <p className="text-[26px] leading-none mb-1.5">
+          <span className="font-semibold text-white">skoleom</span>
+          <span className="font-extrabold text-[#a8ff35]">Live</span>
+        </p>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/35 mb-8">{t('appGate.tagline')}</p>
         <p className="text-white/50 text-sm px-2 mb-10 leading-relaxed">{t('appGate.welcomeSubtitle')}</p>
 
         <div className="space-y-2.5 mb-10">

@@ -49,7 +49,7 @@ export const en = {
     enterUsername: 'Please enter a username.',
   },
   appGate: {
-    welcomeTitle: 'Welcome to skoleomLive',
+    tagline: 'The live you can shop',
     welcomeSubtitle: 'Lives, auctions and shoppable discovery — log in for the full experience, or take a look as a guest.',
     login: 'Log in',
     continueAsGuest: 'Continue as guest',
