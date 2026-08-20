@@ -9,6 +9,7 @@ import { LiveSession } from '../lives/live-session.entity';
 import { WalletTransaction } from '../payments/wallet-transaction.entity';
 import { Message } from '../messages/message.entity';
 import { BoostsModule } from '../boosts/boosts.module';
+import { UsersModule } from '../users/users.module';
 import { AdminActionLog } from './admin-action-log.entity';
 import { AdminService } from './admin.service';
 import { AdminController } from './admin.controller';
@@ -17,6 +18,7 @@ import { AdminController } from './admin.controller';
   imports: [
     TypeOrmModule.forFeature([Order, Boost, User, Post, Gift, LiveSession, AdminActionLog, WalletTransaction, Message]),
     BoostsModule,
+    UsersModule,
   ],
   providers: [AdminService],
   controllers: [AdminController],

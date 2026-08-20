@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { Ban, CheckCircle2, Coins, Plus, Zap, Search } from 'lucide-react';
+import { Ban, CheckCircle2, Coins, Plus, Zap, Search, Trash2 } from 'lucide-react';
 import { AdminSidebar } from '../../client/components/Layout/AdminSidebar';
 import { UserDetailModal } from '../../client/components/Admin/UserDetailModal';
 import { GrantBoostModal } from '../../client/components/Admin/GrantBoostModal';
@@ -73,6 +73,20 @@ export default function AdminUsers() {
       setToast({ kind: 'success', text: nextActive ? `${u.username} réactivé.` : `${u.username} suspendu.` });
     } catch (err) {
       setToast({ kind: 'error', text: err instanceof ApiError ? err.message : "Échec de l'action." });
+    }
+  }
+
+  async function deleteUser(u: AdminUser) {
+    if (!window.confirm(`Supprimer définitivement le compte de ${u.username} ? Tous ses posts, capsules, commandes et messages seront aussi supprimés. Cette action est irréversible.`)) {
+      return;
+    }
+    try {
+      await api.delete(`/admin/users/${u.id}`);
+      setUsers((prev) => prev.filter((x) => x.id !== u.id));
+      setTotal((prev) => prev - 1);
+      setToast({ kind: 'success', text: `${u.username} supprimé.` });
+    } catch (err) {
+      setToast({ kind: 'error', text: err instanceof ApiError ? err.message : 'Échec de la suppression.' });
     }
   }
 
@@ -213,6 +227,14 @@ export default function AdminUsers() {
                             className="w-8 h-8 rounded-lg flex items-center justify-center border border-white/15 text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
                           >
                             <Plus size={14} />
+                          </button>
+                          <button
+                            onClick={() => deleteUser(u)}
+                            disabled={u.role === 'admin'}
+                            title="Supprimer ce compte"
+                            className="w-8 h-8 rounded-lg flex items-center justify-center border border-red-500/30 text-red-500 hover:bg-red-500/10 transition-colors disabled:opacity-30"
+                          >
+                            <Trash2 size={14} />
                           </button>
                         </div>
                       </td>

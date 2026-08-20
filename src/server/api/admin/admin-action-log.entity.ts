@@ -10,6 +10,7 @@ export enum AdminActionType {
   BOOST_GRANT = 'boost_grant',
   BOOST_CANCEL = 'boost_cancel',
   BOOST_APPROVE = 'boost_approve',
+  ACCOUNT_DELETE = 'account_delete',
 }
 
 @Entity('admin_action_logs')

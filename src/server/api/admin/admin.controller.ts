@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Body, Param, Query, Request, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Request, UseGuards } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from '../auth/admin.guard';
@@ -76,6 +76,11 @@ export class AdminController {
   @Patch('users/:id/status')
   setUserActive(@Param('id') id: string, @Body() body: { isActive: boolean }, @Request() req) {
     return this.adminService.setUserActive(id, body.isActive, req.user.id);
+  }
+
+  @Delete('users/:id')
+  deleteUser(@Param('id') id: string, @Request() req) {
+    return this.adminService.deleteUser(id, req.user.id);
   }
 
   @Patch('users/:id/plan')

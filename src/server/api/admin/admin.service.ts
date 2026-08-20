@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, Between, In } from 'typeorm';
 import { Order } from '../orders/order.entity';
@@ -10,8 +10,9 @@ import { LiveSession } from '../lives/live-session.entity';
 import { WalletTransaction } from '../payments/wallet-transaction.entity';
 import { Message } from '../messages/message.entity';
 import { BoostsService } from '../boosts/boosts.service';
+import { UsersService } from '../users/users.service';
 import { AdminActionLog, AdminActionType } from './admin-action-log.entity';
-import { OrderStatus, BoostStatus, PostStatus, UserPlan, BoostScope, BoostObjective, WalletTransactionType } from '../../../shared/types/entities';
+import { OrderStatus, BoostStatus, PostStatus, UserPlan, UserRole, BoostScope, BoostObjective, WalletTransactionType } from '../../../shared/types/entities';
 
 @Injectable()
 export class AdminService {
@@ -35,6 +36,7 @@ export class AdminService {
     @InjectRepository(Message)
     private messagesRepo: Repository<Message>,
     private boostsService: BoostsService,
+    private usersService: UsersService,
   ) {}
 
   async getDashboardStats(period: 'day' | 'month' | 'quarter' | 'year' = 'month') {
@@ -303,6 +305,26 @@ export class AdminService {
       targetUserId: userId,
       details: { from: user?.isActive, to: isActive },
     }));
+  }
+
+  // Suppression definitive (pas de corbeille) — reutilise UsersService.deleteAccount, le meme
+  // chemin que "supprimer mon compte" cote utilisateur, qui nettoie deja toutes les tables
+  // filles dans le bon ordre. Le log est ecrit avant la suppression : targetUserId n'a pas de
+  // contrainte de cle etrangere, donc la trace d'audit survit volontairement a la suppression.
+  async deleteUser(userId: string, adminId: string): Promise<void> {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Utilisateur introuvable');
+    if (user.role === UserRole.ADMIN) {
+      throw new BadRequestException('Impossible de supprimer un compte administrateur.');
+    }
+
+    await this.logsRepo.save(this.logsRepo.create({
+      action: AdminActionType.ACCOUNT_DELETE,
+      adminId,
+      targetUserId: userId,
+      details: { username: user.username, email: user.email },
+    }));
+    await this.usersService.deleteAccount(userId);
   }
 
   async setUserPlan(userId: string, plan: UserPlan, adminId: string): Promise<void> {
