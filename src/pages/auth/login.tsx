@@ -152,13 +152,13 @@ export default function LoginPage() {
           <div className="w-full max-w-sm">
             {/* Heading */}
             <div key={tab} className="text-center mb-8 animate-fade-in">
-              <div className="w-14 h-14 rounded-2xl bg-[#a8ff35]/10 border border-[#a8ff35]/20 flex items-center justify-center mx-auto mb-4">
+              <div className="w-fit flex flex-col items-center gap-2 rounded-2xl bg-[#a8ff35]/10 border border-[#a8ff35]/20 px-6 py-4 mx-auto mb-4">
                 <img src="/skoleom-mark.png" alt="" className="w-8 h-8 object-contain" />
+                <p className="text-lg leading-none">
+                  <span className="font-semibold text-white">skoleom</span>
+                  <span className="font-extrabold text-[#a8ff35]">Live</span>
+                </p>
               </div>
-              <p className="text-lg leading-none mb-2">
-                <span className="font-semibold text-white">skoleom</span>
-                <span className="font-extrabold text-[#a8ff35]">Live</span>
-              </p>
               <h1 className="text-2xl font-bold text-white mb-2">
                 {tab === 'login' ? t('auth.welcome') : t('auth.createAccount')}
               </h1>
@@ -166,6 +166,10 @@ export default function LoginPage() {
                 {tab === 'login' ? t('auth.pleaseLogin') : t('auth.pleaseRegister')}
               </p>
             </div>
+
+            {/* Carte — regroupe tout le formulaire (avant : bascule/Google/champs/comptes demo
+                flottaient directement sur le fond, sans structure visuelle claire). */}
+            <div className="bg-[#0d0d0f] border border-white/[0.08] rounded-[24px] p-6">
 
             {/* Tab toggle — pastille glissante au lieu d'un swap de fond instantane */}
             <div className="relative flex bg-white/[0.05] rounded-full p-1 mb-7">
@@ -325,6 +329,8 @@ export default function LoginPage() {
                   </button>
                 ))}
               </div>
+            </div>
+
             </div>
 
             {/* Footer note */}

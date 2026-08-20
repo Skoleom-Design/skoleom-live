@@ -114,9 +114,15 @@ function DesktopSidebar({
       <div className="cosmic-orb w-24 h-24 bg-[#00ffff]/10 -top-6 -right-10 animate-float" style={{ animationDelay: '0s' }} />
       <div className="cosmic-orb w-20 h-20 bg-[#faee21]/[0.06] bottom-16 -left-8 animate-float" style={{ animationDelay: '-3s' }} />
 
-      <div className="relative px-3 pb-7 pt-2">
-        <div className="absolute left-1 top-0 w-16 h-16 rounded-full bg-skoleom-gradient-warm opacity-25 blur-xl animate-pulse-glow" />
-        <img src="/skoleom-mark.png" alt="skoleomLive" className="relative h-11 object-contain" />
+      <div className="relative px-3 pb-7 pt-2 flex items-center gap-2.5">
+        <div className="relative shrink-0">
+          <div className="absolute -inset-1.5 rounded-full bg-skoleom-gradient-warm opacity-25 blur-xl animate-pulse-glow" />
+          <img src="/skoleom-mark.png" alt="" className="relative h-9 object-contain" />
+        </div>
+        <span className="text-lg leading-none">
+          <span className="font-semibold text-white">skoleom</span>
+          <span className="font-extrabold text-[#a8ff35]">Live</span>
+        </span>
       </div>
 
       <nav className="relative flex-1 space-y-1">
