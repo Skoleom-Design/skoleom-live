@@ -30,6 +30,9 @@ export class LivesGateway implements OnGatewayDisconnect {
   // Une seule invitation de duo en attente a la fois par live — assez pour ce cas d'usage,
   // pas besoin de gerer une file.
   private pendingDuoInvites = new Map<string, { targetUserId: string; inviterSocketId: string }>();
+  // Demandes de duo initiees par des spectateurs (sens inverse de pendingDuoInvites) — plusieurs
+  // spectateurs peuvent demander en meme temps, le createur choisit qui accepter parmi la liste.
+  private pendingDuoRequests = new Map<string, Map<string, { socketId: string; username: string; avatarUrl?: string }>>();
   // Spectateurs expulses par le createur — empeche de rejoindre le meme live une seconde fois
   // (voir handleJoin), en plus d'etre deconnectes immediatement (voir handleKickUser).
   private kicked = new Map<string, Set<string>>();
@@ -123,6 +126,12 @@ export class LivesGateway implements OnGatewayDisconnect {
         if (live?.duoPartnerId === identity.userId) {
           await this.livesService.clearDuoPartner(liveId);
           this.server.to(roomFor(liveId)).emit('duoEnded', {});
+        }
+
+        // Une demande de duo en attente n'a plus de sens si le spectateur qui l'a faite part —
+        // on la retire et on previent le createur pour qu'il ne voie pas une demande fantome.
+        if (this.pendingDuoRequests.get(liveId)?.delete(identity.userId)) {
+          this.server.to(roomFor(liveId)).emit('duoRequestCancelled', { userId: identity.userId });
         }
       }
     }
@@ -285,6 +294,92 @@ export class LivesGateway implements OnGatewayDisconnect {
       });
     } catch (err) {
       this.server.to(pending.inviterSocketId).emit('duoError', {
+        message: err instanceof Error ? err.message : 'Duo refusé.',
+      });
+    }
+  }
+
+  // Sens inverse d'inviteDuo — un spectateur demande lui-meme a rejoindre le live en duo, le
+  // createur voit la demande arriver (duoRequestReceived) et choisit d'accepter ou refuser.
+  @SubscribeMessage('requestDuo')
+  async handleRequestDuo(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { liveId: string; token: string },
+  ) {
+    const user = await this.authenticate(data.token);
+    if (!user) {
+      client.emit('duoRequestError', { message: 'Connecte-toi pour demander un duo.' });
+      return;
+    }
+
+    const live = await this.livesService.getById(data.liveId).catch(() => null);
+    if (!live) return;
+    if (live.creatorId === user.id) return;
+    if (live.duoPartnerId) {
+      client.emit('duoRequestError', { message: 'Un duo est déjà en cours sur ce live.' });
+      return;
+    }
+
+    if (!this.pendingDuoRequests.has(data.liveId)) this.pendingDuoRequests.set(data.liveId, new Map());
+    this.pendingDuoRequests.get(data.liveId)!.set(user.id, {
+      socketId: client.id,
+      username: user.displayName || user.username,
+      avatarUrl: user.avatarUrl,
+    });
+
+    client.emit('duoRequestSent', {});
+    this.server.to(roomFor(data.liveId)).emit('duoRequestReceived', {
+      userId: user.id,
+      username: user.displayName || user.username,
+      avatarUrl: user.avatarUrl,
+    });
+  }
+
+  @SubscribeMessage('cancelDuoRequest')
+  async handleCancelDuoRequest(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { liveId: string; token: string },
+  ) {
+    const user = await this.authenticate(data.token);
+    if (!user) return;
+    if (this.pendingDuoRequests.get(data.liveId)?.delete(user.id)) {
+      this.server.to(roomFor(data.liveId)).emit('duoRequestCancelled', { userId: user.id });
+    }
+  }
+
+  @SubscribeMessage('respondDuoRequest')
+  async handleRespondDuoRequest(
+    @MessageBody() data: { liveId: string; userId: string; accept: boolean; token: string },
+  ) {
+    const user = await this.authenticate(data.token);
+    if (!user || !(await this.livesService.isOwner(data.liveId, user.id))) return;
+
+    const requests = this.pendingDuoRequests.get(data.liveId);
+    const requester = requests?.get(data.userId);
+    if (!requester) return;
+    requests!.delete(data.userId);
+
+    if (!data.accept) {
+      this.server.to(requester.socketId).emit('duoRequestDeclined', {});
+      return;
+    }
+
+    try {
+      await this.livesService.setDuoPartner(data.liveId, data.userId);
+      this.server.to(roomFor(data.liveId)).emit('duoStarted', {
+        partnerId: data.userId,
+        partnerUsername: requester.username,
+        partnerAvatarUrl: requester.avatarUrl,
+      });
+      // Le slot duo est pris — les autres demandes en attente n'ont plus lieu d'etre.
+      if (requests && requests.size > 0) {
+        for (const other of requests.values()) {
+          this.server.to(other.socketId).emit('duoRequestDeclined', {});
+        }
+        requests.clear();
+      }
+    } catch (err) {
+      this.server.to(requester.socketId).emit('duoRequestError', {
         message: err instanceof Error ? err.message : 'Duo refusé.',
       });
     }

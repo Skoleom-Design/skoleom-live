@@ -6,7 +6,7 @@ import { io, Socket } from 'socket.io-client';
 import { Room, RoomEvent, Track } from 'livekit-client';
 import {
   ArrowLeft, Mic, MicOff, Video, VideoOff, Radio, Loader2, Send, Users, Package, X, ShoppingBag,
-  Crown, Trash2, UserX, Gavel, Timer, ChevronRight, Plus, Trophy, Users2, AlertTriangle, MoreVertical,
+  Crown, Trash2, UserX, Gavel, Timer, ChevronRight, Plus, Trophy, Users2, AlertTriangle, MoreVertical, Check,
 } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
@@ -146,6 +146,12 @@ export default function StudioLivePage() {
   const [duoPartner, setDuoPartner] = useState<{ id: string; username: string; avatarUrl?: string } | null>(null);
   const [duoInviteStatus, setDuoInviteStatus] = useState<'idle' | 'inviting' | 'declined' | 'error'>('idle');
   const [duoErrorMsg, setDuoErrorMsg] = useState('');
+  // Demandes de duo initiees par des spectateurs (sens inverse d'inviteDuo) — plusieurs peuvent
+  // etre en attente en meme temps, voir requestDuo/respondDuoRequest dans LivesGateway.
+  const [duoRequests, setDuoRequests] = useState<{ userId: string; username: string; avatarUrl?: string }[]>([]);
+  // Feuille mobile — sur desktop le "Top donateur" vit dans le panneau lateral (voir plus bas),
+  // sur mobile c'est une feuille ouverte depuis une icone sur la video (voir le bloc md:hidden).
+  const [mobileTopDonorsOpen, setMobileTopDonorsOpen] = useState(false);
   const [openViewerMenuId, setOpenViewerMenuId] = useState<string | null>(null);
   const duoVideoRef = useRef<HTMLVideoElement>(null);
   const duoAudioRef = useRef<HTMLAudioElement>(null);
@@ -313,7 +319,9 @@ export default function StudioLivePage() {
 
     const socket = io(API_URL, { transports: ['websocket'] });
     socketRef.current = socket;
-    socket.emit('join', { liveId: live.id });
+    // Voir live/[id].tsx pour le detail : 'connect' se redeclenche a chaque reconnexion, pas
+    // seulement au montage, sinon une coupure reseau silencieuse nous rend invisible cote serveur.
+    socket.on('connect', () => socket.emit('join', { liveId: live.id }));
     socket.on('viewerCount', (d: { count: number }) => setViewerCount(d.count));
     socket.on('history', (h: LiveComment[]) => setComments(h));
     socket.on('comment', (c: LiveComment) => setComments((prev) => [...prev, c]));
@@ -381,6 +389,7 @@ export default function StudioLivePage() {
       setDuoPartner({ id: d.partnerId, username: d.partnerUsername, avatarUrl: d.partnerAvatarUrl });
       setDuoInviteStatus('idle');
       setDuoPanelOpen(false);
+      setDuoRequests([]);
     });
     socket.on('duoEnded', () => {
       setDuoPartner(null);
@@ -390,6 +399,12 @@ export default function StudioLivePage() {
     socket.on('duoError', (d: { message: string }) => {
       setDuoInviteStatus('error');
       setDuoErrorMsg(d.message);
+    });
+    socket.on('duoRequestReceived', (d: { userId: string; username: string; avatarUrl?: string }) => {
+      setDuoRequests((prev) => (prev.some((r) => r.userId === d.userId) ? prev : [...prev, d]));
+    });
+    socket.on('duoRequestCancelled', (d: { userId: string }) => {
+      setDuoRequests((prev) => prev.filter((r) => r.userId !== d.userId));
     });
 
     return () => {
@@ -422,6 +437,12 @@ export default function StudioLivePage() {
   function endDuo() {
     if (!live) return;
     socketRef.current?.emit('endDuo', { liveId: live.id, token: getToken() });
+  }
+
+  function respondDuoRequest(targetUserId: string, accept: boolean) {
+    if (!live) return;
+    socketRef.current?.emit('respondDuoRequest', { liveId: live.id, userId: targetUserId, accept, token: getToken() });
+    setDuoRequests((prev) => prev.filter((r) => r.userId !== targetUserId));
   }
 
   useEffect(() => {
@@ -858,16 +879,82 @@ export default function StudioLivePage() {
                       {live && (
                         <button
                           onClick={() => (duoPartner ? endDuo() : openDuoPanel())}
-                          className={`w-11 h-11 rounded-full flex items-center justify-center transition-all ${
+                          className={`relative w-11 h-11 rounded-full flex items-center justify-center transition-all ${
                             duoPartner ? 'bg-[#a8ff35] text-black' : 'bg-white/10 hover:bg-white/20 text-white'
                           }`}
                           title={duoPartner ? 'Terminer le duo' : 'Inviter en duo'}
                         >
                           <Users2 size={18} />
+                          {!duoPartner && duoRequests.length > 0 && (
+                            <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-black" />
+                          )}
                         </button>
                       )}
                     </div>
                   )}
+
+                  {/* Demande de duo entrante — un spectateur a demande a nous rejoindre (sens
+                      inverse d'"Inviter en duo"). On ne montre que la premiere ici, les autres
+                      (s'il y en a) sont visibles dans le panneau "Spectateurs". */}
+                  {!duoPartner && duoRequests.length > 0 && (
+                    <div className="absolute top-14 left-3 right-3 z-30 flex items-center justify-between gap-2 bg-black/80 backdrop-blur-sm border border-[#a8ff35]/40 rounded-2xl px-3.5 py-2.5">
+                      <p className="text-white text-[12px] font-medium min-w-0">
+                        <span className="font-bold text-[#a8ff35]">@{duoRequests[0].username}</span> demande à faire un duo
+                        {duoRequests.length > 1 ? ` (+${duoRequests.length - 1} autre${duoRequests.length > 2 ? 's' : ''})` : ''}
+                      </p>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button onClick={() => respondDuoRequest(duoRequests[0].userId, true)} className="w-8 h-8 rounded-full bg-[#a8ff35] text-black flex items-center justify-center">
+                          <Check size={14} />
+                        </button>
+                        <button onClick={() => respondDuoRequest(duoRequests[0].userId, false)} className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center">
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Mobile uniquement — fil de commentaires transparent façon TikTok, en
+                      incrustation sur la vidéo, au lieu du pavé opaque qui poussait tout vers le
+                      bas et mangeait l'écran (voir le panneau desktop caché ici, plus bas). */}
+                  <div
+                    className="md:hidden absolute left-0 right-3 bottom-16 z-10 max-h-[30%] overflow-y-auto scrollbar-hide flex flex-col gap-1 px-3 pb-1 pointer-events-none"
+                    style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 22%)', maskImage: 'linear-gradient(to bottom, transparent 0%, black 22%)' }}
+                  >
+                    {comments.map((c) => {
+                      const isHost = c.userId === myId;
+                      if (c.isGift) {
+                        return (
+                          <p key={c.id} className="flex items-center gap-1.5 text-[12.5px] leading-snug [text-shadow:0_1px_4px_rgba(0,0,0,0.9)]">
+                            {c.giftImage && <img src={c.giftImage} alt="" className="w-4 h-4 object-contain shrink-0" />}
+                            <span className="font-bold text-[#f59e0b]">{c.username}</span>
+                            <span className="text-[#f59e0b]/90 font-medium">{c.text}</span>
+                          </p>
+                        );
+                      }
+                      if (c.isBid) {
+                        return (
+                          <p key={c.id} className="text-[12.5px] leading-snug [text-shadow:0_1px_4px_rgba(0,0,0,0.9)]">
+                            <span className="font-bold text-[#a8ff35]">{c.username}</span>{' '}
+                            <span className="text-[#a8ff35]/90 font-medium">{c.text}</span>
+                          </p>
+                        );
+                      }
+                      return (
+                        <p key={c.id} className="text-[12.5px] leading-snug [text-shadow:0_1px_4px_rgba(0,0,0,0.9)]">
+                          <span className={`font-bold ${isHost ? 'text-[#f59e0b]' : 'text-[#a8ff35]'}`}>{c.username}</span>
+                          {isHost && <Crown size={10} className="inline text-[#f59e0b] mx-1 -translate-y-px" />}
+                          <span className="text-white/95"> {c.text}</span>
+                        </p>
+                      );
+                    })}
+                  </div>
+
+                  <button
+                    onClick={() => setMobileTopDonorsOpen(true)}
+                    className="md:hidden absolute right-2 bottom-16 z-30 w-10 h-10 rounded-full bg-black/40 border border-white/15 backdrop-blur-sm flex items-center justify-center"
+                  >
+                    <Trophy size={17} className="text-[#f59e0b]" />
+                  </button>
 
                   {/* Duo — bulle video du partenaire, en incrustation */}
                   <div
@@ -1185,7 +1272,7 @@ export default function StudioLivePage() {
             </div>
 
             {live && (
-              <div className="w-full md:w-[320px] shrink-0 flex flex-col gap-2">
+              <div className="hidden md:w-[320px] md:shrink-0 md:flex flex-col gap-2">
                 <button
                   onClick={() => setTopDonorsOpen((o) => !o)}
                   className="shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-[#f59e0b]/20 via-[#f59e0b]/10 to-transparent border border-[#f59e0b]/30 hover:border-[#f59e0b]/50 transition-all text-left"
@@ -1390,6 +1477,26 @@ export default function StudioLivePage() {
               </button>
             </div>
 
+            {duoRequests.length > 0 && (
+              <div className="mb-4 space-y-1.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[#a8ff35]/80 px-1">Demandes de duo</p>
+                {duoRequests.map((r) => (
+                  <div key={r.userId} className="flex items-center gap-2.5 p-2.5 rounded-xl border border-[#a8ff35]/25 bg-[#a8ff35]/[0.06]">
+                    <div className="w-8 h-8 rounded-full bg-white/[0.08] overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold text-white/60">
+                      {r.avatarUrl ? <img src={r.avatarUrl} alt="" className="w-full h-full object-cover" /> : r.username[0]?.toUpperCase()}
+                    </div>
+                    <span className="text-sm font-medium text-white flex-1 truncate">@{r.username}</span>
+                    <button onClick={() => respondDuoRequest(r.userId, true)} className="w-8 h-8 rounded-full bg-[#a8ff35] text-black flex items-center justify-center shrink-0">
+                      <Check size={14} />
+                    </button>
+                    <button onClick={() => respondDuoRequest(r.userId, false)} className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center shrink-0">
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
             {duoInviteStatus === 'inviting' && (
               <p className="text-white/50 text-xs text-center py-3 mb-2 bg-white/[0.04] rounded-xl">
                 Invitation envoyée, en attente de réponse…
@@ -1456,6 +1563,49 @@ export default function StudioLivePage() {
                         </button>
                       </div>
                     )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {mobileTopDonorsOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-[9999] flex items-end bg-black/70 backdrop-blur-sm"
+          onClick={() => setMobileTopDonorsOpen(false)}
+        >
+          <div className="w-full bg-[#0d0d0f] border-t border-[#f59e0b]/25 rounded-t-[24px] p-5 max-h-[75vh] overflow-y-auto scrollbar-hide" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-center mb-3">
+              <div className="w-10 h-1 rounded-full bg-white/20" />
+            </div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-white font-bold text-base flex items-center gap-2">
+                <Trophy size={16} className="text-[#f59e0b]" /> Top donateurs
+              </h2>
+              <button onClick={() => setMobileTopDonorsOpen(false)} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                <X size={16} className="text-white" />
+              </button>
+            </div>
+            {topDonors.length === 0 ? (
+              <p className="text-white/30 text-xs text-center py-6">Aucun cadeau reçu pour l&apos;instant sur ce live.</p>
+            ) : (
+              <div className="space-y-1.5">
+                {topDonors.map((donor, i) => (
+                  <div key={donor.userId} className="flex items-center gap-2.5 px-1 py-1.5">
+                    <span className="w-5 text-center text-[13px] font-bold text-white/40 shrink-0">
+                      {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
+                    </span>
+                    <div className="w-8 h-8 rounded-full bg-white/[0.06] overflow-hidden shrink-0 flex items-center justify-center text-[11px] font-bold text-white/60">
+                      {donor.avatarUrl ? (
+                        <img src={donor.avatarUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        (donor.displayName || donor.username)[0]?.toUpperCase()
+                      )}
+                    </div>
+                    <span className="flex-1 min-w-0 text-[13px] text-white truncate">{donor.displayName || donor.username}</span>
+                    <span className="text-[12px] font-bold text-[#f59e0b] shrink-0">{donor.totalAmount.toFixed(2)} €</span>
                   </div>
                 ))}
               </div>

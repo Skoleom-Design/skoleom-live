@@ -4,7 +4,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { io, Socket } from 'socket.io-client';
 import { Room, RoomEvent, Track } from 'livekit-client';
-import { ArrowLeft, Users, Send, Gavel, Timer, Package, Crown, Gift, Wallet, Plus, Trophy, VolumeX, Check, X as XIcon, MoreVertical, UserX, AlertTriangle } from 'lucide-react';
+import { ArrowLeft, Users, Users2, Send, Gavel, Timer, Package, Crown, Gift, Wallet, Plus, Trophy, VolumeX, Check, X as XIcon, MoreVertical, UserX, AlertTriangle, Loader2 } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
 import { GiftBurstOverlay, type ActiveGiftBurst } from '../../client/components/Live/GiftBurstOverlay';
@@ -69,6 +69,9 @@ export default function LiveViewerPage() {
   const { id } = router.query;
   const socketRef = useRef<Socket | null>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
+  // Ancre de scroll dediee au fil transparent mobile (voir plus bas) — separee de commentsEndRef
+  // pour ne pas faire deux appels scrollIntoView concurrents sur le meme conteneur.
+  const mobileCommentsEndRef = useRef<HTMLDivElement>(null);
   const roomRef = useRef<Room | null>(null);
   const videoElRef = useRef<HTMLVideoElement>(null);
   const audioElRef = useRef<HTMLAudioElement>(null);
@@ -123,6 +126,14 @@ export default function LiveViewerPage() {
   const [duoPartnerId, setDuoPartnerId] = useState<string | null>(null);
   const [duoPartnerInfo, setDuoPartnerInfo] = useState<{ username: string; avatarUrl?: string } | null>(null);
   const [amDuoHost, setAmDuoHost] = useState(false);
+  // Demande de duo initiee par le spectateur lui-meme (sens inverse de duoInvite ci-dessus) —
+  // voir requestDuo/cancelDuoRequest et LivesGateway (requestDuo/respondDuoRequest).
+  const [duoRequestStatus, setDuoRequestStatus] = useState<'idle' | 'pending' | 'declined' | 'error'>('idle');
+  const [duoRequestErrorMsg, setDuoRequestErrorMsg] = useState('');
+  // Feuilles/panneaux mobiles façon TikTok — sur desktop ces contenus vivent dans le panneau
+  // lateral (voir plus bas), sur mobile ils s'ouvrent en feuille par-dessus la video en plein
+  // ecran (voir le bloc md:hidden dans le JSX).
+  const [mobileGiftsOpen, setMobileGiftsOpen] = useState(false);
 
   // Liste des spectateurs — visible par tout le monde ; le createur voit en plus un menu de
   // moderation par spectateur (exclure/muter), voir isOwner ci-dessous.
@@ -175,6 +186,28 @@ export default function LiveViewerPage() {
     setDuoInvite(null);
   }
 
+  function requestDuo() {
+    if (typeof id !== 'string') return;
+    if (!getToken()) { router.push('/auth/login'); return; }
+    setDuoRequestStatus('pending');
+    setDuoRequestErrorMsg('');
+    socketRef.current?.emit('requestDuo', { liveId: id, token: getToken() });
+  }
+
+  function cancelDuoRequest() {
+    if (typeof id !== 'string') return;
+    socketRef.current?.emit('cancelDuoRequest', { liveId: id, token: getToken() });
+    setDuoRequestStatus('idle');
+  }
+
+  // Les etats "refuse"/"erreur" ne sont que du feedback transitoire — retour a idle apres
+  // quelques secondes pour que le bouton redevienne cliquable sans action de l'utilisateur.
+  useEffect(() => {
+    if (duoRequestStatus !== 'declined' && duoRequestStatus !== 'error') return;
+    const t = setTimeout(() => setDuoRequestStatus('idle'), 3000);
+    return () => clearTimeout(t);
+  }, [duoRequestStatus]);
+
   function openViewersPanel() {
     if (typeof id !== 'string') return;
     setViewersPanelOpen(true);
@@ -210,7 +243,11 @@ export default function LiveViewerPage() {
 
     const socket = io(API_URL, { transports: ['websocket'] });
     socketRef.current = socket;
-    socket.emit('join', { liveId: id, token: getToken() });
+    // 'connect' se redeclenche a chaque reconnexion (coupure reseau, veille mobile...), pas
+    // seulement au montage — sans ca, apres une reconnexion silencieuse le serveur perd notre
+    // identite (viewerIdentities) alors que le chat semble continuer de fonctionner : on devient
+    // invisible au compteur de spectateurs, a la liste de moderation et aux invitations de duo.
+    socket.on('connect', () => socket.emit('join', { liveId: id, token: getToken() }));
     socket.on('viewerCount', (d: { count: number }) => setViewerCount(d.count));
     socket.on('history', (h: LiveComment[]) => setComments(h));
     socket.on('comment', (c: LiveComment) => setComments((prev) => [...prev, c]));
@@ -276,6 +313,7 @@ export default function LiveViewerPage() {
       setDuoPartnerId(d.partnerId);
       setDuoPartnerInfo({ username: d.partnerUsername, avatarUrl: d.partnerAvatarUrl });
       setDuoInvite(null);
+      setDuoRequestStatus('idle');
       if (d.partnerId === myId) setAmDuoHost(true);
     });
     socket.on('duoEnded', () => {
@@ -284,6 +322,12 @@ export default function LiveViewerPage() {
       setAmDuoHost(false);
     });
     socket.on('duoError', () => setDuoInvite(null));
+    socket.on('duoRequestSent', () => setDuoRequestStatus('pending'));
+    socket.on('duoRequestDeclined', () => setDuoRequestStatus('declined'));
+    socket.on('duoRequestError', (d: { message: string }) => {
+      setDuoRequestStatus('error');
+      setDuoRequestErrorMsg(d.message);
+    });
     socket.on('viewersList', (list: { userId: string; username: string; avatarUrl?: string; muted: boolean }[]) => {
       setViewersList(list);
     });
@@ -386,6 +430,7 @@ export default function LiveViewerPage() {
 
   useEffect(() => {
     commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    mobileCommentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [comments]);
 
   useEffect(() => {
@@ -487,10 +532,10 @@ export default function LiveViewerPage() {
             </button>
           </div>
 
-          <div className="flex-1 flex flex-col md:flex-row overflow-y-auto md:overflow-hidden px-4 pb-20 md:pb-6 gap-4">
-            <div className="flex-1 flex flex-col items-center overflow-y-auto scrollbar-hide">
-              <div className="w-full max-w-md">
-                <div className="relative w-full aspect-[9/16] max-h-[65vh] mx-auto rounded-2xl overflow-hidden bg-black border border-white/[0.08] flex items-center justify-center">
+          <div className="flex-1 flex flex-col md:flex-row overflow-hidden md:overflow-hidden px-0 md:px-4 pb-0 md:pb-6 gap-0 md:gap-4">
+            <div className="flex-1 flex flex-col items-center overflow-hidden md:overflow-y-auto scrollbar-hide">
+              <div className="w-full h-full md:h-auto max-w-none md:max-w-md flex flex-col">
+                <div className="relative w-full flex-1 md:flex-none md:aspect-[9/16] md:max-h-[65vh] mx-auto rounded-none md:rounded-2xl overflow-hidden bg-black border-0 md:border md:border-white/[0.08] flex items-center justify-center">
                   {/* Toujours monte (meme avant connexion) — sinon l'attach() de la track video
                       arrive avant le montage de l'element et se perd silencieusement. */}
                   <video
@@ -529,7 +574,7 @@ export default function LiveViewerPage() {
 
                   {/* Duo — bulle video du partenaire (ou la mienne si j'ai accepte) */}
                   <div
-                    className={`absolute bottom-3 left-3 w-20 h-28 rounded-xl overflow-hidden border-2 border-[#a8ff35]/60 bg-black shadow-lg z-20 ${
+                    className={`absolute bottom-20 md:bottom-3 left-3 w-20 h-28 rounded-xl overflow-hidden border-2 border-[#a8ff35]/60 bg-black shadow-lg z-20 ${
                       duoPartnerId ? '' : 'hidden'
                     }`}
                   >
@@ -594,7 +639,7 @@ export default function LiveViewerPage() {
                   )}
 
                   {isAuction && roundActive && (
-                    <div className="absolute bottom-3 inset-x-0 flex flex-col items-center gap-1 px-4">
+                    <div className="absolute bottom-20 md:bottom-3 inset-x-0 flex flex-col items-center gap-1 px-4">
                       <button
                         onClick={() => setBidOpen(true)}
                         disabled={sessionEnded || live.creator.id === myId}
@@ -610,7 +655,7 @@ export default function LiveViewerPage() {
                   )}
 
                   {isAuction && !roundActive && !sessionEnded && (
-                    <div className="absolute bottom-3 inset-x-0 flex justify-center px-4">
+                    <div className="absolute bottom-20 md:bottom-3 inset-x-0 flex justify-center px-4">
                       <p className="bg-black/55 backdrop-blur-sm text-white/50 text-xs px-4 py-2 rounded-full">
                         En attente du lancement d&apos;une enchère par {live.creator.username}…
                       </p>
@@ -620,7 +665,7 @@ export default function LiveViewerPage() {
                   {/* Produit "en vente maintenant" — file de vente façon Whatnot, pilotée par le
                       créateur depuis son studio et diffusée en temps réel via websocket. */}
                   {!isAuction && live.featuredCapsule && (
-                    <div className="absolute bottom-3 inset-x-0 flex justify-center px-4">
+                    <div className="absolute bottom-20 md:bottom-3 inset-x-0 flex justify-center px-4">
                       <button
                         onClick={() => setCapsuleDrawerOpen(true)}
                         className="skoleom-capsule-btn skoleom-capsule-btn--breathe"
@@ -632,6 +677,110 @@ export default function LiveViewerPage() {
                   )}
 
                   <GiftBurstOverlay items={screenGifts} />
+
+                  {/* Mobile uniquement — fil de commentaires transparent façon TikTok (pas de
+                      pavé opaque qui mange l'écran) + rail d'actions + barre de saisie, tous en
+                      incrustation sur la vidéo au lieu d'un panneau séparé qui poussait la vidéo
+                      tout en haut. Le panneau desktop (chat/cadeaux) reste inchangé, caché ici. */}
+                  <div
+                    className="md:hidden absolute left-0 right-14 bottom-16 z-20 max-h-[38%] overflow-y-auto scrollbar-hide flex flex-col gap-1 px-3 pb-1 pointer-events-none"
+                    style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 22%)', maskImage: 'linear-gradient(to bottom, transparent 0%, black 22%)' }}
+                  >
+                    {comments.map((c) => {
+                      const isHost = c.userId === live.creator.id;
+                      if (c.isGift) {
+                        return (
+                          <p key={c.id} className="flex items-center gap-1.5 text-[12.5px] leading-snug [text-shadow:0_1px_4px_rgba(0,0,0,0.9)]">
+                            {c.giftImage && <img src={c.giftImage} alt="" className="w-4 h-4 object-contain shrink-0" />}
+                            <span className="font-bold text-[#f59e0b]">{c.username}</span>
+                            <span className="text-[#f59e0b]/90 font-medium">{c.text}</span>
+                          </p>
+                        );
+                      }
+                      if (c.isBid) {
+                        return (
+                          <p key={c.id} className="text-[12.5px] leading-snug [text-shadow:0_1px_4px_rgba(0,0,0,0.9)]">
+                            <span className="font-bold text-[#a8ff35]">{c.username}</span>{' '}
+                            <span className="text-[#a8ff35]/90 font-medium">{c.text}</span>
+                          </p>
+                        );
+                      }
+                      return (
+                        <p key={c.id} className="text-[12.5px] leading-snug [text-shadow:0_1px_4px_rgba(0,0,0,0.9)]">
+                          <span className={`font-bold ${isHost ? 'text-[#f59e0b]' : 'text-[#a8ff35]'}`}>{c.username}</span>
+                          {isHost && <Crown size={10} className="inline text-[#f59e0b] mx-1 -translate-y-px" />}
+                          <span className="text-white/95"> {c.text}</span>
+                        </p>
+                      );
+                    })}
+                    <div ref={mobileCommentsEndRef} />
+                  </div>
+
+                  <div className="md:hidden absolute right-2 bottom-16 z-30 flex flex-col items-center gap-4">
+                    <button
+                      onClick={() => setTopDonorsOpen(true)}
+                      className="w-11 h-11 rounded-full bg-black/40 border border-white/15 backdrop-blur-sm flex items-center justify-center"
+                    >
+                      <Trophy size={19} className="text-[#f59e0b]" />
+                    </button>
+                    <button
+                      onClick={() => setMobileGiftsOpen(true)}
+                      className="w-11 h-11 rounded-full bg-black/40 border border-white/15 backdrop-blur-sm flex items-center justify-center"
+                    >
+                      <Gift size={19} className="text-[#f59e0b]" />
+                    </button>
+                    {!isOwner && !duoPartnerId && (
+                      <button
+                        onClick={() => (duoRequestStatus === 'pending' ? cancelDuoRequest() : requestDuo())}
+                        className={`w-11 h-11 rounded-full border backdrop-blur-sm flex items-center justify-center transition-all ${
+                          duoRequestStatus === 'pending'
+                            ? 'bg-[#a8ff35] border-[#a8ff35] animate-pulse'
+                            : duoRequestStatus === 'declined' || duoRequestStatus === 'error'
+                            ? 'bg-red-500/70 border-red-400/60'
+                            : 'bg-black/40 border-white/15'
+                        }`}
+                        title="Demander un duo"
+                      >
+                        {duoRequestStatus === 'pending' ? (
+                          <Loader2 size={18} className="text-black animate-spin" />
+                        ) : (
+                          <Users2 size={19} className="text-white" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+
+                  {duoRequestStatus === 'declined' && (
+                    <div className="md:hidden absolute right-16 bottom-[6.2rem] z-30 bg-black/70 backdrop-blur-sm text-white text-[11px] px-2.5 py-1.5 rounded-lg">
+                      Demande refusée
+                    </div>
+                  )}
+                  {duoRequestStatus === 'error' && (
+                    <div className="md:hidden absolute right-16 bottom-[6.2rem] z-30 bg-black/70 backdrop-blur-sm text-white text-[11px] px-2.5 py-1.5 rounded-lg max-w-[160px]">
+                      {duoRequestErrorMsg || 'Duo refusé.'}
+                    </div>
+                  )}
+
+                  <div className="md:hidden absolute bottom-0 inset-x-0 z-30 pt-8 pb-3 px-3 bg-gradient-to-t from-black/75 via-black/25 to-transparent">
+                    {iAmMuted ? (
+                      <p className="text-center text-[11px] text-red-300 [text-shadow:0_1px_4px_rgba(0,0,0,0.9)]">
+                        Tu as été mis en sourdine par le créateur.
+                      </p>
+                    ) : (
+                      <form onSubmit={sendComment} className="flex items-center gap-2">
+                        <input
+                          type="text"
+                          value={commentInput}
+                          onChange={(e) => setCommentInput(e.target.value)}
+                          placeholder="Commenter…"
+                          className="flex-1 bg-black/35 border border-white/20 rounded-full px-3.5 py-2 text-white placeholder:text-white/50 text-[13px] backdrop-blur-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 transition-all"
+                        />
+                        <button type="submit" className="w-9 h-9 rounded-full bg-black/40 border border-white/15 backdrop-blur-sm flex items-center justify-center shrink-0">
+                          <Send size={14} className="text-[#a8ff35]" />
+                        </button>
+                      </form>
+                    )}
+                  </div>
                 </div>
 
                 {isAuction && roundActive && (
@@ -657,7 +806,7 @@ export default function LiveViewerPage() {
               </div>
             </div>
 
-            <div className="w-full md:w-[300px] shrink-0 flex flex-col gap-2">
+            <div className="hidden md:w-[300px] md:shrink-0 md:flex flex-col gap-2">
               <button
                 onClick={() => setTopDonorsOpen((o) => !o)}
                 className="shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-[#f59e0b]/20 via-[#f59e0b]/10 to-transparent border border-[#f59e0b]/30 hover:border-[#f59e0b]/50 transition-all text-left"
@@ -943,6 +1092,141 @@ export default function LiveViewerPage() {
           open={capsuleDrawerOpen}
           onClose={() => setCapsuleDrawerOpen(false)}
         />
+      )}
+
+      {/* Feuilles mobiles — top donateurs et cadeaux vivent dans le panneau desktop (voir plus
+          haut), sur mobile ce sont des feuilles plein écran ouvertes depuis le rail d'icônes. */}
+      {topDonorsOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-[9999] flex items-end bg-black/70 backdrop-blur-sm"
+          onClick={() => setTopDonorsOpen(false)}
+        >
+          <div className="w-full bg-[#0d0d0f] border-t border-[#f59e0b]/25 rounded-t-[24px] p-5 max-h-[75vh] overflow-y-auto scrollbar-hide" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-center mb-3">
+              <div className="w-10 h-1 rounded-full bg-white/20" />
+            </div>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-white font-bold text-base flex items-center gap-2">
+                <Trophy size={16} className="text-[#f59e0b]" /> Top donateurs
+              </h2>
+              <button onClick={() => setTopDonorsOpen(false)} className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
+                <XIcon size={16} className="text-white" />
+              </button>
+            </div>
+            {topDonors.length === 0 ? (
+              <p className="text-white/30 text-xs text-center py-6">Aucun cadeau envoyé pour l&apos;instant — sois le premier à soutenir {live.creator.username} !</p>
+            ) : (
+              <div className="space-y-1.5">
+                {topDonors.map((donor, i) => (
+                  <div key={donor.userId} className="flex items-center gap-2.5 px-1 py-1.5">
+                    <span className="w-5 text-center text-[13px] font-bold text-white/40 shrink-0">
+                      {i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : i + 1}
+                    </span>
+                    <div className="w-8 h-8 rounded-full bg-white/[0.06] overflow-hidden shrink-0 flex items-center justify-center text-[11px] font-bold text-white/60">
+                      {donor.avatarUrl ? (
+                        <img src={donor.avatarUrl} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        (donor.displayName || donor.username)[0]?.toUpperCase()
+                      )}
+                    </div>
+                    <span className="flex-1 min-w-0 text-[13px] text-white truncate">{donor.displayName || donor.username}</span>
+                    <span className="text-[12px] font-bold text-[#f59e0b] shrink-0">{donor.totalAmount.toFixed(2)} €</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {mobileGiftsOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-[9999] flex items-end bg-black/70 backdrop-blur-sm"
+          onClick={() => setMobileGiftsOpen(false)}
+        >
+          <div className="w-full bg-[#0d0d0f] border-t border-[#f59e0b]/25 rounded-t-[24px] max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-center pt-3 pb-1 shrink-0">
+              <div className="w-10 h-1 rounded-full bg-white/20" />
+            </div>
+            <div className="px-4 py-3 border-b border-white/[0.06] shrink-0 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-full bg-[#f59e0b]/20 border border-[#f59e0b]/40 flex items-center justify-center">
+                  <Wallet size={13} className="text-[#f59e0b]" />
+                </div>
+                <div>
+                  <p className="text-[15px] font-extrabold text-white leading-none">{coins.toLocaleString('fr-FR')} 🪙</p>
+                  <p className="text-[10px] text-white/35 mt-0.5">≈ {(coins / 100).toFixed(2).replace('.', ',')} €</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowRecharge((r) => !r)}
+                className="flex items-center gap-1 px-3 py-1.5 rounded-full bg-[#f59e0b]/15 border border-[#f59e0b]/35 text-[#f59e0b] text-[12px] font-bold"
+              >
+                <Plus size={12} /> Recharger
+              </button>
+            </div>
+
+            {showRecharge && (
+              <div className="px-3 py-3 border-b border-white/[0.06] shrink-0">
+                <p className="text-[11px] font-bold text-[#f59e0b] uppercase tracking-wide mb-2">Packs de coins</p>
+                <div className="grid grid-cols-2 gap-1.5">
+                  {COIN_PACKS.map((pack) => (
+                    <button
+                      key={pack.coins}
+                      onClick={() => buyCoins(pack)}
+                      className="flex items-center justify-between px-3 py-2 bg-white/[0.04] border border-white/[0.08] rounded-xl"
+                    >
+                      <span className="text-[13px] font-bold text-white">{pack.coins} 🪙</span>
+                      <span className="text-[12px] font-semibold text-[#f59e0b]">{pack.eur}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="px-4 py-2 shrink-0">
+              <p className="text-[11px] text-white/35">
+                Envoie un cadeau à <span className="text-white/60 font-semibold">{live.creator.username}</span> — il reçoit 50% de la valeur.
+              </p>
+            </div>
+
+            {giftError && (
+              <p className="mx-4 mb-2 text-red-400 text-[11px] bg-red-400/10 px-3 py-2 rounded-xl border border-red-400/20">{giftError}</p>
+            )}
+
+            <div className="flex-1 overflow-y-auto scrollbar-hide px-3 pb-6">
+              <div className="grid grid-cols-2 gap-2">
+                {GIFTS.map((gift) => {
+                  const canAfford = coins >= gift.coins;
+                  const wasSent = sentGift === gift.id;
+                  return (
+                    <button
+                      key={gift.id}
+                      onClick={() => sendRealGift(gift)}
+                      className={`relative flex flex-col items-center gap-1.5 rounded-[16px] p-3 border transition-all ${
+                        wasSent
+                          ? 'scale-95 bg-white/[0.12] border-white/30'
+                          : canAfford
+                          ? 'bg-white/[0.04] border-white/[0.07] active:scale-95'
+                          : 'bg-white/[0.02] border-white/[0.04] opacity-50 cursor-not-allowed'
+                      }`}
+                    >
+                      <img src={gift.image3d} alt={gift.name} className="w-10 h-10 object-contain" />
+                      <p className="text-[11px] font-bold text-white">{gift.name}</p>
+                      <span className="text-[10px] font-semibold text-[#f59e0b]">{gift.coins} 🪙</span>
+                      <p className="text-[9px] text-white/30">{gift.eur}</p>
+                      {wasSent && (
+                        <div className="absolute inset-0 rounded-[16px] flex items-center justify-center bg-black/40">
+                          <span className="text-[20px]">✓</span>
+                        </div>
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
 
       {viewersPanelOpen && (
