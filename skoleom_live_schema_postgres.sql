@@ -483,6 +483,7 @@ CREATE TABLE public.users (
     "walletBalance" numeric(10,2) DEFAULT '0'::numeric NOT NULL,
     "pendingBalance" numeric(10,2) DEFAULT '0'::numeric NOT NULL,
     "stripeAccountId" character varying,
+    "monetizerUserId" character varying,
     "instagramUserId" character varying,
     "instagramUsername" character varying,
     "instagramAccessToken" character varying,

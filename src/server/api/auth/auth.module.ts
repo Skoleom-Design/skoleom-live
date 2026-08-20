@@ -7,6 +7,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtStrategy } from './jwt.strategy';
 import { AdminSeedService } from './admin-seed.service';
+import { MonetizerService } from '../integrations/monetizer.service';
 
 @Module({
   imports: [
@@ -17,7 +18,7 @@ import { AdminSeedService } from './admin-seed.service';
       signOptions: { expiresIn: process.env.JWT_EXPIRES_IN || '7d' },
     }),
   ],
-  providers: [AuthService, JwtStrategy, AdminSeedService],
+  providers: [AuthService, JwtStrategy, AdminSeedService, MonetizerService],
   controllers: [AuthController],
   exports: [AuthService],
 })

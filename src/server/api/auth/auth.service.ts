@@ -7,6 +7,7 @@ import axios from 'axios';
 import { randomUUID } from 'crypto';
 import { User } from '../users/user.entity';
 import { UserPlan } from '../../../shared/types/entities';
+import { MonetizerService } from '../integrations/monetizer.service';
 
 const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
 const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
@@ -21,6 +22,7 @@ export class AuthService {
     @InjectRepository(User)
     private usersRepo: Repository<User>,
     private jwtService: JwtService,
+    private monetizerService: MonetizerService,
   ) {
     // Meme principe que InstagramService : JWT dedie de courte duree pour securiser `state`
     // sans avoir a le stocker cote serveur entre la redirection vers Google et le retour.
@@ -46,6 +48,14 @@ export class AuthService {
     const hashed = await bcrypt.hash(password, 12);
     const user = this.usersRepo.create({ email, username, password: hashed, plan });
     const saved = await this.usersRepo.save(user);
+
+    // Provisionnement du compte Monetizer en tache de fond — jamais bloquant, jamais fatal :
+    // voir MonetizerService pour le detail (mot de passe genere, jamais celui de l'utilisateur).
+    this.monetizerService.createAccount(email, username)
+      .then((monetizerUserId) => {
+        if (monetizerUserId) this.usersRepo.update(saved.id, { monetizerUserId });
+      });
+
     const { password: _, ...result } = saved;
     return { user: result, token: await this.issueSession(saved.id, saved.role) };
   }

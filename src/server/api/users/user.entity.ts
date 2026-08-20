@@ -70,6 +70,11 @@ export class User {
   @Column({ nullable: true })
   stripeAccountId: string;
 
+  // Compte Monetizer provisionne automatiquement a l'inscription — nul si l'appel a echoue
+  // (best-effort, jamais bloquant), voir MonetizerService.
+  @Column({ nullable: true })
+  monetizerUserId: string;
+
   @Column({ nullable: true })
   instagramUserId: string;
 
