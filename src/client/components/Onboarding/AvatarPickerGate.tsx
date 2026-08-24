@@ -3,6 +3,7 @@ import { api } from '../../../shared/api/http';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { PRESET_AVATARS } from '../../constants/avatars';
 import { AvatarCategoryPicker } from './AvatarCategoryPicker';
+import { LogoLockup } from '../Brand/LogoLockup';
 
 interface AvatarPickerGateProps {
   onDone: (avatarUrl: string) => void;
@@ -30,12 +31,8 @@ export function AvatarPickerGate({ onDone }: AvatarPickerGateProps) {
     <div className="cosmic-bg min-h-screen flex flex-col items-center justify-center px-4 py-10 animate-fade-in">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="w-fit flex flex-col items-center gap-2 rounded-2xl bg-[#a8ff35]/10 border border-[#a8ff35]/20 px-6 py-4 mx-auto mb-4">
-            <img src="/skoleom-mark.png" alt="" className="w-8 h-8 object-contain" />
-            <p className="text-lg leading-none">
-              <span className="font-semibold text-white">skoleom</span>
-              <span className="font-extrabold text-[#a8ff35]">Live</span>
-            </p>
+          <div className="flex justify-center mb-4">
+            <LogoLockup width={240} />
           </div>
           <h1 className="text-2xl font-bold text-white mb-2">{t('onboarding.chooseAvatar')}</h1>
           <p className="text-white/45 text-sm px-2">{t('onboarding.avatarSubtitle')}</p>

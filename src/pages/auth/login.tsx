@@ -7,6 +7,7 @@ import { api, ApiError, getToken, setSession, getStoredUser } from '../../shared
 import { useLanguage } from '../../client/i18n/LanguageContext';
 import { InterestsGate } from '../../client/components/Onboarding/InterestsGate';
 import { AvatarPickerGate } from '../../client/components/Onboarding/AvatarPickerGate';
+import { LogoLockup } from '../../client/components/Brand/LogoLockup';
 
 type Tab = 'login' | 'register';
 type OnboardingStep = 'avatar' | 'interests' | null;
@@ -152,12 +153,8 @@ export default function LoginPage() {
           <div className="w-full max-w-sm">
             {/* Heading */}
             <div key={tab} className="text-center mb-8 animate-fade-in">
-              <div className="w-fit flex flex-col items-center gap-2 rounded-2xl bg-[#a8ff35]/10 border border-[#a8ff35]/20 px-6 py-4 mx-auto mb-4">
-                <img src="/skoleom-mark.png" alt="" className="w-8 h-8 object-contain" />
-                <p className="text-lg leading-none">
-                  <span className="font-semibold text-white">skoleom</span>
-                  <span className="font-extrabold text-[#a8ff35]">Live</span>
-                </p>
+              <div className="flex justify-center mb-4">
+                <LogoLockup width={240} />
               </div>
               <h1 className="text-2xl font-bold text-white mb-2">
                 {tab === 'login' ? t('auth.welcome') : t('auth.createAccount')}

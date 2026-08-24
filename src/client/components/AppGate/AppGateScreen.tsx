@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { QrCode, Sparkles, LogIn } from 'lucide-react';
 import { getToken } from '../../../shared/api/http';
 import { useLanguage } from '../../i18n/LanguageContext';
+import { LogoLockup } from '../Brand/LogoLockup';
 
 const DISMISS_KEY = 'skoleom:app-gate-dismissed';
 
@@ -32,13 +33,8 @@ export function AppGateScreen() {
       <div className="cosmic-orb w-56 h-56 bg-[#00ffff]/[0.06] bottom-0 right-0 animate-float" style={{ animationDelay: '-4s' }} />
 
       <div className="relative w-full max-w-sm text-center my-auto">
-        <div className="relative w-fit flex flex-col items-center gap-2.5 rounded-[28px] bg-[#a8ff35]/10 border border-[#a8ff35]/20 px-9 py-6 mx-auto mb-5">
-          <div className="absolute inset-0 rounded-[28px] bg-skoleom-gradient-warm opacity-20 blur-xl animate-pulse-glow" />
-          <img src="/skoleom-mark.png" alt="" className="relative w-16 h-16 object-contain" />
-          <p className="relative text-[26px] leading-none">
-            <span className="font-semibold text-white">skoleom</span>
-            <span className="font-extrabold text-[#a8ff35]">Live</span>
-          </p>
+        <div className="flex justify-center mb-5">
+          <LogoLockup width={320} />
         </div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white/35 mb-8">{t('appGate.tagline')}</p>
         <p className="text-white/50 text-sm px-2 mb-10 leading-relaxed">{t('appGate.welcomeSubtitle')}</p>
