@@ -91,6 +91,22 @@ export class AdminController {
     return this.adminService.moderatePost(id, body.status);
   }
 
+  // Corbeille — supprime (soft) sans effacer les données, restaure, ou vide définitivement.
+  @Delete('posts/:id')
+  deletePost(@Param('id') id: string) {
+    return this.adminService.deletePost(id);
+  }
+
+  @Patch('posts/:id/restore')
+  restorePost(@Param('id') id: string) {
+    return this.adminService.restorePost(id);
+  }
+
+  @Delete('posts/:id/permanent')
+  permanentlyDeletePost(@Param('id') id: string) {
+    return this.adminService.permanentlyDeletePost(id);
+  }
+
   @Patch('users/:id/status')
   setUserActive(@Param('id') id: string, @Body() body: { isActive: boolean }, @Request() req) {
     return this.adminService.setUserActive(id, body.isActive, req.user.id);

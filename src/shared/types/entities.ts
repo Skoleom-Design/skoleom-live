@@ -19,6 +19,9 @@ export enum PostStatus {
   ACTIVE = 'active',
   ARCHIVED = 'archived',
   MODERATED = 'moderated',
+  // Supprimé par un admin (corbeille) — restaurable via AdminService.restorePost, distinct de
+  // ARCHIVED qui est un soft-delete par l'auteur lui-même (voir PostsService.delete).
+  DELETED = 'deleted',
 }
 
 export enum CapsuleStatus {

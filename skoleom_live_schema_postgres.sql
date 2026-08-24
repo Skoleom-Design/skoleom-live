@@ -148,8 +148,11 @@ CREATE TYPE public.orders_status_enum AS ENUM (
 CREATE TYPE public.posts_status_enum AS ENUM (
     'active',
     'archived',
-    'moderated'
+    'moderated',
+    'deleted'
 );
+-- 'deleted' ajouté pour la corbeille admin (voir AdminService.deletePost/restorePost) — sur une
+-- base existante : ALTER TYPE public.posts_status_enum ADD VALUE 'deleted';
 
 
 --

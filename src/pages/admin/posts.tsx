@@ -1,19 +1,20 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { Search, Eye, EyeOff } from 'lucide-react';
+import { Search, Eye, EyeOff, Trash2, RotateCcw, XCircle } from 'lucide-react';
 import { AdminSidebar } from '../../client/components/Layout/AdminSidebar';
 import type { Post } from '../../shared/types/api';
 import { api } from '../../shared/api/http';
 
-type PostStatus = 'active' | 'archived' | 'moderated';
+type PostStatus = 'active' | 'archived' | 'moderated' | 'deleted';
 type AdminPost = Post & { status: PostStatus };
-type FilterKey = '' | 'active' | 'hidden';
+type FilterKey = '' | 'active' | 'hidden' | 'trash';
 
 const FILTERS: { key: FilterKey; label: string }[] = [
   { key: '', label: 'Tous' },
   { key: 'active', label: 'Affiché' },
   { key: 'hidden', label: 'Caché' },
+  { key: 'trash', label: 'Corbeille' },
 ];
 
 // modéré et archivé ont le même effet réel (post retiré du feed) — on les affiche
@@ -57,6 +58,41 @@ export default function AdminPosts() {
       setPosts((prev) => prev.map((p) => (p.id === id ? { ...p, status } : p)));
     } catch {
       // le statut affiché reste inchangé si la requête échoue
+    }
+  }
+
+  // Corbeille — supprimer retire le post de la liste courante (il n'apparaît que sous l'onglet
+  // Corbeille), restaurer/vider ne s'utilisent que depuis cet onglet donc on retire la ligne.
+  async function moveToTrash(id: string) {
+    try {
+      await api.delete(`/admin/posts/${id}`);
+      setPosts((prev) => prev.filter((p) => p.id !== id));
+      setTotal((t) => t - 1);
+    } catch {
+      // rien de local à annuler, la ligne reste affichée si la requête échoue
+    }
+  }
+
+  async function restore(id: string) {
+    try {
+      await api.patch(`/admin/posts/${id}/restore`, {});
+      setPosts((prev) => prev.filter((p) => p.id !== id));
+      setTotal((t) => t - 1);
+    } catch {
+      // idem
+    }
+  }
+
+  async function permanentlyDelete(id: string) {
+    if (!window.confirm('Supprimer définitivement ce post ? Ses commentaires et boosts seront aussi effacés. Cette action est irréversible.')) {
+      return;
+    }
+    try {
+      await api.delete(`/admin/posts/${id}/permanent`);
+      setPosts((prev) => prev.filter((p) => p.id !== id));
+      setTotal((t) => t - 1);
+    } catch {
+      // idem
     }
   }
 
@@ -109,6 +145,7 @@ export default function AdminPosts() {
           ) : (
             <div className="space-y-3">
               {posts.map((post) => {
+                const inTrash = post.status === 'deleted';
                 const hidden = isHidden(post.status);
                 return (
                   <div
@@ -128,26 +165,52 @@ export default function AdminPosts() {
                       </Link>
                       <p className="text-xs text-gray-400 mt-0.5">
                         @{post.creator?.username || 'inconnu'} ·{' '}
-                        <span className={hidden ? 'text-gray-400' : 'text-green-400'}>
-                          {hidden ? 'Caché' : 'Affiché'}
+                        <span className={inTrash ? 'text-red-400' : hidden ? 'text-gray-400' : 'text-green-400'}>
+                          {inTrash ? 'Dans la corbeille' : hidden ? 'Caché' : 'Affiché'}
                         </span>
                       </p>
                     </div>
                     <div className="flex gap-2">
-                      {hidden ? (
-                        <button
-                          onClick={() => moderate(post.id, 'active')}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-green-400/30 text-green-400 hover:bg-green-400/10 transition-colors"
-                        >
-                          <Eye size={13} /> Afficher
-                        </button>
+                      {inTrash ? (
+                        <>
+                          <button
+                            onClick={() => restore(post.id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-green-400/30 text-green-400 hover:bg-green-400/10 transition-colors"
+                          >
+                            <RotateCcw size={13} /> Restaurer
+                          </button>
+                          <button
+                            onClick={() => permanentlyDelete(post.id)}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-red-500/30 text-red-500 hover:bg-red-500/10 transition-colors"
+                          >
+                            <XCircle size={13} /> Supprimer définitivement
+                          </button>
+                        </>
                       ) : (
-                        <button
-                          onClick={() => moderate(post.id, 'moderated')}
-                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-red-400/30 text-red-400 hover:bg-red-400/10 transition-colors"
-                        >
-                          <EyeOff size={13} /> Cacher
-                        </button>
+                        <>
+                          {hidden ? (
+                            <button
+                              onClick={() => moderate(post.id, 'active')}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-green-400/30 text-green-400 hover:bg-green-400/10 transition-colors"
+                            >
+                              <Eye size={13} /> Afficher
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => moderate(post.id, 'moderated')}
+                              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-red-400/30 text-red-400 hover:bg-red-400/10 transition-colors"
+                            >
+                              <EyeOff size={13} /> Cacher
+                            </button>
+                          )}
+                          <button
+                            onClick={() => moveToTrash(post.id)}
+                            title="Mettre à la corbeille"
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border border-white/15 text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
+                          >
+                            <Trash2 size={13} />
+                          </button>
+                        </>
                       )}
                     </div>
                   </div>

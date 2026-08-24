@@ -198,8 +198,14 @@ export class AdminService {
     // (le post disparaît du feed), donc l'UI les traite comme un seul état "Caché".
     if (status === 'hidden') {
       qb.andWhere('post.status IN (:...statuses)', { statuses: [PostStatus.MODERATED, PostStatus.ARCHIVED] });
+    } else if (status === 'trash') {
+      qb.andWhere('post.status = :status', { status: PostStatus.DELETED });
     } else if (status) {
       qb.andWhere('post.status = :status', { status });
+    } else {
+      // Par défaut ("Tous"), la corbeille reste un espace séparé — un post supprimé n'apparaît
+      // que dans l'onglet dédié, pas mélangé avec les posts actifs/cachés.
+      qb.andWhere('post.status != :deleted', { deleted: PostStatus.DELETED });
     }
     if (search?.trim()) {
       qb.andWhere('(post.caption LIKE :search OR creator.username LIKE :search)', {
@@ -319,6 +325,28 @@ export class AdminService {
 
   async moderatePost(postId: string, status: PostStatus): Promise<void> {
     await this.postsRepo.update(postId, { status });
+  }
+
+  // Corbeille — soft-delete admin, distinct de ARCHIVED (soft-delete par l'auteur). Restaurable
+  // via restorePost tant qu'il n'a pas été vidé via permanentlyDeletePost.
+  async deletePost(postId: string): Promise<void> {
+    await this.postsRepo.update(postId, { status: PostStatus.DELETED });
+  }
+
+  async restorePost(postId: string): Promise<void> {
+    await this.postsRepo.update(postId, { status: PostStatus.ACTIVE });
+  }
+
+  // Vide la corbeille pour ce post — irréversible. Meme ordre de nettoyage (tables filles avant
+  // le post lui-meme) que UsersService.deleteAccount ; post_likes/post_capsules sont des tables
+  // de jointure avec ON DELETE CASCADE, pas besoin de les nettoyer explicitement.
+  async permanentlyDeletePost(postId: string): Promise<void> {
+    await this.postsRepo.manager.transaction(async (manager) => {
+      await manager.query('DELETE FROM comments WHERE "postId" = $1', [postId]);
+      await manager.query('DELETE FROM boosts WHERE "postId" = $1', [postId]);
+      await manager.query('DELETE FROM notifications WHERE "postId" = $1', [postId]);
+      await manager.query('DELETE FROM posts WHERE id = $1', [postId]);
+    });
   }
 
   async setUserActive(userId: string, isActive: boolean, adminId: string): Promise<void> {
