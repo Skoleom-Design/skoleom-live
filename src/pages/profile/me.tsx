@@ -230,11 +230,22 @@ export default function ProfilePage() {
 
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
   const [notifLoading, setNotifLoading] = useState(false);
+  const [unreadNotifCount, setUnreadNotifCount] = useState(0);
+
+  // Independant de l'onglet actif — sert au point rouge sur l'onglet "Notifications" lui-meme
+  // (avant, tout /profile/me marquait les notifications comme lues, meme sans ouvrir cet onglet).
+  useEffect(() => {
+    api.get<{ count: number }>('/notifications/unread-count').then((res) => setUnreadNotifCount(res.count)).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (tab !== 'notifications') return;
     setNotifLoading(true);
     api.get<AppNotification[]>('/notifications').then(setNotifications).catch(() => {}).finally(() => setNotifLoading(false));
+    if (unreadNotifCount > 0) {
+      api.patch('/notifications/read-all', {}).then(() => setUnreadNotifCount(0)).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
   function showComingSoon(label: string) {
@@ -765,8 +776,14 @@ export default function ProfilePage() {
                 const active = tab === tabItem.key;
                 return (
                   <button key={tabItem.key} onClick={() => setTab(tabItem.key)}
-                    className={`flex items-center gap-2 px-4 py-2.5 text-[13px] font-semibold border-b-2 transition-all -mb-px ${active ? 'border-white text-white' : 'border-transparent text-white/40 hover:text-white/70'}`}>
-                    <Icon size={15} />{tabItem.label}
+                    className={`relative flex items-center gap-2 px-4 py-2.5 text-[13px] font-semibold border-b-2 transition-all -mb-px ${active ? 'border-white text-white' : 'border-transparent text-white/40 hover:text-white/70'}`}>
+                    <span className="relative">
+                      <Icon size={15} />
+                      {tabItem.key === 'notifications' && unreadNotifCount > 0 && (
+                        <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 border-2 border-black/80" />
+                      )}
+                    </span>
+                    {tabItem.label}
                   </button>
                 );
               })}

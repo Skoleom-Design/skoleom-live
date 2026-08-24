@@ -53,12 +53,9 @@ export function AppSidebar() {
     };
   }, [router.pathname]);
 
-  // Visiter son profil marque les notifications comme lues — le badge disparaît.
-  useEffect(() => {
-    if (router.pathname === '/profile/me' && unreadCount > 0) {
-      api.patch('/notifications/read-all', {}).then(() => setUnreadCount(0)).catch(() => {});
-    }
-  }, [router.pathname, unreadCount]);
+  // Le marquage "lu" se fait desormais uniquement en ouvrant l'onglet Notifications du profil
+  // (voir profile/me.tsx) — visiter /profile/me sur un autre onglet (Posts, Wallet...) ne doit
+  // plus effacer le badge sans que l'utilisateur ait reellement vu ses notifications.
 
   // Visiter la messagerie remet a zero le badge — chaque conversation ouverte marque ses
   // propres messages comme lus (voir pages/messages/[id].tsx), ce badge ne fait que suivre.
