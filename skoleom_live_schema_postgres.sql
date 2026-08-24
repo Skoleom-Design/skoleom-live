@@ -355,6 +355,45 @@ CREATE TABLE public.live_comments (
 
 
 --
+-- Name: live_guests; Type: TABLE; Schema: public; Owner: -
+-- Invités autorisés à publier caméra/micro dans la room LiveKit d'un live, en plus du créateur
+-- (généralisation multi-invités de l'ancien slot unique live_sessions.duoPartnerId — cette
+-- colonne, si elle existe encore en base, n'est plus lue/écrite par le code applicatif).
+--
+
+CREATE TABLE public.live_guests (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    "liveId" uuid NOT NULL,
+    "userId" uuid NOT NULL,
+    "joinedAt" timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT "PK_live_guests" PRIMARY KEY (id),
+    CONSTRAINT "UQ_live_guests_live_user" UNIQUE ("liveId", "userId")
+);
+
+CREATE INDEX "IDX_live_guests_liveId" ON public.live_guests ("liveId");
+CREATE INDEX "IDX_live_guests_userId" ON public.live_guests ("userId");
+
+
+--
+-- Name: live_viewer_access; Type: TABLE; Schema: public; Owner: -
+-- Qui a le droit de REGARDER un live prive (live_sessions."isPrivate"), en plus du créateur —
+-- distinct de live_guests qui contrôle qui a le droit de PUBLIER sa caméra/micro.
+--
+
+CREATE TABLE public.live_viewer_access (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    "liveId" uuid NOT NULL,
+    "userId" uuid NOT NULL,
+    "grantedAt" timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT "PK_live_viewer_access" PRIMARY KEY (id),
+    CONSTRAINT "UQ_live_viewer_access_live_user" UNIQUE ("liveId", "userId")
+);
+
+CREATE INDEX "IDX_live_viewer_access_liveId" ON public.live_viewer_access ("liveId");
+CREATE INDEX "IDX_live_viewer_access_userId" ON public.live_viewer_access ("userId");
+
+
+--
 -- Name: live_sessions; Type: TABLE; Schema: public; Owner: -
 --
 
@@ -364,6 +403,7 @@ CREATE TABLE public.live_sessions (
     status public.live_sessions_status_enum DEFAULT 'live'::public.live_sessions_status_enum NOT NULL,
     mode public.live_sessions_mode_enum DEFAULT 'live'::public.live_sessions_mode_enum NOT NULL,
     "creatorId" uuid NOT NULL,
+    "isPrivate" boolean DEFAULT false NOT NULL,
     "startedAt" timestamp without time zone,
     "endedAt" timestamp without time zone,
     "featuredCapsuleId" uuid,
@@ -378,6 +418,24 @@ CREATE TABLE public.live_sessions (
     "createdAt" timestamp without time zone DEFAULT now() NOT NULL,
     "updatedAt" timestamp without time zone DEFAULT now() NOT NULL
 );
+
+
+--
+-- Name: login_logs; Type: TABLE; Schema: public; Owner: -
+-- Une ligne par connexion reussie (login classique ou Google) — historique affiche dans le
+-- detail utilisateur admin, voir AdminService.getUserDetail.
+--
+
+CREATE TABLE public.login_logs (
+    id uuid DEFAULT gen_random_uuid() NOT NULL,
+    "userId" uuid NOT NULL,
+    ip character varying,
+    "userAgent" character varying,
+    "createdAt" timestamp with time zone DEFAULT now() NOT NULL,
+    CONSTRAINT "PK_login_logs" PRIMARY KEY (id)
+);
+
+CREATE INDEX "IDX_login_logs_userId" ON public.login_logs ("userId");
 
 
 --

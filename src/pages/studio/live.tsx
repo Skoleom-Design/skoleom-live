@@ -3,10 +3,10 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import { io, Socket } from 'socket.io-client';
-import { Room, RoomEvent, Track } from 'livekit-client';
+import { Room, RoomEvent, Track, type RemoteTrack } from 'livekit-client';
 import {
   ArrowLeft, Mic, MicOff, Video, VideoOff, Radio, Loader2, Send, Users, Package, X, ShoppingBag,
-  Crown, Trash2, UserX, Gavel, Timer, ChevronRight, Plus, Trophy, Users2, AlertTriangle, MoreVertical, Check,
+  Crown, Trash2, UserX, Gavel, Timer, ChevronRight, Plus, Trophy, Users2, AlertTriangle, MoreVertical, Check, Lock, Eye,
 } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
@@ -24,6 +24,7 @@ interface LiveSession {
   id: string;
   title?: string;
   startedAt: string;
+  isPrivate?: boolean;
   capsules?: Capsule[];
   mode?: LiveMode;
   auctionCapsuleId?: string;
@@ -138,27 +139,89 @@ export default function StudioLivePage() {
   const [topDonors, setTopDonors] = useState<TopDonor[]>([]);
   const [topDonorsOpen, setTopDonorsOpen] = useState(false);
 
-  // Duo façon TikTok — voir LivesGateway (inviteDuo/respondDuo/endDuo) pour le signalement.
-  // Le meme panneau sert aussi de liste des spectateurs avec moderation (exclure/muter) —
-  // voir openDuoPanel, kickUser, setMuted.
+  // Invites façon TikTok (ex-duo, desormais N invites simultanes) — voir LivesGateway
+  // (inviteDuo/respondDuo/requestDuo/respondDuoRequest/endDuo) pour le signalement. Le meme
+  // panneau sert aussi de liste des spectateurs avec moderation (exclure/muter) — voir
+  // openDuoPanel, kickUser, setMuted.
   const [duoPanelOpen, setDuoPanelOpen] = useState(false);
   const [viewersList, setViewersList] = useState<{ userId: string; username: string; avatarUrl?: string; muted: boolean }[]>([]);
-  const [duoPartner, setDuoPartner] = useState<{ id: string; username: string; avatarUrl?: string } | null>(null);
+  const [guests, setGuests] = useState<{ id: string; username: string; avatarUrl?: string }[]>([]);
   const [duoInviteStatus, setDuoInviteStatus] = useState<'idle' | 'inviting' | 'declined' | 'error'>('idle');
   const [duoErrorMsg, setDuoErrorMsg] = useState('');
   // Demandes de duo initiees par des spectateurs (sens inverse d'inviteDuo) — plusieurs peuvent
   // etre en attente en meme temps, voir requestDuo/respondDuoRequest dans LivesGateway.
   const [duoRequests, setDuoRequests] = useState<{ userId: string; username: string; avatarUrl?: string }[]>([]);
+  // Demandes d'ACCES VISIONNAGE (live prive) — distinct des demandes de duo ci-dessus, voir
+  // requestViewAccess/respondViewRequest dans LivesGateway.
+  const [viewRequests, setViewRequests] = useState<{ userId: string; username: string; avatarUrl?: string }[]>([]);
+  // Onglets du panneau d'invitation — recherche par pseudo et "mes abonnements" en plus de la
+  // liste des spectateurs deja connectes (voir GET /users/search et GET /follows/mine/following).
+  const [invitePanelTab, setInvitePanelTab] = useState<'viewers' | 'search' | 'following'>('viewers');
+  const [inviteQuery, setInviteQuery] = useState('');
+  const [inviteSearchResults, setInviteSearchResults] = useState<{ id: string; username: string; displayName?: string; avatarUrl?: string }[]>([]);
+  const [followingList, setFollowingList] = useState<{ id: string; username: string; displayName?: string; avatarUrl?: string }[]>([]);
   // Feuille mobile — sur desktop le "Top donateur" vit dans le panneau lateral (voir plus bas),
   // sur mobile c'est une feuille ouverte depuis une icone sur la video (voir le bloc md:hidden).
   const [mobileTopDonorsOpen, setMobileTopDonorsOpen] = useState(false);
   const [openViewerMenuId, setOpenViewerMenuId] = useState<string | null>(null);
-  const duoVideoRef = useRef<HTMLVideoElement>(null);
-  const duoAudioRef = useRef<HTMLAudioElement>(null);
+  const guestVideoRefs = useRef(new Map<string, HTMLVideoElement>());
+  const guestAudioRefs = useRef(new Map<string, HTMLAudioElement>());
+  const guestTracksRef = useRef(new Map<string, RemoteTrack[]>());
+  const pendingGuestTracksRef = useRef(new Map<string, RemoteTrack[]>());
+
+  function attachGuestTrack(guestId: string, track: RemoteTrack) {
+    const el = track.kind === Track.Kind.Video ? guestVideoRefs.current.get(guestId) : guestAudioRefs.current.get(guestId);
+    if (!el) {
+      if (!pendingGuestTracksRef.current.has(guestId)) pendingGuestTracksRef.current.set(guestId, []);
+      pendingGuestTracksRef.current.get(guestId)!.push(track);
+      return;
+    }
+    track.attach(el);
+    if (!guestTracksRef.current.has(guestId)) guestTracksRef.current.set(guestId, []);
+    guestTracksRef.current.get(guestId)!.push(track);
+    if (track.kind === Track.Kind.Audio) (el as HTMLAudioElement).play().catch(() => {});
+  }
+
+  function flushPendingGuestTracks(guestId: string, kind: Track.Kind) {
+    const pending = pendingGuestTracksRef.current.get(guestId) ?? [];
+    const matching = pending.filter((t) => t.kind === kind);
+    const rest = pending.filter((t) => t.kind !== kind);
+    pendingGuestTracksRef.current.set(guestId, rest);
+    matching.forEach((t) => attachGuestTrack(guestId, t));
+  }
+
+  function makeGuestVideoRef(guestId: string) {
+    return (el: HTMLVideoElement | null) => {
+      if (el) {
+        guestVideoRefs.current.set(guestId, el);
+        flushPendingGuestTracks(guestId, Track.Kind.Video);
+      }
+      return () => {
+        guestVideoRefs.current.delete(guestId);
+        (guestTracksRef.current.get(guestId) ?? []).forEach((t) => { if (el && t.kind === Track.Kind.Video) t.detach(el); });
+      };
+    };
+  }
+
+  function makeGuestAudioRef(guestId: string) {
+    return (el: HTMLAudioElement | null) => {
+      if (el) {
+        guestAudioRefs.current.set(guestId, el);
+        flushPendingGuestTracks(guestId, Track.Kind.Audio);
+      }
+      return () => {
+        guestAudioRefs.current.delete(guestId);
+        (guestTracksRef.current.get(guestId) ?? []).forEach((t) => { if (el && t.kind === Track.Kind.Audio) t.detach(el); });
+      };
+    };
+  }
 
   // "Commencer un live" (Studio) renvoie ici sans parametre — mode par defaut "live". "Commencer
   // une enchere" renvoie avec ?mode=auction, voir l'effet ci-dessous.
   const [mode, setMode] = useState<LiveMode>('live');
+  // Live prive — seul le createur (+ invites/demandes acceptees) peut regarder, voir
+  // LivesGateway (inviteViewer/requestViewAccess/respondViewRequest) et LiveSession.isPrivate.
+  const [isPrivate, setIsPrivate] = useState(false);
 
   // Le bouton "Enchere" du Studio renvoie ici avec ?mode=auction pour pre-selectionner le mode.
   useEffect(() => {
@@ -386,14 +449,14 @@ export default function StudioLivePage() {
       setViewersList((prev) => prev.map((v) => (v.userId === d.userId ? { ...v, muted: d.muted } : v)));
     });
     socket.on('duoStarted', (d: { partnerId: string; partnerUsername: string; partnerAvatarUrl?: string }) => {
-      setDuoPartner({ id: d.partnerId, username: d.partnerUsername, avatarUrl: d.partnerAvatarUrl });
+      setGuests((prev) => (prev.some((g) => g.id === d.partnerId) ? prev : [...prev, { id: d.partnerId, username: d.partnerUsername, avatarUrl: d.partnerAvatarUrl }]));
       setDuoInviteStatus('idle');
-      setDuoPanelOpen(false);
-      setDuoRequests([]);
     });
-    socket.on('duoEnded', () => {
-      setDuoPartner(null);
-      duoVideoRef.current?.srcObject && (duoVideoRef.current.srcObject = null);
+    socket.on('duoEnded', (d: { userId: string }) => {
+      setGuests((prev) => prev.filter((g) => g.id !== d.userId));
+      (guestTracksRef.current.get(d.userId) ?? []).forEach((t) => t.detach());
+      guestTracksRef.current.delete(d.userId);
+      pendingGuestTracksRef.current.delete(d.userId);
     });
     socket.on('duoDeclined', () => setDuoInviteStatus('declined'));
     socket.on('duoError', (d: { message: string }) => {
@@ -405,6 +468,12 @@ export default function StudioLivePage() {
     });
     socket.on('duoRequestCancelled', (d: { userId: string }) => {
       setDuoRequests((prev) => prev.filter((r) => r.userId !== d.userId));
+    });
+    socket.on('viewRequestReceived', (d: { userId: string; username: string; avatarUrl?: string }) => {
+      setViewRequests((prev) => (prev.some((r) => r.userId === d.userId) ? prev : [...prev, d]));
+    });
+    socket.on('viewRequestCancelled', (d: { userId: string }) => {
+      setViewRequests((prev) => prev.filter((r) => r.userId !== d.userId));
     });
 
     return () => {
@@ -424,6 +493,7 @@ export default function StudioLivePage() {
   function openDuoPanel() {
     if (!live) return;
     setDuoPanelOpen(true);
+    setInvitePanelTab('viewers');
     setDuoInviteStatus('idle');
     socketRef.current?.emit('listViewers', { liveId: live.id, token: getToken() });
   }
@@ -434,10 +504,30 @@ export default function StudioLivePage() {
     socketRef.current?.emit('inviteDuo', { liveId: live.id, targetUserId, token: getToken() });
   }
 
-  function endDuo() {
+  function endDuo(targetUserId: string) {
     if (!live) return;
-    socketRef.current?.emit('endDuo', { liveId: live.id, token: getToken() });
+    socketRef.current?.emit('endDuo', { liveId: live.id, token: getToken(), targetUserId });
   }
+
+  // Recherche par pseudo debattue cote serveur — meme pattern que pages/index.tsx.
+  useEffect(() => {
+    const q = inviteQuery.trim();
+    if (!q) { setInviteSearchResults([]); return; }
+    const timeout = setTimeout(() => {
+      api.get<{ id: string; username: string; displayName?: string; avatarUrl?: string }[]>(`/users/search?q=${encodeURIComponent(q)}`)
+        .then(setInviteSearchResults)
+        .catch(() => setInviteSearchResults([]));
+    }, 250);
+    return () => clearTimeout(timeout);
+  }, [inviteQuery]);
+
+  // Charge la liste d'abonnements une seule fois a l'ouverture de cet onglet, pas a chaque frappe.
+  useEffect(() => {
+    if (invitePanelTab !== 'following' || !duoPanelOpen) return;
+    api.get<{ id: string; username: string; displayName?: string; avatarUrl?: string }[]>('/follows/mine/following')
+      .then(setFollowingList)
+      .catch(() => setFollowingList([]));
+  }, [invitePanelTab, duoPanelOpen]);
 
   function respondDuoRequest(targetUserId: string, accept: boolean) {
     if (!live) return;
@@ -445,11 +535,31 @@ export default function StudioLivePage() {
     setDuoRequests((prev) => prev.filter((r) => r.userId !== targetUserId));
   }
 
+  // Accorde l'acces visionnage a quelqu'un — immediat, pas besoin qu'il accepte (contrairement
+  // au duo qui implique de publier sa camera, voir LivesGateway.handleInviteViewer).
+  function inviteViewer(targetUserId: string) {
+    if (!live) return;
+    socketRef.current?.emit('inviteViewer', { liveId: live.id, targetUserId, token: getToken() });
+  }
+
+  function respondViewRequest(targetUserId: string, accept: boolean) {
+    if (!live) return;
+    socketRef.current?.emit('respondViewRequest', { liveId: live.id, userId: targetUserId, accept, token: getToken() });
+    setViewRequests((prev) => prev.filter((r) => r.userId !== targetUserId));
+  }
+
   useEffect(() => {
     if (!live?.id) return;
     fetchTopDonors(live.id);
     const timer = setInterval(() => fetchTopDonors(live.id), 20000);
     return () => clearInterval(timer);
+  }, [live?.id]);
+
+  // Invites deja presents si le studio est recharge en cours de live (l'etat temps reel seul
+  // ne couvre que les changements a partir de maintenant).
+  useEffect(() => {
+    if (!live?.id) return;
+    api.get<{ id: string; username: string; avatarUrl?: string }[]>(`/lives/${live.id}/guests`).then(setGuests).catch(() => {});
   }, [live?.id]);
 
   useEffect(() => {
@@ -519,14 +629,10 @@ export default function StudioLivePage() {
         const { token, url } = await api.get<{ token: string; url: string }>(`/lives/${live.id}/livekit-token`);
         if (cancelled) return;
         const room = new Room();
-        // Seul un partenaire de duo peut publier dans cette room a part moi — n'importe quelle
-        // piste reçue d'un autre participant est forcement la sienne.
-        room.on(RoomEvent.TrackSubscribed, (track) => {
-          if (track.kind === Track.Kind.Video && duoVideoRef.current) {
-            track.attach(duoVideoRef.current);
-          } else if (track.kind === Track.Kind.Audio && duoAudioRef.current) {
-            track.attach(duoAudioRef.current);
-          }
+        // Seuls les invites peuvent publier dans cette room a part moi — n'importe quelle piste
+        // reçue d'un autre participant est forcement celle d'un invite (voir son identity).
+        room.on(RoomEvent.TrackSubscribed, (track, _pub, participant) => {
+          attachGuestTrack(participant.identity, track);
         });
         room.on(RoomEvent.TrackUnsubscribed, (track) => track.detach());
         await room.connect(url, token);
@@ -598,6 +704,7 @@ export default function StudioLivePage() {
       const session = await api.post<LiveSession>('/lives', {
         title: title.trim() || undefined,
         mode: mode === 'auction' ? 'auction' : undefined,
+        isPrivate: isPrivate || undefined,
       });
       setLive(session);
       setElapsed(0);
@@ -826,9 +933,16 @@ export default function StudioLivePage() {
                   )}
 
                   {live && (
-                    <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-red-600 text-white text-[11px] font-extrabold px-2.5 py-1 rounded-full">
-                      <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
-                      LIVE · {fmtElapsed(elapsed)}
+                    <div className="absolute top-3 left-3 flex items-center gap-1.5">
+                      <div className="flex items-center gap-1.5 bg-red-600 text-white text-[11px] font-extrabold px-2.5 py-1 rounded-full">
+                        <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
+                        LIVE · {fmtElapsed(elapsed)}
+                      </div>
+                      {live.isPrivate && (
+                        <div className="flex items-center gap-1 bg-black/60 text-white/80 text-[11px] font-semibold px-2 py-1 rounded-full">
+                          <Lock size={10} /> Privé
+                        </div>
+                      )}
                     </div>
                   )}
 
@@ -878,14 +992,14 @@ export default function StudioLivePage() {
                       </button>
                       {live && (
                         <button
-                          onClick={() => (duoPartner ? endDuo() : openDuoPanel())}
+                          onClick={openDuoPanel}
                           className={`relative w-11 h-11 rounded-full flex items-center justify-center transition-all ${
-                            duoPartner ? 'bg-[#a8ff35] text-black' : 'bg-white/10 hover:bg-white/20 text-white'
+                            guests.length > 0 ? 'bg-[#a8ff35] text-black' : 'bg-white/10 hover:bg-white/20 text-white'
                           }`}
-                          title={duoPartner ? 'Terminer le duo' : 'Inviter en duo'}
+                          title="Gérer les invités"
                         >
                           <Users2 size={18} />
-                          {!duoPartner && duoRequests.length > 0 && (
+                          {duoRequests.length > 0 && (
                             <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-black" />
                           )}
                         </button>
@@ -896,7 +1010,7 @@ export default function StudioLivePage() {
                   {/* Demande de duo entrante — un spectateur a demande a nous rejoindre (sens
                       inverse d'"Inviter en duo"). On ne montre que la premiere ici, les autres
                       (s'il y en a) sont visibles dans le panneau "Spectateurs". */}
-                  {!duoPartner && duoRequests.length > 0 && (
+                  {duoRequests.length > 0 && (
                     <div className="absolute top-14 left-3 right-3 z-30 flex items-center justify-between gap-2 bg-black/80 backdrop-blur-sm border border-[#a8ff35]/40 rounded-2xl px-3.5 py-2.5">
                       <p className="text-white text-[12px] font-medium min-w-0">
                         <span className="font-bold text-[#a8ff35]">@{duoRequests[0].username}</span> demande à faire un duo
@@ -956,30 +1070,34 @@ export default function StudioLivePage() {
                     <Trophy size={17} className="text-[#f59e0b]" />
                   </button>
 
-                  {/* Duo — bulle video du partenaire, en incrustation */}
-                  <div
-                    className={`absolute bottom-16 left-3 w-20 h-28 rounded-xl overflow-hidden border-2 border-[#a8ff35]/60 bg-black shadow-lg z-10 ${
-                      duoPartner ? '' : 'hidden'
-                    }`}
-                  >
-                    <video ref={duoVideoRef} autoPlay playsInline className="w-full h-full object-cover" />
-                    <audio ref={duoAudioRef} autoPlay />
-                    {duoPartner && (
-                      <span className="absolute bottom-0.5 inset-x-0 text-center text-[9px] text-white/90 font-semibold truncate px-1 drop-shadow">
-                        @{duoPartner.username}
-                      </span>
-                    )}
-                  </div>
+                  {/* Invites — une bulle video par invite, en incrustation */}
+                  {guests.length > 0 && (
+                    <div className="absolute bottom-16 left-3 flex items-end gap-1.5 z-10">
+                      {guests.map((g) => (
+                        <div key={g.id} className="relative w-20 h-28 rounded-xl overflow-hidden border-2 border-[#a8ff35]/60 bg-black shadow-lg shrink-0">
+                          <video ref={makeGuestVideoRef(g.id)} autoPlay playsInline className="w-full h-full object-cover" />
+                          <audio ref={makeGuestAudioRef(g.id)} autoPlay />
+                          <span className="absolute bottom-0.5 inset-x-0 text-center text-[9px] text-white/90 font-semibold truncate px-1 drop-shadow">
+                            @{g.username}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
 
                   <GiftBurstOverlay items={screenGifts} />
                 </div>
 
-                {duoPartner && (
-                  <div className="mt-2 flex items-center justify-between bg-[#a8ff35]/10 border border-[#a8ff35]/25 rounded-xl px-3.5 py-2">
-                    <p className="text-[12px] text-[#a8ff35] font-semibold">Duo avec @{duoPartner.username}</p>
-                    <button onClick={endDuo} className="text-[11px] text-white/50 hover:text-white underline">
-                      Terminer
-                    </button>
+                {guests.length > 0 && (
+                  <div className="mt-2 space-y-1.5">
+                    {guests.map((g) => (
+                      <div key={g.id} className="flex items-center justify-between bg-[#a8ff35]/10 border border-[#a8ff35]/25 rounded-xl px-3.5 py-2">
+                        <p className="text-[12px] text-[#a8ff35] font-semibold">Invité @{g.username}</p>
+                        <button onClick={() => endDuo(g.id)} className="text-[11px] text-white/50 hover:text-white underline">
+                          Terminer
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 )}
 
@@ -1013,6 +1131,21 @@ export default function StudioLivePage() {
                       placeholder="Titre du live (optionnel)"
                       className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
                     />
+
+                    <button
+                      type="button"
+                      onClick={() => setIsPrivate((p) => !p)}
+                      className="w-full flex items-center justify-between gap-3 bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-left transition-all hover:bg-white/[0.08]"
+                    >
+                      <span className="flex items-center gap-2.5 text-sm text-white">
+                        <Lock size={15} className={isPrivate ? 'text-[#a8ff35]' : 'text-white/40'} />
+                        Live privé
+                        <span className="text-white/35 text-xs font-normal">— accès sur invitation ou demande</span>
+                      </span>
+                      <span className={`relative w-9 h-5 rounded-full shrink-0 transition-colors ${isPrivate ? 'bg-[#a8ff35]' : 'bg-white/15'}`}>
+                        <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-black transition-transform ${isPrivate ? 'translate-x-4' : ''}`} />
+                      </span>
+                    </button>
 
                     {cooldownSeconds > 0 && (
                       <p className="text-amber-300 text-sm bg-amber-400/10 px-4 py-2.5 rounded-xl border border-amber-400/20 text-center">
@@ -1469,13 +1602,48 @@ export default function StudioLivePage() {
           <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-white font-bold text-base flex items-center gap-2">
-                <Users size={16} /> Spectateurs
+                <Users size={16} /> Invités {guests.length > 0 ? `(${guests.length})` : ''}
               </h2>
               <button onClick={() => { setDuoPanelOpen(false); setOpenViewerMenuId(null); }}
                 className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
                 <X size={16} className="text-white" />
               </button>
             </div>
+
+            <div className="flex gap-1 mb-4 bg-white/[0.04] rounded-xl p-1">
+              {([
+                { key: 'viewers', label: 'Spectateurs' },
+                { key: 'search', label: 'Rechercher' },
+                { key: 'following', label: 'Abonnements' },
+              ] as const).map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setInvitePanelTab(tab.key)}
+                  className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
+                    invitePanelTab === tab.key ? 'bg-[#a8ff35] text-black' : 'text-white/50 hover:text-white'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+
+            {guests.length > 0 && (
+              <div className="mb-4 space-y-1.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[#a8ff35]/80 px-1">Invités actuels</p>
+                {guests.map((g) => (
+                  <div key={g.id} className="flex items-center gap-2.5 p-2.5 rounded-xl border border-[#a8ff35]/25 bg-[#a8ff35]/[0.06]">
+                    <div className="w-8 h-8 rounded-full bg-white/[0.08] overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold text-white/60">
+                      {g.avatarUrl ? <img src={g.avatarUrl} alt="" className="w-full h-full object-cover" /> : g.username[0]?.toUpperCase()}
+                    </div>
+                    <span className="text-sm font-medium text-white flex-1 truncate">@{g.username}</span>
+                    <button onClick={() => endDuo(g.id)} className="text-[11px] text-white/50 hover:text-white underline shrink-0">
+                      Terminer
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {duoRequests.length > 0 && (
               <div className="mb-4 space-y-1.5">
@@ -1490,6 +1658,26 @@ export default function StudioLivePage() {
                       <Check size={14} />
                     </button>
                     <button onClick={() => respondDuoRequest(r.userId, false)} className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center shrink-0">
+                      <X size={14} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {viewRequests.length > 0 && (
+              <div className="mb-4 space-y-1.5">
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[#a8ff35]/80 px-1">Demandes d'accès (live privé)</p>
+                {viewRequests.map((r) => (
+                  <div key={r.userId} className="flex items-center gap-2.5 p-2.5 rounded-xl border border-[#a8ff35]/25 bg-[#a8ff35]/[0.06]">
+                    <div className="w-8 h-8 rounded-full bg-white/[0.08] overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold text-white/60">
+                      {r.avatarUrl ? <img src={r.avatarUrl} alt="" className="w-full h-full object-cover" /> : r.username[0]?.toUpperCase()}
+                    </div>
+                    <span className="text-sm font-medium text-white flex-1 truncate">@{r.username}</span>
+                    <button onClick={() => respondViewRequest(r.userId, true)} className="w-8 h-8 rounded-full bg-[#a8ff35] text-black flex items-center justify-center shrink-0">
+                      <Check size={14} />
+                    </button>
+                    <button onClick={() => respondViewRequest(r.userId, false)} className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center shrink-0">
                       <X size={14} />
                     </button>
                   </div>
@@ -1513,58 +1701,143 @@ export default function StudioLivePage() {
               </p>
             )}
 
-            {viewersList.length === 0 ? (
-              <p className="text-white/40 text-sm text-center py-6">
-                Aucun spectateur connecté pour l'instant.
-              </p>
-            ) : (
-              <div className="space-y-1.5 max-h-72 overflow-y-auto scrollbar-hide">
-                {viewersList.map((v) => (
-                  <div
-                    key={v.userId}
-                    className="relative w-full flex items-center gap-3 p-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02]"
-                  >
-                    <div className="w-9 h-9 rounded-full bg-white/[0.08] overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold text-white/60">
-                      {v.avatarUrl ? <img src={v.avatarUrl} alt="" className="w-full h-full object-cover" /> : v.username[0]?.toUpperCase()}
-                    </div>
-                    <span className="text-sm font-medium text-white flex-1 truncate">@{v.username}</span>
-                    {v.muted && (
-                      <span className="text-[10px] text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded-full shrink-0">muet</span>
-                    )}
-                    <button
-                      onClick={(e) => { e.stopPropagation(); setOpenViewerMenuId((id) => (id === v.userId ? null : v.userId)); }}
-                      className="w-7 h-7 rounded-full hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all shrink-0"
+            {invitePanelTab === 'viewers' && (
+              viewersList.length === 0 ? (
+                <p className="text-white/40 text-sm text-center py-6">
+                  Aucun spectateur connecté pour l'instant.
+                </p>
+              ) : (
+                <div className="space-y-1.5 max-h-72 overflow-y-auto scrollbar-hide">
+                  {viewersList.map((v) => (
+                    <div
+                      key={v.userId}
+                      className="relative w-full flex items-center gap-3 p-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02]"
                     >
-                      <MoreVertical size={14} />
-                    </button>
-
-                    {openViewerMenuId === v.userId && (
-                      <div className="absolute right-0 top-full mt-1 z-10 w-48 bg-[#181818] border border-white/[0.1] rounded-xl shadow-lg overflow-hidden">
-                        {!duoPartner && (
-                          <button
-                            onClick={() => { inviteDuo(v.userId); setOpenViewerMenuId(null); }}
-                            disabled={duoInviteStatus === 'inviting'}
-                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-white hover:bg-white/[0.06] transition-colors disabled:opacity-50"
-                          >
-                            <Users2 size={14} /> Inviter en duo
-                          </button>
-                        )}
-                        <button
-                          onClick={() => setMuted(v.userId, !v.muted)}
-                          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-white hover:bg-white/[0.06] transition-colors"
-                        >
-                          <UserX size={14} /> {v.muted ? 'Réactiver le son' : 'Mettre en sourdine'}
-                        </button>
-                        <button
-                          onClick={() => kickUser(v.userId)}
-                          className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-red-400 hover:bg-red-500/10 transition-colors"
-                        >
-                          <X size={14} /> Exclure du live
-                        </button>
+                      <div className="w-9 h-9 rounded-full bg-white/[0.08] overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold text-white/60">
+                        {v.avatarUrl ? <img src={v.avatarUrl} alt="" className="w-full h-full object-cover" /> : v.username[0]?.toUpperCase()}
                       </div>
-                    )}
-                  </div>
-                ))}
+                      <span className="text-sm font-medium text-white flex-1 truncate">@{v.username}</span>
+                      {v.muted && (
+                        <span className="text-[10px] text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded-full shrink-0">muet</span>
+                      )}
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setOpenViewerMenuId((id) => (id === v.userId ? null : v.userId)); }}
+                        className="w-7 h-7 rounded-full hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all shrink-0"
+                      >
+                        <MoreVertical size={14} />
+                      </button>
+
+                      {openViewerMenuId === v.userId && (
+                        <div className="absolute right-0 top-full mt-1 z-10 w-48 bg-[#181818] border border-white/[0.1] rounded-xl shadow-lg overflow-hidden">
+                          {!guests.some((g) => g.id === v.userId) && (
+                            <button
+                              onClick={() => { inviteDuo(v.userId); setOpenViewerMenuId(null); }}
+                              disabled={duoInviteStatus === 'inviting'}
+                              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-white hover:bg-white/[0.06] transition-colors disabled:opacity-50"
+                            >
+                              <Users2 size={14} /> Inviter
+                            </button>
+                          )}
+                          {live?.isPrivate && (
+                            <button
+                              onClick={() => { inviteViewer(v.userId); setOpenViewerMenuId(null); }}
+                              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-white hover:bg-white/[0.06] transition-colors"
+                            >
+                              <Eye size={14} /> Autoriser à regarder
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setMuted(v.userId, !v.muted)}
+                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-white hover:bg-white/[0.06] transition-colors"
+                          >
+                            <UserX size={14} /> {v.muted ? 'Réactiver le son' : 'Mettre en sourdine'}
+                          </button>
+                          <button
+                            onClick={() => kickUser(v.userId)}
+                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-red-400 hover:bg-red-500/10 transition-colors"
+                          >
+                            <X size={14} /> Exclure du live
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )
+            )}
+
+            {invitePanelTab === 'search' && (
+              <div className="space-y-2">
+                <input
+                  type="text"
+                  autoFocus
+                  value={inviteQuery}
+                  onChange={(e) => setInviteQuery(e.target.value)}
+                  placeholder="Chercher un pseudo…"
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-full px-3.5 py-2 text-white placeholder:text-white/30 text-[13px] focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50"
+                />
+                <div className="space-y-1.5 max-h-64 overflow-y-auto scrollbar-hide">
+                  {inviteQuery.trim() && inviteSearchResults.length === 0 && (
+                    <p className="text-white/30 text-xs text-center py-4">Aucun résultat.</p>
+                  )}
+                  {inviteSearchResults.map((u) => (
+                    <div key={u.id} className="flex items-center gap-2.5 p-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02]">
+                      <div className="w-8 h-8 rounded-full bg-white/[0.08] overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold text-white/60">
+                        {u.avatarUrl ? <img src={u.avatarUrl} alt="" className="w-full h-full object-cover" /> : u.username[0]?.toUpperCase()}
+                      </div>
+                      <span className="text-sm font-medium text-white flex-1 truncate">@{u.username}</span>
+                      {live?.isPrivate && (
+                        <button
+                          onClick={() => inviteViewer(u.id)}
+                          title="Autoriser à regarder"
+                          className="w-7 h-7 rounded-full flex items-center justify-center border border-white/15 text-white/60 hover:text-white hover:bg-white/10 shrink-0"
+                        >
+                          <Eye size={13} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => inviteDuo(u.id)}
+                        disabled={guests.some((g) => g.id === u.id) || duoInviteStatus === 'inviting'}
+                        className="text-[11px] font-semibold text-black bg-[#a8ff35] px-3 py-1.5 rounded-full disabled:opacity-40 shrink-0"
+                      >
+                        {guests.some((g) => g.id === u.id) ? 'Invité' : 'Inviter'}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {invitePanelTab === 'following' && (
+              <div className="space-y-1.5 max-h-72 overflow-y-auto scrollbar-hide">
+                {followingList.length === 0 ? (
+                  <p className="text-white/30 text-xs text-center py-4">Tu ne suis personne pour l'instant.</p>
+                ) : (
+                  followingList.map((u) => (
+                    <div key={u.id} className="flex items-center gap-2.5 p-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02]">
+                      <div className="w-8 h-8 rounded-full bg-white/[0.08] overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold text-white/60">
+                        {u.avatarUrl ? <img src={u.avatarUrl} alt="" className="w-full h-full object-cover" /> : u.username[0]?.toUpperCase()}
+                      </div>
+                      <span className="text-sm font-medium text-white flex-1 truncate">@{u.username}</span>
+                      {live?.isPrivate && (
+                        <button
+                          onClick={() => inviteViewer(u.id)}
+                          title="Autoriser à regarder"
+                          className="w-7 h-7 rounded-full flex items-center justify-center border border-white/15 text-white/60 hover:text-white hover:bg-white/10 shrink-0"
+                        >
+                          <Eye size={13} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => inviteDuo(u.id)}
+                        disabled={guests.some((g) => g.id === u.id) || duoInviteStatus === 'inviting'}
+                        className="text-[11px] font-semibold text-black bg-[#a8ff35] px-3 py-1.5 rounded-full disabled:opacity-40 shrink-0"
+                      >
+                        {guests.some((g) => g.id === u.id) ? 'Invité' : 'Inviter'}
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
             )}
           </div>

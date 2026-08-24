@@ -10,6 +10,8 @@ import { CapsuleGroup } from './api/capsules/capsule-group.entity';
 import { Order } from './api/orders/order.entity';
 import { Boost } from './api/boosts/boost.entity';
 import { LiveSession } from './api/lives/live-session.entity';
+import { LiveGuest } from './api/lives/live-guest.entity';
+import { LiveViewerAccess } from './api/lives/live-viewer-access.entity';
 import { LiveComment } from './api/lives/live-comment.entity';
 import { Gift } from './api/lives/gift.entity';
 import { AuctionBid } from './api/lives/auction-bid.entity';
@@ -19,6 +21,7 @@ import { Notification } from './api/notifications/notification.entity';
 import { Follow } from './api/follows/follow.entity';
 import { Conversation } from './api/messages/conversation.entity';
 import { Message } from './api/messages/message.entity';
+import { LoginLog } from './api/auth/login-log.entity';
 import { PostsModule } from './api/posts/posts.module';
 import { NotificationsModule } from './api/notifications/notifications.module';
 import { CapsulesModule } from './api/capsules/capsules.module';
@@ -49,14 +52,14 @@ import { MessagesModule } from './api/messages/messages.module';
           // Supabase (et la plupart des hebergeurs Postgres geres) exige TLS sur la connexion ;
           // rejectUnauthorized: false accepte leur certificat auto-signe / chaine non verifiee.
           ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
-          entities: [User, Post, Comment, Capsule, CapsuleGroup, Order, Boost, LiveSession, LiveComment, Gift, AuctionBid, WalletTransaction, AdminActionLog, Notification, Follow, Conversation, Message],
+          entities: [User, Post, Comment, Capsule, CapsuleGroup, Order, Boost, LiveSession, LiveGuest, LiveViewerAccess, LiveComment, Gift, AuctionBid, WalletTransaction, AdminActionLog, Notification, Follow, Conversation, Message, LoginLog],
           synchronize: process.env.NODE_ENV !== 'production',
           logging: process.env.NODE_ENV === 'development',
         })
       : TypeOrmModule.forRoot({
           type: 'better-sqlite3',
           database: 'skoleom-live.sqlite',
-          entities: [User, Post, Comment, Capsule, CapsuleGroup, Order, Boost, LiveSession, LiveComment, Gift, AuctionBid, WalletTransaction, AdminActionLog, Notification, Follow, Conversation, Message],
+          entities: [User, Post, Comment, Capsule, CapsuleGroup, Order, Boost, LiveSession, LiveGuest, LiveViewerAccess, LiveComment, Gift, AuctionBid, WalletTransaction, AdminActionLog, Notification, Follow, Conversation, Message, LoginLog],
           synchronize: true,
         }),
     AuthModule,

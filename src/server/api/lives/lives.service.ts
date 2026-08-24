@@ -1,8 +1,10 @@
-import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, LessThanOrEqual, Repository } from 'typeorm';
 import { AccessToken, RoomServiceClient } from 'livekit-server-sdk';
 import { LiveSession } from './live-session.entity';
+import { LiveGuest } from './live-guest.entity';
+import { LiveViewerAccess } from './live-viewer-access.entity';
 import { LiveComment } from './live-comment.entity';
 import { Gift } from './gift.entity';
 import { AuctionBid } from './auction-bid.entity';
@@ -40,6 +42,10 @@ export interface AuctionSettlement {
 const ANTI_SNIPE_WINDOW_MS = 30_000;
 const ANTI_SNIPE_EXTENSION_MS = 30_000;
 
+// Plafond technique anti-abus sur le nombre d'invités simultanés d'un live (ex-duo, généralisé
+// à N) — pas une limite métier par offre, juste un garde-fou (voir LivesGateway).
+export const MAX_LIVE_GUESTS = 12;
+
 // Catalogue des cadeaux virtuels — doit rester aligné avec GIFTS dans src/pages/live.tsx.
 export const GIFT_CATALOG: Record<string, number> = {
   rose: 0.10,
@@ -57,6 +63,10 @@ export class LivesService {
   constructor(
     @InjectRepository(LiveSession)
     private livesRepo: Repository<LiveSession>,
+    @InjectRepository(LiveGuest)
+    private liveGuestsRepo: Repository<LiveGuest>,
+    @InjectRepository(LiveViewerAccess)
+    private viewerAccessRepo: Repository<LiveViewerAccess>,
     @InjectRepository(LiveComment)
     private commentsRepo: Repository<LiveComment>,
     @InjectRepository(Gift)
@@ -84,7 +94,7 @@ export class LivesService {
       .catch(() => {});
   }
 
-  async start(creatorId: string, title?: string): Promise<LiveSession> {
+  async start(creatorId: string, title?: string, isPrivate?: boolean): Promise<LiveSession> {
     const existing = await this.livesRepo.findOne({ where: { creatorId, status: LiveStatus.LIVE } });
     if (existing) throw new BadRequestException('Un live est déjà en cours sur ce compte.');
     await this.assertNotInRestartCooldown(creatorId);
@@ -95,13 +105,14 @@ export class LivesService {
       status: LiveStatus.LIVE,
       mode: LiveMode.LIVE,
       startedAt: new Date(),
+      isPrivate: !!isPrivate,
     });
     const saved = await this.livesRepo.save(live);
     this.notifyFollowersLiveStarted(creatorId, saved.id);
     return saved;
   }
 
-  async startAuction(creatorId: string, title?: string): Promise<LiveSession> {
+  async startAuction(creatorId: string, title?: string, isPrivate?: boolean): Promise<LiveSession> {
     const existing = await this.livesRepo.findOne({ where: { creatorId, status: LiveStatus.LIVE } });
     if (existing) throw new BadRequestException('Un live est déjà en cours sur ce compte.');
     await this.assertNotInRestartCooldown(creatorId);
@@ -113,6 +124,7 @@ export class LivesService {
       mode: LiveMode.AUCTION,
       startedAt: new Date(),
       auctionActive: false,
+      isPrivate: !!isPrivate,
     });
     const saved = await this.livesRepo.save(live);
     this.notifyFollowersLiveStarted(creatorId, saved.id);
@@ -391,7 +403,11 @@ export class LivesService {
     return this.commentsRepo.save(comment);
   }
 
-  async getComments(liveId: string): Promise<LiveComment[]> {
+  async getComments(liveId: string, viewerId?: string): Promise<LiveComment[]> {
+    const live = await this.livesRepo.findOne({ where: { id: liveId } });
+    if (live && !(await this.hasViewAccess(live, viewerId))) {
+      throw new ForbiddenException('Ce live est privé.');
+    }
     return this.commentsRepo.find({
       where: { liveSessionId: liveId },
       order: { createdAt: 'ASC' },
@@ -539,8 +555,11 @@ export class LivesService {
 
     const live = await this.livesRepo.findOne({ where: { id: liveId } });
     if (!live) throw new NotFoundException('Live introuvable');
+    if (!(await this.hasViewAccess(live, userId))) {
+      throw new ForbiddenException('Ce live est privé — demande à en faire partie.');
+    }
 
-    const isPublisher = live.creatorId === userId || live.duoPartnerId === userId;
+    const isPublisher = live.creatorId === userId || (await this.isGuest(liveId, userId));
     const at = new AccessToken(apiKey, apiSecret, { identity: userId });
     at.addGrant({
       roomJoin: true,
@@ -567,22 +586,67 @@ export class LivesService {
     await roomService.removeParticipant(liveId, userId).catch(() => {});
   }
 
-  // Le duo est uniquement du signalement temps reel (voir LivesGateway.inviteDuo/respondDuo) —
-  // ces deux methodes ne font que persister/effacer le partenaire courant, pour que
-  // getLiveKitToken sache qui a le droit de publier et que l'etat survive a un refresh de page.
-  async setDuoPartner(liveId: string, partnerId: string): Promise<LiveSession> {
-    const live = await this.livesRepo.findOne({ where: { id: liveId } });
-    if (!live) throw new NotFoundException('Live introuvable');
-    if (live.creatorId === partnerId) throw new BadRequestException('Tu ne peux pas faire un duo avec toi-même.');
-
-    await this.livesRepo.update(liveId, { duoPartnerId: partnerId });
-    return this.getById(liveId);
+  // L'invitation/la demande elles-memes ne sont que du signalement temps reel (voir LivesGateway
+  // inviteDuo/respondDuo/requestDuo/respondDuoRequest) — ces methodes ne font que persister/
+  // effacer l'appartenance a la liste d'invites, pour que getLiveKitToken sache qui a le droit
+  // de publier et que l'etat survive a un refresh de page.
+  async getGuestIds(liveId: string): Promise<string[]> {
+    const rows = await this.liveGuestsRepo.find({ where: { liveId } });
+    return rows.map((r) => r.userId);
   }
 
-  async clearDuoPartner(liveId: string): Promise<LiveSession> {
-    // `null` explicite, pas `undefined` — TypeORM omet purement et simplement les proprietes
-    // `undefined` du UPDATE genere (ne les mettrait pas a NULL, ne toucherait pas la colonne).
-    await this.livesRepo.update(liveId, { duoPartnerId: null as unknown as string });
-    return this.getById(liveId);
+  // Hydrate les invites actuels d'un live (id/username/avatar) — utilise a l'arrivee sur la
+  // page pour afficher tout de suite les bulles des invites deja presents, sans attendre un
+  // evenement temps reel qui ne sera plus emis pour eux (ils ont rejoint avant notre connexion).
+  async getGuestsHydrated(liveId: string): Promise<{ id: string; username: string; displayName?: string; avatarUrl?: string }[]> {
+    const ids = await this.getGuestIds(liveId);
+    if (ids.length === 0) return [];
+    const users = await this.usersRepo.find({ where: { id: In(ids) } });
+    return users.map((u) => ({ id: u.id, username: u.username, displayName: u.displayName, avatarUrl: u.avatarUrl }));
+  }
+
+  async isGuest(liveId: string, userId: string): Promise<boolean> {
+    return (await this.liveGuestsRepo.count({ where: { liveId, userId } })) > 0;
+  }
+
+  async addGuest(liveId: string, userId: string): Promise<void> {
+    const live = await this.livesRepo.findOne({ where: { id: liveId } });
+    if (!live) throw new NotFoundException('Live introuvable');
+    if (live.creatorId === userId) throw new BadRequestException('Tu ne peux pas t\'inviter toi-même.');
+    if (await this.isGuest(liveId, userId)) return;
+
+    const count = await this.liveGuestsRepo.count({ where: { liveId } });
+    if (count >= MAX_LIVE_GUESTS) {
+      throw new BadRequestException(`Ce live a déjà atteint son maximum de ${MAX_LIVE_GUESTS} invités.`);
+    }
+
+    await this.liveGuestsRepo.save(this.liveGuestsRepo.create({ liveId, userId }));
+    // Publier implique forcement de pouvoir regarder (recevoir les autres flux) — sur un live
+    // prive, devenir invite accorde donc aussi l'acces visionnage, sans etape separee.
+    if (live.isPrivate) await this.grantViewAccess(liveId, userId);
+  }
+
+  async removeGuest(liveId: string, userId: string): Promise<void> {
+    await this.liveGuestsRepo.delete({ liveId, userId });
+  }
+
+  // Qui a le droit de REGARDER un live prive (distinct de isGuest, qui decide qui peut publier
+  // sa camera). Toujours vrai pour un live public, pour le createur, ou pour un compte a qui
+  // l'acces a ete accorde (invitation directe ou demande acceptee, voir LiveViewerAccess).
+  async hasViewAccess(live: LiveSession, userId?: string): Promise<boolean> {
+    if (!live.isPrivate) return true;
+    if (!userId) return false;
+    if (live.creatorId === userId) return true;
+    return (await this.viewerAccessRepo.count({ where: { liveId: live.id, userId } })) > 0;
+  }
+
+  async grantViewAccess(liveId: string, userId: string): Promise<void> {
+    const exists = await this.viewerAccessRepo.count({ where: { liveId, userId } });
+    if (exists) return;
+    await this.viewerAccessRepo.save(this.viewerAccessRepo.create({ liveId, userId }));
+  }
+
+  async revokeViewAccess(liveId: string, userId: string): Promise<void> {
+    await this.viewerAccessRepo.delete({ liveId, userId });
   }
 }

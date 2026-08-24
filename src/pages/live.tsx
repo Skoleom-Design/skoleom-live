@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
-import { Radio, Loader2 } from 'lucide-react';
+import { Radio, Loader2, Lock } from 'lucide-react';
 import { AppSidebar } from '../client/components/Layout/Sidebar';
 import { api } from '../shared/api/http';
 import type { Capsule } from '../shared/types/api';
@@ -12,6 +12,7 @@ interface ActiveLive {
   mode: 'live' | 'auction';
   creator: { username: string; displayName?: string; avatarUrl?: string };
   featuredCapsule?: Capsule;
+  isPrivate?: boolean;
 }
 
 /* ── Live page — liste les vrais lives classiques en cours ; la diffusion, le chat et la
@@ -65,6 +66,11 @@ export default function LivePage() {
                       <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" />
                       LIVE
                     </span>
+                    {live.isPrivate && (
+                      <span className="absolute top-2.5 right-2.5 flex items-center justify-center w-6 h-6 rounded-full bg-black/60">
+                        <Lock size={11} className="text-white/80" />
+                      </span>
+                    )}
 
                     <div className="absolute bottom-0 left-0 right-0 p-3">
                       <p className="text-white text-[13px] font-semibold truncate">

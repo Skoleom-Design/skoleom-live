@@ -7,6 +7,12 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 export class FollowsController {
   constructor(private readonly followsService: FollowsService) {}
 
+  // Route statique déclarée avant ':userId' — sinon Nest matcherait "mine" comme un id.
+  @Get('mine/following')
+  getMyFollowing(@Request() req) {
+    return this.followsService.getFollowingHydrated(req.user.id);
+  }
+
   @Post(':userId')
   follow(@Request() req, @Param('userId') userId: string) {
     return this.followsService.follow(req.user.id, userId);

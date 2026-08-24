@@ -3,8 +3,8 @@ import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
 import { io, Socket } from 'socket.io-client';
-import { Room, RoomEvent, Track } from 'livekit-client';
-import { ArrowLeft, Users, Users2, Send, Gavel, Timer, Package, Crown, Gift, Wallet, Plus, Trophy, VolumeX, Check, X as XIcon, MoreVertical, UserX, AlertTriangle, Loader2 } from 'lucide-react';
+import { Room, RoomEvent, Track, type RemoteTrack } from 'livekit-client';
+import { ArrowLeft, Users, Users2, Send, Gavel, Timer, Package, Crown, Gift, Wallet, Plus, Trophy, VolumeX, Check, X as XIcon, MoreVertical, UserX, AlertTriangle, Loader2, Lock } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
 import { GiftBurstOverlay, type ActiveGiftBurst } from '../../client/components/Live/GiftBurstOverlay';
@@ -35,8 +35,14 @@ interface LiveSession {
   featuredCapsuleId?: string | null;
   featuredCapsule?: Capsule | null;
   creator: { id: string; username: string; displayName?: string; avatarUrl?: string };
-  duoPartnerId?: string | null;
-  duoPartner?: { id: string; username: string; displayName?: string; avatarUrl?: string } | null;
+  isPrivate?: boolean;
+  hasAccess?: boolean;
+}
+
+interface LiveGuest {
+  id: string;
+  username: string;
+  avatarUrl?: string;
 }
 
 interface LiveComment {
@@ -75,12 +81,66 @@ export default function LiveViewerPage() {
   const roomRef = useRef<Room | null>(null);
   const videoElRef = useRef<HTMLVideoElement>(null);
   const audioElRef = useRef<HTMLAudioElement>(null);
-  // Duo — bulle video separee : le flux du partenaire si je regarde, ou mon propre apercu
-  // camera local (pas via LiveKit) si c'est moi qui viens d'accepter le duo.
-  const duoBubbleVideoRef = useRef<HTMLVideoElement>(null);
-  const duoBubbleAudioRef = useRef<HTMLAudioElement>(null);
+  // Invites (ex-duo, desormais N) — une bulle video par invite : le flux de chacun si je
+  // regarde, ou mon propre apercu camera local (pas via LiveKit) si je suis moi-meme invite.
+  const guestVideoRefs = useRef(new Map<string, HTMLVideoElement>());
+  const guestAudioRefs = useRef(new Map<string, HTMLAudioElement>());
+  // Tracks LiveKit deja attachees par invite — permet de les detacher explicitement quand sa
+  // bulle disparait (fin d'invite ou depart), plutot que de compter sur le seul retrait du DOM.
+  const guestTracksRef = useRef(new Map<string, RemoteTrack[]>());
+  // Tracks recues avant que la bulle React du nouvel invite soit montee (TrackSubscribed peut
+  // arriver avant le re-render qui ajoute son entree a `guests`) — rattachees dans l'effet
+  // ci-dessous des que la bulle existe.
+  const pendingGuestTracksRef = useRef(new Map<string, RemoteTrack[]>());
   const duoStreamRef = useRef<MediaStream | null>(null);
   const myId = getStoredUser()?.id;
+
+  function attachGuestTrack(guestId: string, track: RemoteTrack) {
+    const el = track.kind === Track.Kind.Video ? guestVideoRefs.current.get(guestId) : guestAudioRefs.current.get(guestId);
+    if (!el) {
+      if (!pendingGuestTracksRef.current.has(guestId)) pendingGuestTracksRef.current.set(guestId, []);
+      pendingGuestTracksRef.current.get(guestId)!.push(track);
+      return;
+    }
+    track.attach(el);
+    if (!guestTracksRef.current.has(guestId)) guestTracksRef.current.set(guestId, []);
+    guestTracksRef.current.get(guestId)!.push(track);
+    if (track.kind === Track.Kind.Audio) (el as HTMLAudioElement).play().catch(() => {});
+  }
+
+  function flushPendingGuestTracks(guestId: string, kind: Track.Kind) {
+    const pending = pendingGuestTracksRef.current.get(guestId) ?? [];
+    const matching = pending.filter((t) => t.kind === kind);
+    const rest = pending.filter((t) => t.kind !== kind);
+    pendingGuestTracksRef.current.set(guestId, rest);
+    matching.forEach((t) => attachGuestTrack(guestId, t));
+  }
+
+  function makeGuestVideoRef(guestId: string) {
+    return (el: HTMLVideoElement | null) => {
+      if (el) {
+        guestVideoRefs.current.set(guestId, el);
+        flushPendingGuestTracks(guestId, Track.Kind.Video);
+      }
+      return () => {
+        guestVideoRefs.current.delete(guestId);
+        (guestTracksRef.current.get(guestId) ?? []).forEach((t) => { if (el && t.kind === Track.Kind.Video) t.detach(el); });
+      };
+    };
+  }
+
+  function makeGuestAudioRef(guestId: string) {
+    return (el: HTMLAudioElement | null) => {
+      if (el) {
+        guestAudioRefs.current.set(guestId, el);
+        flushPendingGuestTracks(guestId, Track.Kind.Audio);
+      }
+      return () => {
+        guestAudioRefs.current.delete(guestId);
+        (guestTracksRef.current.get(guestId) ?? []).forEach((t) => { if (el && t.kind === Track.Kind.Audio) t.detach(el); });
+      };
+    };
+  }
 
   const [live, setLive] = useState<LiveSession | null>(null);
   const [loading, setLoading] = useState(true);
@@ -121,11 +181,10 @@ export default function LiveViewerPage() {
   const [topDonors, setTopDonors] = useState<TopDonor[]>([]);
   const [topDonorsOpen, setTopDonorsOpen] = useState(false);
 
-  // Duo façon TikTok — voir LivesGateway (inviteDuo/respondDuo/endDuo) pour le signalement.
+  // Invites (ex-duo, desormais N) — voir LivesGateway (inviteDuo/respondDuo/endDuo).
   const [duoInvite, setDuoInvite] = useState<{ fromUsername: string } | null>(null);
-  const [duoPartnerId, setDuoPartnerId] = useState<string | null>(null);
-  const [duoPartnerInfo, setDuoPartnerInfo] = useState<{ username: string; avatarUrl?: string } | null>(null);
-  const [amDuoHost, setAmDuoHost] = useState(false);
+  const [guests, setGuests] = useState<LiveGuest[]>([]);
+  const amGuest = guests.some((g) => g.id === myId);
   // Demande de duo initiee par le spectateur lui-meme (sens inverse de duoInvite ci-dessus) —
   // voir requestDuo/cancelDuoRequest et LivesGateway (requestDuo/respondDuoRequest).
   const [duoRequestStatus, setDuoRequestStatus] = useState<'idle' | 'pending' | 'declined' | 'error'>('idle');
@@ -144,6 +203,13 @@ export default function LiveViewerPage() {
   const [kickedMessage, setKickedMessage] = useState('');
   const isOwner = !!live && live.creator.id === myId;
 
+  // Live prive (voir LiveSession.isPrivate) — null tant qu'on ne sait pas encore (chargement),
+  // pour ne pas afficher un instant l'ecran "demande d'acces" avant meme d'avoir la reponse.
+  const [hasAccess, setHasAccess] = useState<boolean | null>(null);
+  const [accessDeniedMsg, setAccessDeniedMsg] = useState('');
+  const [viewRequestStatus, setViewRequestStatus] = useState<'idle' | 'pending' | 'declined' | 'error'>('idle');
+  const [viewRequestErrorMsg, setViewRequestErrorMsg] = useState('');
+
   // Le solde de coins reflete le vrai wallet (walletBalance, 100 coins = 1€).
   useEffect(() => {
     if (!getToken()) return;
@@ -157,11 +223,7 @@ export default function LiveViewerPage() {
     api.get<LiveSession>(`/lives/${id}`)
       .then((session) => {
         setLive(session);
-        if (session.duoPartnerId) {
-          setDuoPartnerId(session.duoPartnerId);
-          setDuoPartnerInfo(session.duoPartner ? { username: session.duoPartner.username, avatarUrl: session.duoPartner.avatarUrl } : null);
-          setAmDuoHost(session.duoPartnerId === myId);
-        }
+        setHasAccess(session.hasAccess ?? true);
         if (session.mode === 'auction' && session.auctionActive) {
           setRoundActive(true);
           setActiveCapsule(session.auctionCapsule);
@@ -208,6 +270,15 @@ export default function LiveViewerPage() {
     return () => clearTimeout(t);
   }, [duoRequestStatus]);
 
+  // Demande d'acces VISIONNAGE (live prive) — distinct de requestDuo (qui demande a publier).
+  function requestViewAccess() {
+    if (typeof id !== 'string') return;
+    if (!getToken()) { router.push('/auth/login'); return; }
+    setViewRequestStatus('pending');
+    setViewRequestErrorMsg('');
+    socketRef.current?.emit('requestViewAccess', { liveId: id, token: getToken() });
+  }
+
   function openViewersPanel() {
     if (typeof id !== 'string') return;
     setViewersPanelOpen(true);
@@ -234,6 +305,14 @@ export default function LiveViewerPage() {
     fetchTopDonors(live.id);
     const timer = setInterval(() => fetchTopDonors(live.id), 20000);
     return () => clearInterval(timer);
+  }, [live?.id]);
+
+  // Invites deja presents avant notre arrivee (rejoint pendant qu'on chargeait la page, ou avant
+  // notre connexion) — les evenements temps reel ne couvrent que les changements a partir de
+  // maintenant, il faut donc aussi hydrater l'etat initial via l'API.
+  useEffect(() => {
+    if (!live?.id) return;
+    api.get<LiveGuest[]>(`/lives/${live.id}/guests`).then(setGuests).catch(() => {});
   }, [live?.id]);
 
   // Depend uniquement de live?.id (pas de `live` en entier) : mettre a jour live.featuredCapsule
@@ -310,16 +389,15 @@ export default function LiveViewerPage() {
     });
     socket.on('duoInvite', (d: { fromUsername: string }) => setDuoInvite(d));
     socket.on('duoStarted', (d: { partnerId: string; partnerUsername: string; partnerAvatarUrl?: string }) => {
-      setDuoPartnerId(d.partnerId);
-      setDuoPartnerInfo({ username: d.partnerUsername, avatarUrl: d.partnerAvatarUrl });
+      setGuests((prev) => (prev.some((g) => g.id === d.partnerId) ? prev : [...prev, { id: d.partnerId, username: d.partnerUsername, avatarUrl: d.partnerAvatarUrl }]));
       setDuoInvite(null);
       setDuoRequestStatus('idle');
-      if (d.partnerId === myId) setAmDuoHost(true);
     });
-    socket.on('duoEnded', () => {
-      setDuoPartnerId(null);
-      setDuoPartnerInfo(null);
-      setAmDuoHost(false);
+    socket.on('duoEnded', (d: { userId: string }) => {
+      setGuests((prev) => prev.filter((g) => g.id !== d.userId));
+      (guestTracksRef.current.get(d.userId) ?? []).forEach((t) => t.detach());
+      guestTracksRef.current.delete(d.userId);
+      pendingGuestTracksRef.current.delete(d.userId);
     });
     socket.on('duoError', () => setDuoInvite(null));
     socket.on('duoRequestSent', () => setDuoRequestStatus('pending'));
@@ -346,6 +424,25 @@ export default function LiveViewerPage() {
       socket.close();
       setTimeout(() => router.push('/live'), 2500);
     });
+    // Live prive et pas encore autorise — pas d'erreur fatale, juste l'ecran "demande d'acces"
+    // (voir le rendu conditionnel plus bas) ; canRequest est faux pour un visiteur non connecte.
+    socket.on('accessDenied', (d: { message: string; canRequest: boolean }) => {
+      setHasAccess(false);
+      setAccessDeniedMsg(d.message);
+    });
+    socket.on('viewRequestSent', () => setViewRequestStatus('pending'));
+    socket.on('viewRequestDeclined', () => setViewRequestStatus('declined'));
+    socket.on('viewRequestError', (d: { message: string }) => {
+      setViewRequestStatus('error');
+      setViewRequestErrorMsg(d.message);
+    });
+    // Accorde (invitation directe ou demande acceptee) — on redemande explicitement a rejoindre
+    // puisque la premiere tentative avait ete refusee cote serveur (pas de room/historique reçus).
+    socket.on('viewAccessGranted', () => {
+      setHasAccess(true);
+      setViewRequestStatus('idle');
+      socket.emit('join', { liveId: id, token: getToken() });
+    });
     socket.on('commentError', (d: { message: string }) => {
       if (d.message?.toLowerCase().includes('banni')) setIAmMuted(true);
     });
@@ -360,39 +457,42 @@ export default function LiveViewerPage() {
   }, [live?.id, id]);
 
   // Reception de la video en direct (LiveKit) — se connecte a la room, en lecture seule sauf si
-  // je suis moi-meme le partenaire de duo accepte (amDuoHost), auquel cas je publie aussi ma
-  // propre camera/micro. Depend de amDuoHost : accepter un duo (ou le voir se terminer) force
-  // une deconnexion/reconnexion avec un jeton different (canPublish change cote serveur — voir
-  // getLiveKitToken dans lives.service.ts, un jeton LiveKit deja emis ne peut pas etre mis a jour
-  // en place). Si LiveKit n'est pas configure cote serveur, le placeholder texte reste affiche.
+  // je suis moi-meme un invite accepte (amGuest), auquel cas je publie aussi ma propre camera/
+  // micro. Depend de amGuest : rejoindre (ou quitter) la liste d'invites force une deconnexion/
+  // reconnexion avec un jeton different (canPublish change cote serveur — voir getLiveKitToken
+  // dans lives.service.ts, un jeton LiveKit deja emis ne peut pas etre mis a jour en place). Si
+  // LiveKit n'est pas configure cote serveur, le placeholder texte reste affiche.
   useEffect(() => {
-    if (!live || typeof id !== 'string' || !getToken()) return;
+    if (!live || typeof id !== 'string' || !getToken() || !hasAccess) return;
 
     let cancelled = false;
     let room: Room | null = null;
 
     (async () => {
       try {
-        if (amDuoHost) {
+        if (amGuest) {
           const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
           if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
           duoStreamRef.current = stream;
-          if (duoBubbleVideoRef.current) duoBubbleVideoRef.current.srcObject = stream;
+          const myVideoEl = guestVideoRefs.current.get(myId!);
+          if (myVideoEl) myVideoEl.srcObject = stream;
         }
 
         const { token, url } = await api.get<{ token: string; url: string }>(`/lives/${id}/livekit-token`);
         if (cancelled) return;
         room = new Room();
         room.on(RoomEvent.TrackSubscribed, (track, _pub, participant) => {
-          const fromPartner = participant.identity !== live.creator.id;
-          const videoTarget = fromPartner ? duoBubbleVideoRef.current : videoElRef.current;
-          const audioTarget = fromPartner ? duoBubbleAudioRef.current : audioElRef.current;
-          if (track.kind === Track.Kind.Video && videoTarget) {
-            track.attach(videoTarget);
-            if (!fromPartner) setVideoConnected(true);
-          } else if (track.kind === Track.Kind.Audio && audioTarget) {
-            track.attach(audioTarget);
-            audioTarget.play().catch(() => { if (!fromPartner) setSoundBlocked(true); });
+          const fromGuest = participant.identity !== live.creator.id;
+          if (fromGuest) {
+            attachGuestTrack(participant.identity, track);
+            return;
+          }
+          if (track.kind === Track.Kind.Video && videoElRef.current) {
+            track.attach(videoElRef.current);
+            setVideoConnected(true);
+          } else if (track.kind === Track.Kind.Audio && audioElRef.current) {
+            track.attach(audioElRef.current);
+            audioElRef.current.play().catch(() => setSoundBlocked(true));
           }
         });
         room.on(RoomEvent.TrackUnsubscribed, (track, _pub, participant) => {
@@ -406,7 +506,7 @@ export default function LiveViewerPage() {
         }
         roomRef.current = room;
 
-        if (amDuoHost && duoStreamRef.current) {
+        if (amGuest && duoStreamRef.current) {
           const videoTrack = duoStreamRef.current.getVideoTracks()[0];
           const audioTrack = duoStreamRef.current.getAudioTracks()[0];
           if (videoTrack) await room.localParticipant.publishTrack(videoTrack, { source: Track.Source.Camera });
@@ -426,7 +526,7 @@ export default function LiveViewerPage() {
       duoStreamRef.current?.getTracks().forEach((t) => t.stop());
       duoStreamRef.current = null;
     };
-  }, [live?.id, id, amDuoHost]);
+  }, [live?.id, id, amGuest, hasAccess]);
 
   useEffect(() => {
     commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -508,6 +608,54 @@ export default function LiveViewerPage() {
     );
   }
 
+  // Live prive et acces pas encore accorde — ecran "demande d'acces" a la place du live lui-meme
+  // (voir hasAccess, alimente par le fetch initial puis par accessDenied/viewAccessGranted).
+  if (live.isPrivate && hasAccess === false && !isOwner) {
+    return (
+      <>
+        <Head><title>{live.title || 'Live privé'} — skoleomLive</title></Head>
+        <div className="flex h-screen cosmic-bg overflow-hidden">
+          <AppSidebar />
+          <main className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
+            <div className="w-14 h-14 rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center">
+              <Lock size={22} className="text-white/50" />
+            </div>
+            <div>
+              <p className="text-white font-semibold text-sm mb-1">Ce live est privé</p>
+              <p className="text-white/40 text-xs max-w-[280px]">
+                {accessDeniedMsg || `${live.creator.username} a limité l'accès à ce live.`}
+              </p>
+            </div>
+
+            {!getToken() ? (
+              <Link href="/auth/login" className="btn-skoleom px-6 py-2.5 rounded-full text-sm">
+                Se connecter pour demander l'accès
+              </Link>
+            ) : viewRequestStatus === 'pending' ? (
+              <p className="text-white/50 text-xs flex items-center gap-2">
+                <Loader2 size={14} className="animate-spin" /> Demande envoyée, en attente de {live.creator.username}…
+              </p>
+            ) : (
+              <>
+                <button onClick={requestViewAccess} className="btn-skoleom px-6 py-2.5 rounded-full text-sm">
+                  Demander à rejoindre
+                </button>
+                {viewRequestStatus === 'declined' && (
+                  <p className="text-red-400 text-xs">Ta demande a été refusée.</p>
+                )}
+                {viewRequestStatus === 'error' && (
+                  <p className="text-red-400 text-xs">{viewRequestErrorMsg || 'Demande refusée.'}</p>
+                )}
+              </>
+            )}
+
+            <Link href="/live" className="text-white/30 text-xs underline mt-2">Retour aux lives</Link>
+          </main>
+        </div>
+      </>
+    );
+  }
+
   const isAuction = live.mode === 'auction';
   const sessionEnded = live.status === 'ended';
   const minNextBid = currentBid + 1;
@@ -524,6 +672,11 @@ export default function LiveViewerPage() {
               <ArrowLeft size={16} className="text-white/70" />
             </Link>
             <span className="text-white font-bold text-sm">{live.title || (isAuction ? 'Enchère' : 'Live')}</span>
+            {live.isPrivate && (
+              <span className="flex items-center gap-1 text-white/40 text-[11px] font-semibold">
+                <Lock size={11} /> Privé
+              </span>
+            )}
             <button
               onClick={openViewersPanel}
               className="ml-auto flex items-center gap-2 text-white/60 hover:text-white text-xs font-semibold transition-colors"
@@ -572,26 +725,34 @@ export default function LiveViewerPage() {
                     </div>
                   )}
 
-                  {/* Duo — bulle video du partenaire (ou la mienne si j'ai accepte) */}
-                  <div
-                    className={`absolute bottom-20 md:bottom-3 left-3 w-20 h-28 rounded-xl overflow-hidden border-2 border-[#a8ff35]/60 bg-black shadow-lg z-20 ${
-                      duoPartnerId ? '' : 'hidden'
-                    }`}
-                  >
-                    <video ref={duoBubbleVideoRef} autoPlay muted={amDuoHost} playsInline className="w-full h-full object-cover" />
-                    <audio ref={duoBubbleAudioRef} autoPlay className="hidden" />
-                    <span className="absolute bottom-0.5 inset-x-0 text-center text-[9px] text-white/90 font-semibold truncate px-1 drop-shadow">
-                      {amDuoHost ? 'Toi' : duoPartnerInfo ? `@${duoPartnerInfo.username}` : ''}
-                    </span>
-                    {amDuoHost && (
-                      <button
-                        onClick={() => { if (typeof id === 'string') socketRef.current?.emit('endDuo', { liveId: id, token: getToken() }); }}
-                        className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 flex items-center justify-center"
-                      >
-                        <XIcon size={9} className="text-white" />
-                      </button>
-                    )}
-                  </div>
+                  {/* Invites — une bulle video par invite (dont la mienne si j'en fais partie) */}
+                  {guests.length > 0 && (
+                    <div className="absolute bottom-20 md:bottom-3 left-3 flex items-end gap-1.5 z-20">
+                      {guests.map((g) => {
+                        const isMe = g.id === myId;
+                        return (
+                          <div key={g.id} className="relative w-20 h-28 rounded-xl overflow-hidden border-2 border-[#a8ff35]/60 bg-black shadow-lg shrink-0">
+                            <video ref={makeGuestVideoRef(g.id)} autoPlay muted={isMe} playsInline className="w-full h-full object-cover" />
+                            <audio ref={makeGuestAudioRef(g.id)} autoPlay className="hidden" />
+                            <span className="absolute bottom-0.5 inset-x-0 text-center text-[9px] text-white/90 font-semibold truncate px-1 drop-shadow">
+                              {isMe ? 'Toi' : `@${g.username}`}
+                            </span>
+                            {(isMe || isOwner) && (
+                              <button
+                                onClick={() => {
+                                  if (typeof id !== 'string') return;
+                                  socketRef.current?.emit('endDuo', { liveId: id, token: getToken(), ...(isMe ? {} : { targetUserId: g.id }) });
+                                }}
+                                className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 flex items-center justify-center"
+                              >
+                                <XIcon size={9} className="text-white" />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
 
                   {!videoConnected && (
                     isAuction && roundActive && activeCapsule?.imageUrl ? (
@@ -729,7 +890,7 @@ export default function LiveViewerPage() {
                     >
                       <Gift size={19} className="text-[#f59e0b]" />
                     </button>
-                    {!isOwner && !duoPartnerId && (
+                    {!isOwner && !amGuest && (
                       <button
                         onClick={() => (duoRequestStatus === 'pending' ? cancelDuoRequest() : requestDuo())}
                         className={`w-11 h-11 rounded-full border backdrop-blur-sm flex items-center justify-center transition-all ${

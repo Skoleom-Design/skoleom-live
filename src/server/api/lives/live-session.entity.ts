@@ -28,6 +28,11 @@ export class LiveSession {
   @Column()
   creatorId: string;
 
+  // Live prive — seul le createur peut regarder par defaut ; les autres doivent avoir ete
+  // invites ou avoir vu leur demande acceptee (voir LiveViewerAccess, LivesService.hasViewAccess).
+  @Column({ default: false })
+  isPrivate: boolean;
+
   @Column({ type: 'timestamptz', nullable: true })
   startedAt: Date;
 
@@ -74,14 +79,9 @@ export class LiveSession {
   @Column({ default: false })
   auctionSettled: boolean;
 
-  // Duo façon TikTok — un deuxième créateur autorisé à publier caméra/micro dans la même room
-  // LiveKit (voir getLiveKitToken dans lives.service.ts). Nul quand aucun duo n'est en cours.
-  @ManyToOne(() => User, { nullable: true, eager: true })
-  @JoinColumn({ name: 'duoPartnerId' })
-  duoPartner: User;
-
-  @Column({ nullable: true })
-  duoPartnerId: string;
+  // Les invités multi-guests (ex-duo, désormais N invités) vivent dans la table LiveGuest
+  // (voir live-guest.entity.ts) plutôt que sur cette entité — la colonne `duoPartnerId` reste
+  // en base pour l'historique mais n'est plus référencée ici ni ailleurs dans le code.
 
   // Un live "enchere" peut enchainer plusieurs manches (une par capsule choisie en cours de
   // direct) — true tant qu'une manche est en cours de mise, false entre deux manches.

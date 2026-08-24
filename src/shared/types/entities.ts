@@ -95,4 +95,8 @@ export enum NotificationType {
   FOLLOW = 'follow',
   NEW_POST = 'new_post',
   LIVE_STARTED = 'live_started',
+  LIVE_GUEST_INVITE = 'live_guest_invite',
+  LIVE_GUEST_REQUEST = 'live_guest_request',
+  LIVE_VIEW_INVITE = 'live_view_invite',
+  LIVE_VIEW_REQUEST = 'live_view_request',
 }

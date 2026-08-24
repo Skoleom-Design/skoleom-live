@@ -8,8 +8,10 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { Interval } from '@nestjs/schedule';
 import { User } from '../users/user.entity';
-import { LivesService } from './lives.service';
+import { LivesService, MAX_LIVE_GUESTS } from './lives.service';
 import { LiveSession } from './live-session.entity';
+import { NotificationsService } from '../notifications/notifications.service';
+import { NotificationType } from '../../../shared/types/entities';
 
 function roomFor(liveId: string): string {
   return `live:${liveId}`;
@@ -27,12 +29,15 @@ export class LivesGateway implements OnGatewayDisconnect {
   // liste "inviter en duo" (voir listViewers) et a router les invitations/reponses vers le bon
   // socket. Les spectateurs anonymes ne sont jamais invitables (pas d'identite a proposer).
   private viewerIdentities = new Map<string, { liveId: string; userId: string; username: string; avatarUrl?: string }>();
-  // Une seule invitation de duo en attente a la fois par live — assez pour ce cas d'usage,
-  // pas besoin de gerer une file.
-  private pendingDuoInvites = new Map<string, { targetUserId: string; inviterSocketId: string }>();
+  // Une invitation en attente par (live, cible) — un live peut avoir plusieurs invitations en
+  // cours vers des cibles differentes en meme temps (invites multiples, voir addGuest).
+  private pendingDuoInvites = new Map<string, Map<string, { inviterSocketId: string }>>();
   // Demandes de duo initiees par des spectateurs (sens inverse de pendingDuoInvites) — plusieurs
   // spectateurs peuvent demander en meme temps, le createur choisit qui accepter parmi la liste.
   private pendingDuoRequests = new Map<string, Map<string, { socketId: string; username: string; avatarUrl?: string }>>();
+  // Meme principe que pendingDuoRequests, mais pour l'acces VISIONNAGE d'un live prive (pas la
+  // publication) — voir requestViewAccess/respondViewRequest/inviteViewer.
+  private pendingViewRequests = new Map<string, Map<string, { socketId: string; username: string; avatarUrl?: string }>>();
   // Spectateurs expulses par le createur — empeche de rejoindre le meme live une seconde fois
   // (voir handleJoin), en plus d'etre deconnectes immediatement (voir handleKickUser).
   private kicked = new Map<string, Set<string>>();
@@ -40,6 +45,7 @@ export class LivesGateway implements OnGatewayDisconnect {
   constructor(
     private jwtService: JwtService,
     private livesService: LivesService,
+    private notificationsService: NotificationsService,
     @InjectRepository(User)
     private usersRepo: Repository<User>,
   ) {}
@@ -71,13 +77,9 @@ export class LivesGateway implements OnGatewayDisconnect {
       return;
     }
 
-    client.join(roomFor(liveId));
-    this.socketLive.set(client.id, liveId);
-
-    if (!this.viewers.has(liveId)) this.viewers.set(liveId, new Set());
-    this.viewers.get(liveId)!.add(client.id);
-    this.broadcastCount(liveId);
-
+    // Enregistree avant le controle d'acces ci-dessous — sinon un spectateur refuse est
+    // introuvable quand son acces est ensuite accorde (invitation ou demande acceptee), voir
+    // handleInviteViewer/handleRespondViewRequest.
     if (user) {
       this.viewerIdentities.set(client.id, {
         liveId,
@@ -87,7 +89,24 @@ export class LivesGateway implements OnGatewayDisconnect {
       });
     }
 
-    const comments = await this.livesService.getComments(liveId);
+    const live = await this.livesService.getById(liveId).catch(() => null);
+    if (!live) {
+      client.emit('joinError', { message: 'Live introuvable.' });
+      return;
+    }
+    if (!(await this.livesService.hasViewAccess(live, user?.id))) {
+      client.emit('accessDenied', { message: 'Ce live est privé.', canRequest: !!user });
+      return;
+    }
+
+    client.join(roomFor(liveId));
+    this.socketLive.set(client.id, liveId);
+
+    if (!this.viewers.has(liveId)) this.viewers.set(liveId, new Set());
+    this.viewers.get(liveId)!.add(client.id);
+    this.broadcastCount(liveId);
+
+    const comments = await this.livesService.getComments(liveId, user?.id);
     client.emit('history', comments.map((c) => ({
       id: c.id,
       text: c.text,
@@ -113,8 +132,8 @@ export class LivesGateway implements OnGatewayDisconnect {
     this.viewers.get(liveId)?.delete(client.id);
     this.socketLive.delete(client.id);
 
-    // Le partenaire de duo qui quitte (onglet ferme, connexion perdue) met fin au duo tout de
-    // suite, plutot que de laisser l'autre cote publier dans le vide sans que personne le sache.
+    // Un invite qui quitte (onglet ferme, connexion perdue) est retire tout de suite de la
+    // liste, plutot que de laisser sa camera/micro publier dans le vide sans que personne le sache.
     const identity = this.viewerIdentities.get(client.id);
     this.viewerIdentities.delete(client.id);
     if (identity) {
@@ -122,16 +141,22 @@ export class LivesGateway implements OnGatewayDisconnect {
         (v) => v.liveId === liveId && v.userId === identity.userId,
       );
       if (!stillConnected) {
-        const live = await this.livesService.getById(liveId).catch(() => null);
-        if (live?.duoPartnerId === identity.userId) {
-          await this.livesService.clearDuoPartner(liveId);
-          this.server.to(roomFor(liveId)).emit('duoEnded', {});
+        // Best-effort — une erreur ici (DB transitoirement indisponible, etc.) ne doit jamais
+        // faire planter tout le serveur temps reel pour tout le monde a la deconnexion d'un seul.
+        const wasGuest = await this.livesService.isGuest(liveId, identity.userId).catch(() => false);
+        if (wasGuest) {
+          await this.livesService.removeGuest(liveId, identity.userId).catch(() => {});
+          this.server.to(roomFor(liveId)).emit('duoEnded', { userId: identity.userId });
         }
 
-        // Une demande de duo en attente n'a plus de sens si le spectateur qui l'a faite part —
-        // on la retire et on previent le createur pour qu'il ne voie pas une demande fantome.
+        // Une invitation/demande en attente n'a plus de sens si le spectateur part —
+        // on la retire pour ne pas laisser un fantome que personne ne peut plus resoudre.
+        this.pendingDuoInvites.get(liveId)?.delete(identity.userId);
         if (this.pendingDuoRequests.get(liveId)?.delete(identity.userId)) {
           this.server.to(roomFor(liveId)).emit('duoRequestCancelled', { userId: identity.userId });
+        }
+        if (this.pendingViewRequests.get(liveId)?.delete(identity.userId)) {
+          this.server.to(roomFor(liveId)).emit('viewRequestCancelled', { userId: identity.userId });
         }
       }
     }
@@ -244,6 +269,16 @@ export class LivesGateway implements OnGatewayDisconnect {
     client.emit('viewersList', [...seen.values()]);
   }
 
+  // Diffuse a tout le live qu'un invite vient de rejoindre — appele a la fois quand une
+  // invitation est acceptee et quand une demande est acceptee (les deux menent au meme etat).
+  private broadcastGuestJoined(liveId: string, guest: { id: string; username: string; avatarUrl?: string }) {
+    this.server.to(roomFor(liveId)).emit('duoStarted', {
+      partnerId: guest.id,
+      partnerUsername: guest.username,
+      partnerAvatarUrl: guest.avatarUrl,
+    });
+  }
+
   @SubscribeMessage('inviteDuo')
   async handleInviteDuo(
     @ConnectedSocket() client: Socket,
@@ -251,6 +286,15 @@ export class LivesGateway implements OnGatewayDisconnect {
   ) {
     const user = await this.authenticate(data.token);
     if (!user || !(await this.livesService.isOwner(data.liveId, user.id))) return;
+
+    // Deja invite -> pas la peine de renvoyer une invitation.
+    if (await this.livesService.isGuest(data.liveId, data.targetUserId)) return;
+
+    const guestCount = (await this.livesService.getGuestIds(data.liveId)).length;
+    if (guestCount >= MAX_LIVE_GUESTS) {
+      client.emit('duoError', { message: `Ce live a déjà atteint son maximum de ${MAX_LIVE_GUESTS} invités.` });
+      return;
+    }
 
     const targetSockets = [...this.viewerIdentities.entries()].filter(
       ([, v]) => v.liveId === data.liveId && v.userId === data.targetUserId,
@@ -260,13 +304,25 @@ export class LivesGateway implements OnGatewayDisconnect {
       return;
     }
 
-    this.pendingDuoInvites.set(data.liveId, { targetUserId: data.targetUserId, inviterSocketId: client.id });
+    // Le spectateur avait deja demande a rejoindre au meme moment -> on resout directement au
+    // lieu de laisser les deux en attente l'un de l'autre.
+    const existingRequest = this.pendingDuoRequests.get(data.liveId)?.get(data.targetUserId);
+    if (existingRequest) {
+      this.pendingDuoRequests.get(data.liveId)!.delete(data.targetUserId);
+      await this.livesService.addGuest(data.liveId, data.targetUserId);
+      this.broadcastGuestJoined(data.liveId, { id: data.targetUserId, username: existingRequest.username, avatarUrl: existingRequest.avatarUrl });
+      return;
+    }
+
+    if (!this.pendingDuoInvites.has(data.liveId)) this.pendingDuoInvites.set(data.liveId, new Map());
+    this.pendingDuoInvites.get(data.liveId)!.set(data.targetUserId, { inviterSocketId: client.id });
     for (const [socketId] of targetSockets) {
       this.server.to(socketId).emit('duoInvite', {
         liveId: data.liveId,
         fromUsername: user.displayName || user.username,
       });
     }
+    await this.notificationsService.notify(data.targetUserId, user.id, NotificationType.LIVE_GUEST_INVITE, { liveId: data.liveId });
   }
 
   @SubscribeMessage('respondDuo')
@@ -276,9 +332,9 @@ export class LivesGateway implements OnGatewayDisconnect {
     const user = await this.authenticate(data.token);
     if (!user) return;
 
-    const pending = this.pendingDuoInvites.get(data.liveId);
-    if (!pending || pending.targetUserId !== user.id) return;
-    this.pendingDuoInvites.delete(data.liveId);
+    const pending = this.pendingDuoInvites.get(data.liveId)?.get(user.id);
+    if (!pending) return;
+    this.pendingDuoInvites.get(data.liveId)!.delete(user.id);
 
     if (!data.accept) {
       this.server.to(pending.inviterSocketId).emit('duoDeclined', { username: user.username });
@@ -286,21 +342,17 @@ export class LivesGateway implements OnGatewayDisconnect {
     }
 
     try {
-      await this.livesService.setDuoPartner(data.liveId, user.id);
-      this.server.to(roomFor(data.liveId)).emit('duoStarted', {
-        partnerId: user.id,
-        partnerUsername: user.displayName || user.username,
-        partnerAvatarUrl: user.avatarUrl,
-      });
+      await this.livesService.addGuest(data.liveId, user.id);
+      this.broadcastGuestJoined(data.liveId, { id: user.id, username: user.displayName || user.username, avatarUrl: user.avatarUrl });
     } catch (err) {
       this.server.to(pending.inviterSocketId).emit('duoError', {
-        message: err instanceof Error ? err.message : 'Duo refusé.',
+        message: err instanceof Error ? err.message : 'Invitation refusée.',
       });
     }
   }
 
-  // Sens inverse d'inviteDuo — un spectateur demande lui-meme a rejoindre le live en duo, le
-  // createur voit la demande arriver (duoRequestReceived) et choisit d'accepter ou refuser.
+  // Sens inverse d'inviteDuo — un spectateur demande lui-meme a rejoindre le live, le createur
+  // voit la demande arriver (duoRequestReceived) et choisit d'accepter ou refuser.
   @SubscribeMessage('requestDuo')
   async handleRequestDuo(
     @ConnectedSocket() client: Socket,
@@ -308,15 +360,31 @@ export class LivesGateway implements OnGatewayDisconnect {
   ) {
     const user = await this.authenticate(data.token);
     if (!user) {
-      client.emit('duoRequestError', { message: 'Connecte-toi pour demander un duo.' });
+      client.emit('duoRequestError', { message: 'Connecte-toi pour demander à rejoindre le live.' });
       return;
     }
 
     const live = await this.livesService.getById(data.liveId).catch(() => null);
     if (!live) return;
     if (live.creatorId === user.id) return;
-    if (live.duoPartnerId) {
-      client.emit('duoRequestError', { message: 'Un duo est déjà en cours sur ce live.' });
+
+    if (await this.livesService.isGuest(data.liveId, user.id)) {
+      client.emit('duoRequestError', { message: 'Tu fais déjà partie des invités de ce live.' });
+      return;
+    }
+
+    const guestCount = (await this.livesService.getGuestIds(data.liveId)).length;
+    if (guestCount >= MAX_LIVE_GUESTS) {
+      client.emit('duoRequestError', { message: `Ce live a déjà atteint son maximum de ${MAX_LIVE_GUESTS} invités.` });
+      return;
+    }
+
+    // Le createur nous avait deja invite au meme moment -> on resout directement.
+    const existingInvite = this.pendingDuoInvites.get(data.liveId)?.get(user.id);
+    if (existingInvite) {
+      this.pendingDuoInvites.get(data.liveId)!.delete(user.id);
+      await this.livesService.addGuest(data.liveId, user.id);
+      this.broadcastGuestJoined(data.liveId, { id: user.id, username: user.displayName || user.username, avatarUrl: user.avatarUrl });
       return;
     }
 
@@ -333,6 +401,7 @@ export class LivesGateway implements OnGatewayDisconnect {
       username: user.displayName || user.username,
       avatarUrl: user.avatarUrl,
     });
+    await this.notificationsService.notify(live.creatorId, user.id, NotificationType.LIVE_GUEST_REQUEST, { liveId: data.liveId });
   }
 
   @SubscribeMessage('cancelDuoRequest')
@@ -365,36 +434,119 @@ export class LivesGateway implements OnGatewayDisconnect {
     }
 
     try {
-      await this.livesService.setDuoPartner(data.liveId, data.userId);
-      this.server.to(roomFor(data.liveId)).emit('duoStarted', {
-        partnerId: data.userId,
-        partnerUsername: requester.username,
-        partnerAvatarUrl: requester.avatarUrl,
-      });
-      // Le slot duo est pris — les autres demandes en attente n'ont plus lieu d'etre.
-      if (requests && requests.size > 0) {
-        for (const other of requests.values()) {
-          this.server.to(other.socketId).emit('duoRequestDeclined', {});
-        }
-        requests.clear();
-      }
+      await this.livesService.addGuest(data.liveId, data.userId);
+      this.broadcastGuestJoined(data.liveId, { id: data.userId, username: requester.username, avatarUrl: requester.avatarUrl });
     } catch (err) {
       this.server.to(requester.socketId).emit('duoRequestError', {
-        message: err instanceof Error ? err.message : 'Duo refusé.',
+        message: err instanceof Error ? err.message : 'Demande refusée.',
       });
     }
   }
 
+  // Retire un invite de la liste — soit le createur en cible une precise (moderation), soit
+  // un invite se retire lui-meme (pas de targetUserId, on utilise l'appelant).
   @SubscribeMessage('endDuo')
-  async handleEndDuo(@MessageBody() data: { liveId: string; token: string }) {
+  async handleEndDuo(@MessageBody() data: { liveId: string; token: string; targetUserId?: string }) {
     const user = await this.authenticate(data.token);
     if (!user) return;
 
     const live = await this.livesService.getById(data.liveId).catch(() => null);
-    if (!live || (live.creatorId !== user.id && live.duoPartnerId !== user.id)) return;
+    if (!live) return;
 
-    await this.livesService.clearDuoPartner(data.liveId);
-    this.server.to(roomFor(data.liveId)).emit('duoEnded', {});
+    let targetUserId: string;
+    if (data.targetUserId) {
+      if (live.creatorId !== user.id) return;
+      targetUserId = data.targetUserId;
+    } else {
+      if (!(await this.livesService.isGuest(data.liveId, user.id))) return;
+      targetUserId = user.id;
+    }
+
+    await this.livesService.removeGuest(data.liveId, targetUserId);
+    this.server.to(roomFor(data.liveId)).emit('duoEnded', { userId: targetUserId });
+  }
+
+  // Acces VISIONNAGE d'un live prive (distinct des invites/duo qui publient) — meme structure
+  // que requestDuo/inviteDuo/respondDuoRequest, cote "regarder" plutot que "publier".
+
+  // Le createur autorise directement quelqu'un a regarder — pas besoin qu'il soit connecte
+  // (accès immédiat, décision produit confirmée), contrairement a un duo qui necessite un
+  // accord de la cible puisqu'il implique de publier sa camera.
+  @SubscribeMessage('inviteViewer')
+  async handleInviteViewer(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { liveId: string; targetUserId: string; token: string },
+  ) {
+    const user = await this.authenticate(data.token);
+    if (!user || !(await this.livesService.isOwner(data.liveId, user.id))) return;
+
+    await this.livesService.grantViewAccess(data.liveId, data.targetUserId);
+    await this.notificationsService.notify(data.targetUserId, user.id, NotificationType.LIVE_VIEW_INVITE, { liveId: data.liveId });
+
+    // Si la cible a deja un socket connecte (ex: elle regardait l'ecran "demande d'acces"),
+    // la prevenir tout de suite plutot que de la laisser recharger la page pour le decouvrir.
+    const targetSockets = [...this.viewerIdentities.entries()].filter(
+      ([, v]) => v.liveId === data.liveId && v.userId === data.targetUserId,
+    );
+    for (const [socketId] of targetSockets) {
+      this.server.to(socketId).emit('viewAccessGranted', {});
+    }
+    this.pendingViewRequests.get(data.liveId)?.delete(data.targetUserId);
+  }
+
+  @SubscribeMessage('requestViewAccess')
+  async handleRequestViewAccess(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { liveId: string; token: string },
+  ) {
+    const user = await this.authenticate(data.token);
+    if (!user) {
+      client.emit('viewRequestError', { message: 'Connecte-toi pour demander à rejoindre ce live.' });
+      return;
+    }
+
+    const live = await this.livesService.getById(data.liveId).catch(() => null);
+    if (!live) return;
+    if (!live.isPrivate || (await this.livesService.hasViewAccess(live, user.id))) {
+      client.emit('viewAccessGranted', {});
+      return;
+    }
+
+    if (!this.pendingViewRequests.has(data.liveId)) this.pendingViewRequests.set(data.liveId, new Map());
+    this.pendingViewRequests.get(data.liveId)!.set(user.id, {
+      socketId: client.id,
+      username: user.displayName || user.username,
+      avatarUrl: user.avatarUrl,
+    });
+
+    client.emit('viewRequestSent', {});
+    this.server.to(roomFor(data.liveId)).emit('viewRequestReceived', {
+      userId: user.id,
+      username: user.displayName || user.username,
+      avatarUrl: user.avatarUrl,
+    });
+    await this.notificationsService.notify(live.creatorId, user.id, NotificationType.LIVE_VIEW_REQUEST, { liveId: data.liveId });
+  }
+
+  @SubscribeMessage('respondViewRequest')
+  async handleRespondViewRequest(
+    @MessageBody() data: { liveId: string; userId: string; accept: boolean; token: string },
+  ) {
+    const user = await this.authenticate(data.token);
+    if (!user || !(await this.livesService.isOwner(data.liveId, user.id))) return;
+
+    const requests = this.pendingViewRequests.get(data.liveId);
+    const requester = requests?.get(data.userId);
+    if (!requester) return;
+    requests!.delete(data.userId);
+
+    if (!data.accept) {
+      this.server.to(requester.socketId).emit('viewRequestDeclined', {});
+      return;
+    }
+
+    await this.livesService.grantViewAccess(data.liveId, data.userId);
+    this.server.to(requester.socketId).emit('viewAccessGranted', {});
   }
 
   @SubscribeMessage('placeBid')

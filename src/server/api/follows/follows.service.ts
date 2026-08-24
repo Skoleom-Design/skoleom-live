@@ -54,4 +54,21 @@ export class FollowsService {
     const rows = await this.followsRepo.find({ where: { followingId: userId } });
     return rows.map((r) => r.followerId);
   }
+
+  // Liste hydratee des comptes suivis par userId — meme forme que UserSearchResult (voir
+  // users.service.ts) pour que le frontend reutilise le meme composant de liste que la
+  // recherche par pseudo (voir LivesGateway/studio "inviter parmi mes abonnements").
+  async getFollowingHydrated(userId: string): Promise<{ id: string; username: string; displayName: string; avatarUrl: string }[]> {
+    const rows = await this.followsRepo
+      .createQueryBuilder('follow')
+      .innerJoin('follow.following', 'user')
+      .select('user.id', 'id')
+      .addSelect('user.username', 'username')
+      .addSelect('user.displayName', 'displayName')
+      .addSelect('user.avatarUrl', 'avatarUrl')
+      .where('follow.followerId = :userId', { userId })
+      .orderBy('user.username', 'ASC')
+      .getRawMany();
+    return rows;
+  }
 }

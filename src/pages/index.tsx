@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
-import { Search, Loader2, Radio, Gavel, BadgeCheck } from 'lucide-react';
+import { Search, Loader2, Radio, Gavel, BadgeCheck, Lock } from 'lucide-react';
 import { InstaPostCard } from '../client/components/Post/InstaPostCard';
 import { AppSidebar } from '../client/components/Layout/Sidebar';
 import { AppGateScreen } from '../client/components/AppGate/AppGateScreen';
@@ -24,6 +24,7 @@ interface LiveResult {
   title?: string;
   mode: 'live' | 'auction';
   creator: { username: string };
+  isPrivate?: boolean;
 }
 
 const PAGE_SIZE = 30;
@@ -204,8 +205,9 @@ export default function FeedPage() {
                               )}
                             </div>
                             <div className="min-w-0">
-                              <p className="text-white text-[13px] font-semibold truncate">
+                              <p className="text-white text-[13px] font-semibold truncate flex items-center gap-1.5">
                                 {l.title || (l.mode === 'auction' ? t('sidebar.auction') : t('sidebar.live'))}
+                                {l.isPrivate && <Lock size={10} className="text-white/40 shrink-0" />}
                               </p>
                               <p className="text-white/35 text-xs truncate">@{l.creator.username}</p>
                             </div>

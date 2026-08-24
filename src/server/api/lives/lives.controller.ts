@@ -4,6 +4,7 @@ import {
 import { LivesService } from './lives.service';
 import { LivesGateway } from './lives.gateway';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 
 @Controller('lives')
 export class LivesController {
@@ -39,11 +40,11 @@ export class LivesController {
 
   @UseGuards(JwtAuthGuard)
   @Post()
-  start(@Request() req, @Body() body: { title?: string; mode?: 'live' | 'auction' }) {
+  start(@Request() req, @Body() body: { title?: string; mode?: 'live' | 'auction'; isPrivate?: boolean }) {
     if (body.mode === 'auction') {
-      return this.livesService.startAuction(req.user.id, body.title);
+      return this.livesService.startAuction(req.user.id, body.title, body.isPrivate);
     }
-    return this.livesService.start(req.user.id, body.title);
+    return this.livesService.start(req.user.id, body.title, body.isPrivate);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -70,9 +71,14 @@ export class LivesController {
     return this.livesService.sendDemoGift(req.user.id, body.giftType);
   }
 
+  // OptionalJwtAuthGuard (pas obligatoire) — un visiteur non connecte doit pouvoir voir qu'un
+  // live prive existe (titre/createur, pour l'ecran "demande d'acces"), juste sans hasAccess.
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':id')
-  getById(@Param('id') id: string) {
-    return this.livesService.getById(id);
+  async getById(@Param('id') id: string, @Request() req) {
+    const live = await this.livesService.getById(id);
+    const hasAccess = await this.livesService.hasViewAccess(live, req.user?.id);
+    return { ...live, hasAccess };
   }
 
   @UseGuards(JwtAuthGuard)
@@ -81,9 +87,15 @@ export class LivesController {
     return this.livesService.getLiveKitToken(id, req.user.id);
   }
 
+  @Get(':id/guests')
+  getGuests(@Param('id') id: string) {
+    return this.livesService.getGuestsHydrated(id);
+  }
+
+  @UseGuards(OptionalJwtAuthGuard)
   @Get(':id/comments')
-  getComments(@Param('id') id: string) {
-    return this.livesService.getComments(id);
+  getComments(@Param('id') id: string, @Request() req) {
+    return this.livesService.getComments(id, req.user?.id);
   }
 
   @Get(':id/bids')
