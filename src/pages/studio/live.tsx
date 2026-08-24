@@ -6,7 +6,7 @@ import { io, Socket } from 'socket.io-client';
 import { Room, RoomEvent, Track, type RemoteTrack } from 'livekit-client';
 import {
   ArrowLeft, Mic, MicOff, Video, VideoOff, Radio, Loader2, Send, Users, Package, X, ShoppingBag,
-  Crown, Trash2, UserX, Gavel, Timer, ChevronRight, Plus, Trophy, Users2, AlertTriangle, MoreVertical, Check, Lock, Eye,
+  Crown, Trash2, UserX, Gavel, Timer, ChevronRight, Plus, Trophy, Users2, AlertTriangle, Check, Lock, Eye,
 } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
@@ -154,6 +154,10 @@ export default function StudioLivePage() {
   // Demandes d'ACCES VISIONNAGE (live prive) — distinct des demandes de duo ci-dessus, voir
   // requestViewAccess/respondViewRequest dans LivesGateway.
   const [viewRequests, setViewRequests] = useState<{ userId: string; username: string; avatarUrl?: string }[]>([]);
+  // Retour visuel local apres "Autoriser à regarder" — inviteViewer est un aller simple (pas de
+  // reponse serveur a attendre), sans ca le bouton ne change pas d'etat et l'hote peut croire
+  // que le clic n'a rien fait.
+  const [grantedViewerIds, setGrantedViewerIds] = useState<Set<string>>(new Set());
   // Onglets du panneau d'invitation — recherche par pseudo et "mes abonnements" en plus de la
   // liste des spectateurs deja connectes (voir GET /users/search et GET /follows/mine/following).
   const [invitePanelTab, setInvitePanelTab] = useState<'viewers' | 'search' | 'following'>('viewers');
@@ -163,7 +167,6 @@ export default function StudioLivePage() {
   // Feuille mobile — sur desktop le "Top donateur" vit dans le panneau lateral (voir plus bas),
   // sur mobile c'est une feuille ouverte depuis une icone sur la video (voir le bloc md:hidden).
   const [mobileTopDonorsOpen, setMobileTopDonorsOpen] = useState(false);
-  const [openViewerMenuId, setOpenViewerMenuId] = useState<string | null>(null);
   const guestVideoRefs = useRef(new Map<string, HTMLVideoElement>());
   const guestAudioRefs = useRef(new Map<string, HTMLAudioElement>());
   const guestTracksRef = useRef(new Map<string, RemoteTrack[]>());
@@ -384,7 +387,10 @@ export default function StudioLivePage() {
     socketRef.current = socket;
     // Voir live/[id].tsx pour le detail : 'connect' se redeclenche a chaque reconnexion, pas
     // seulement au montage, sinon une coupure reseau silencieuse nous rend invisible cote serveur.
-    socket.on('connect', () => socket.emit('join', { liveId: live.id }));
+    // Le token est indispensable ici : sans lui, handleJoin nous traite comme un spectateur
+    // anonyme et refuse l'entree en room sur un live prive — meme pour son propre createur — ce
+    // qui coupait tout evenement diffuse a la room (demandes d'acces, invites, cadeaux...).
+    socket.on('connect', () => socket.emit('join', { liveId: live.id, token: getToken() }));
     socket.on('viewerCount', (d: { count: number }) => setViewerCount(d.count));
     socket.on('history', (h: LiveComment[]) => setComments(h));
     socket.on('comment', (c: LiveComment) => setComments((prev) => [...prev, c]));
@@ -493,7 +499,10 @@ export default function StudioLivePage() {
   function openDuoPanel() {
     if (!live) return;
     setDuoPanelOpen(true);
-    setInvitePanelTab('viewers');
+    // Sur un live prive, l'onglet "Spectateurs" est vide par construction (personne ne peut
+    // etre connecte sans acces) — partir sur "Rechercher" evite que l'hote atterrisse sur un
+    // onglet vide et croie qu'il n'y a aucun moyen d'inviter quelqu'un.
+    setInvitePanelTab(live.isPrivate ? 'search' : 'viewers');
     setDuoInviteStatus('idle');
     socketRef.current?.emit('listViewers', { liveId: live.id, token: getToken() });
   }
@@ -540,6 +549,7 @@ export default function StudioLivePage() {
   function inviteViewer(targetUserId: string) {
     if (!live) return;
     socketRef.current?.emit('inviteViewer', { liveId: live.id, targetUserId, token: getToken() });
+    setGrantedViewerIds((prev) => new Set(prev).add(targetUserId));
   }
 
   function respondViewRequest(targetUserId: string, accept: boolean) {
@@ -804,7 +814,6 @@ export default function StudioLivePage() {
     if (!live || !socketRef.current) return;
     setViewersList((prev) => prev.map((v) => (v.userId === userId ? { ...v, muted } : v)));
     socketRef.current.emit('setMuted', { liveId: live.id, userId, muted, token: getToken() });
-    setOpenViewerMenuId(null);
   }
 
   function kickUser(userId: string) {
@@ -812,7 +821,6 @@ export default function StudioLivePage() {
     if (!window.confirm('Exclure cet utilisateur de ce live ? Il ne pourra pas le rejoindre.')) return;
     socketRef.current.emit('kickUser', { liveId: live.id, userId, token: getToken() });
     setViewersList((prev) => prev.filter((v) => v.userId !== userId));
-    setOpenViewerMenuId(null);
   }
 
   // Met en avant un produit — file de vente façon Whatnot. `setFeatured` persiste le choix
@@ -999,7 +1007,7 @@ export default function StudioLivePage() {
                           title="Gérer les invités"
                         >
                           <Users2 size={18} />
-                          {duoRequests.length > 0 && (
+                          {(duoRequests.length > 0 || viewRequests.length > 0) && (
                             <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-red-500 border-2 border-black" />
                           )}
                         </button>
@@ -1021,6 +1029,26 @@ export default function StudioLivePage() {
                           <Check size={14} />
                         </button>
                         <button onClick={() => respondDuoRequest(duoRequests[0].userId, false)} className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center">
+                          <X size={14} />
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Demande d'ACCES VISIONNAGE (live prive) — meme principe que la bannière
+                      duo ci-dessus mais pour "regarder", pas "publier". Décalée sous la bannière
+                      duo si les deux sont visibles en même temps. */}
+                  {viewRequests.length > 0 && (
+                    <div className={`absolute left-3 right-3 z-30 flex items-center justify-between gap-2 bg-black/80 backdrop-blur-sm border border-[#a8ff35]/40 rounded-2xl px-3.5 py-2.5 ${duoRequests.length > 0 ? 'top-[6.5rem]' : 'top-14'}`}>
+                      <p className="text-white text-[12px] font-medium min-w-0">
+                        <span className="font-bold text-[#a8ff35]">@{viewRequests[0].username}</span> demande à rejoindre ce live privé
+                        {viewRequests.length > 1 ? ` (+${viewRequests.length - 1} autre${viewRequests.length > 2 ? 's' : ''})` : ''}
+                      </p>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button onClick={() => respondViewRequest(viewRequests[0].userId, true)} className="w-8 h-8 rounded-full bg-[#a8ff35] text-black flex items-center justify-center">
+                          <Check size={14} />
+                        </button>
+                        <button onClick={() => respondViewRequest(viewRequests[0].userId, false)} className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center">
                           <X size={14} />
                         </button>
                       </div>
@@ -1598,13 +1626,13 @@ export default function StudioLivePage() {
 
       {duoPanelOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
-          onClick={() => setOpenViewerMenuId(null)}>
+          onClick={() => setDuoPanelOpen(false)}>
           <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-white font-bold text-base flex items-center gap-2">
                 <Users size={16} /> Invités {guests.length > 0 ? `(${guests.length})` : ''}
               </h2>
-              <button onClick={() => { setDuoPanelOpen(false); setOpenViewerMenuId(null); }}
+              <button onClick={() => setDuoPanelOpen(false)}
                 className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
                 <X size={16} className="text-white" />
               </button>
@@ -1711,55 +1739,58 @@ export default function StudioLivePage() {
                   {viewersList.map((v) => (
                     <div
                       key={v.userId}
-                      className="relative w-full flex items-center gap-3 p-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02]"
+                      className="w-full flex items-center gap-2 p-2.5 rounded-xl border border-white/[0.08] bg-white/[0.02]"
                     >
                       <div className="w-9 h-9 rounded-full bg-white/[0.08] overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold text-white/60">
                         {v.avatarUrl ? <img src={v.avatarUrl} alt="" className="w-full h-full object-cover" /> : v.username[0]?.toUpperCase()}
                       </div>
-                      <span className="text-sm font-medium text-white flex-1 truncate">@{v.username}</span>
+                      <span className="text-sm font-medium text-white flex-1 min-w-0 truncate">@{v.username}</span>
                       {v.muted && (
                         <span className="text-[10px] text-red-400 bg-red-400/10 px-1.5 py-0.5 rounded-full shrink-0">muet</span>
                       )}
-                      <button
-                        onClick={(e) => { e.stopPropagation(); setOpenViewerMenuId((id) => (id === v.userId ? null : v.userId)); }}
-                        className="w-7 h-7 rounded-full hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all shrink-0"
-                      >
-                        <MoreVertical size={14} />
-                      </button>
-
-                      {openViewerMenuId === v.userId && (
-                        <div className="absolute right-0 top-full mt-1 z-10 w-48 bg-[#181818] border border-white/[0.1] rounded-xl shadow-lg overflow-hidden">
-                          {!guests.some((g) => g.id === v.userId) && (
-                            <button
-                              onClick={() => { inviteDuo(v.userId); setOpenViewerMenuId(null); }}
-                              disabled={duoInviteStatus === 'inviting'}
-                              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-white hover:bg-white/[0.06] transition-colors disabled:opacity-50"
-                            >
-                              <Users2 size={14} /> Inviter
-                            </button>
-                          )}
-                          {live?.isPrivate && (
-                            <button
-                              onClick={() => { inviteViewer(v.userId); setOpenViewerMenuId(null); }}
-                              className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-white hover:bg-white/[0.06] transition-colors"
-                            >
-                              <Eye size={14} /> Autoriser à regarder
-                            </button>
-                          )}
+                      {/* Actions en ligne plutôt que dans un menu déroulant — un menu absolu
+                          dans cette liste défilante se retrouvait coupé/invisible pour les lignes
+                          proches du bas, ce qui donnait l'impression que rien n'était cliquable. */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        {!guests.some((g) => g.id === v.userId) && (
                           <button
-                            onClick={() => setMuted(v.userId, !v.muted)}
-                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-white hover:bg-white/[0.06] transition-colors"
+                            onClick={() => inviteDuo(v.userId)}
+                            disabled={duoInviteStatus === 'inviting'}
+                            title="Inviter en duo"
+                            className="w-7 h-7 rounded-full flex items-center justify-center border border-white/15 text-white/60 hover:text-white hover:bg-white/10 disabled:opacity-40 transition-colors"
                           >
-                            <UserX size={14} /> {v.muted ? 'Réactiver le son' : 'Mettre en sourdine'}
+                            <Users2 size={13} />
                           </button>
+                        )}
+                        {live?.isPrivate && (
                           <button
-                            onClick={() => kickUser(v.userId)}
-                            className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-[13px] text-red-400 hover:bg-red-500/10 transition-colors"
+                            onClick={() => inviteViewer(v.userId)}
+                            disabled={grantedViewerIds.has(v.userId)}
+                            title={grantedViewerIds.has(v.userId) ? 'Accès autorisé' : 'Autoriser à regarder'}
+                            className={`w-7 h-7 rounded-full flex items-center justify-center border transition-colors ${
+                              grantedViewerIds.has(v.userId)
+                                ? 'border-[#a8ff35]/40 text-[#a8ff35]'
+                                : 'border-white/15 text-white/60 hover:text-white hover:bg-white/10'
+                            }`}
                           >
-                            <X size={14} /> Exclure du live
+                            {grantedViewerIds.has(v.userId) ? <Check size={13} /> : <Eye size={13} />}
                           </button>
-                        </div>
-                      )}
+                        )}
+                        <button
+                          onClick={() => setMuted(v.userId, !v.muted)}
+                          title={v.muted ? 'Réactiver le son' : 'Mettre en sourdine'}
+                          className="w-7 h-7 rounded-full flex items-center justify-center border border-white/15 text-white/60 hover:text-white hover:bg-white/10 transition-colors"
+                        >
+                          <UserX size={13} />
+                        </button>
+                        <button
+                          onClick={() => kickUser(v.userId)}
+                          title="Exclure du live"
+                          className="w-7 h-7 rounded-full flex items-center justify-center border border-red-500/25 text-red-400 hover:bg-red-500/10 transition-colors"
+                        >
+                          <X size={13} />
+                        </button>
+                      </div>
                     </div>
                   ))}
                 </div>
@@ -1789,10 +1820,15 @@ export default function StudioLivePage() {
                       {live?.isPrivate && (
                         <button
                           onClick={() => inviteViewer(u.id)}
-                          title="Autoriser à regarder"
-                          className="w-7 h-7 rounded-full flex items-center justify-center border border-white/15 text-white/60 hover:text-white hover:bg-white/10 shrink-0"
+                          disabled={grantedViewerIds.has(u.id)}
+                          title={grantedViewerIds.has(u.id) ? 'Accès autorisé' : 'Autoriser à regarder'}
+                          className={`w-7 h-7 rounded-full flex items-center justify-center border shrink-0 transition-colors ${
+                            grantedViewerIds.has(u.id)
+                              ? 'border-[#a8ff35]/40 text-[#a8ff35]'
+                              : 'border-white/15 text-white/60 hover:text-white hover:bg-white/10'
+                          }`}
                         >
-                          <Eye size={13} />
+                          {grantedViewerIds.has(u.id) ? <Check size={13} /> : <Eye size={13} />}
                         </button>
                       )}
                       <button
@@ -1822,10 +1858,15 @@ export default function StudioLivePage() {
                       {live?.isPrivate && (
                         <button
                           onClick={() => inviteViewer(u.id)}
-                          title="Autoriser à regarder"
-                          className="w-7 h-7 rounded-full flex items-center justify-center border border-white/15 text-white/60 hover:text-white hover:bg-white/10 shrink-0"
+                          disabled={grantedViewerIds.has(u.id)}
+                          title={grantedViewerIds.has(u.id) ? 'Accès autorisé' : 'Autoriser à regarder'}
+                          className={`w-7 h-7 rounded-full flex items-center justify-center border shrink-0 transition-colors ${
+                            grantedViewerIds.has(u.id)
+                              ? 'border-[#a8ff35]/40 text-[#a8ff35]'
+                              : 'border-white/15 text-white/60 hover:text-white hover:bg-white/10'
+                          }`}
                         >
-                          <Eye size={13} />
+                          {grantedViewerIds.has(u.id) ? <Check size={13} /> : <Eye size={13} />}
                         </button>
                       )}
                       <button

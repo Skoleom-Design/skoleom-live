@@ -677,6 +677,31 @@ export default function LiveViewerPage() {
                 <Lock size={11} /> Privé
               </span>
             )}
+            {/* Version desktop du bouton "demander a monter" — la bulle mobile plus bas (bloc
+                md:hidden) couvre déjà les petits écrans ; sans ceci, un spectateur sur desktop
+                n'avait tout simplement aucun moyen de faire cette demande lui-même. */}
+            {!isOwner && !amGuest && (
+              <button
+                onClick={() => (duoRequestStatus === 'pending' ? cancelDuoRequest() : requestDuo())}
+                className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
+                  duoRequestStatus === 'pending'
+                    ? 'bg-[#a8ff35]/15 border-[#a8ff35]/40 text-[#a8ff35]'
+                    : duoRequestStatus === 'declined' || duoRequestStatus === 'error'
+                    ? 'bg-red-500/10 border-red-400/30 text-red-300'
+                    : 'bg-white/[0.06] border-white/15 text-white/70 hover:text-white hover:border-white/30'
+                }`}
+              >
+                {duoRequestStatus === 'pending' ? (
+                  <><Loader2 size={13} className="animate-spin" /> Demande envoyée…</>
+                ) : duoRequestStatus === 'declined' ? (
+                  <>Refusée</>
+                ) : duoRequestStatus === 'error' ? (
+                  <>{duoRequestErrorMsg || 'Refusée'}</>
+                ) : (
+                  <><Users2 size={13} /> Demander à monter</>
+                )}
+              </button>
+            )}
             <button
               onClick={openViewersPanel}
               className="ml-auto flex items-center gap-2 text-white/60 hover:text-white text-xs font-semibold transition-colors"
