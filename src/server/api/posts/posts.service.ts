@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { Post } from './post.entity';
@@ -203,6 +203,24 @@ export class PostsService {
       order: { createdAt: 'DESC' },
       take: 100,
     });
+  }
+
+  // Le commentaire lui-meme n'a pas de creatorId de post en cache — on va chercher le post pour
+  // savoir si le demandeur en est le proprietaire (seul cas ou il peut supprimer le commentaire
+  // de quelqu'un d'autre), en plus de son propre commentaire.
+  async deleteComment(commentId: string, requesterId: string, isAdmin = false): Promise<void> {
+    const comment = await this.commentsRepo.findOne({ where: { id: commentId } });
+    if (!comment) throw new NotFoundException('Commentaire introuvable');
+
+    if (!isAdmin && comment.userId !== requesterId) {
+      const post = await this.postsRepo.findOne({ where: { id: comment.postId } });
+      if (!post || post.creatorId !== requesterId) {
+        throw new ForbiddenException('Tu ne peux pas supprimer ce commentaire.');
+      }
+    }
+
+    await this.commentsRepo.delete(commentId);
+    await this.postsRepo.decrement({ id: comment.postId }, 'commentCount', 1);
   }
 
   async getLikedByUser(userId: string): Promise<Post[]> {

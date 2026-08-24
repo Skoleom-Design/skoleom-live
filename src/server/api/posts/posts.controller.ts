@@ -82,4 +82,10 @@ export class PostsController {
   addComment(@Param('id') id: string, @Body() body: { text: string }, @Request() req) {
     return this.postsService.addComment(id, req.user.id, body.text);
   }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete(':id/comments/:commentId')
+  deleteComment(@Param('commentId') commentId: string, @Request() req) {
+    return this.postsService.deleteComment(commentId, req.user.id, req.user.role === UserRole.ADMIN);
+  }
 }

@@ -1,15 +1,17 @@
 import { useEffect, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useRouter } from 'next/router';
-import { X, Send } from 'lucide-react';
+import { X, Send, Trash2 } from 'lucide-react';
 import type { Comment } from '../../../shared/types/api';
-import { api, ApiError, getToken } from '../../../shared/api/http';
+import { api, ApiError, getToken, getStoredUser } from '../../../shared/api/http';
 
 interface Props {
   postId: string;
+  postCreatorId: string;
   open: boolean;
   onClose: () => void;
   onCommentAdded?: () => void;
+  onCommentDeleted?: () => void;
 }
 
 function timeAgo(date: string) {
@@ -22,7 +24,7 @@ function timeAgo(date: string) {
   return `${Math.floor(hours / 24)} j`;
 }
 
-export function CommentsDrawer({ postId, open, onClose, onCommentAdded }: Props) {
+export function CommentsDrawer({ postId, postCreatorId, open, onClose, onCommentAdded, onCommentDeleted }: Props) {
   const router = useRouter();
   const [mounted, setMounted] = useState(false);
   const [comments, setComments] = useState<Comment[]>([]);
@@ -30,6 +32,8 @@ export function CommentsDrawer({ postId, open, onClose, onCommentAdded }: Props)
   const [text, setText] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
+  const myId = getStoredUser()?.id;
+  const isPostOwner = myId === postCreatorId;
 
   useEffect(() => setMounted(true), []);
 
@@ -64,6 +68,17 @@ export function CommentsDrawer({ postId, open, onClose, onCommentAdded }: Props)
     }
   }
 
+  async function deleteComment(commentId: string) {
+    if (!window.confirm('Supprimer ce commentaire ?')) return;
+    try {
+      await api.delete(`/posts/${postId}/comments/${commentId}`);
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+      onCommentDeleted?.();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Échec de la suppression.');
+    }
+  }
+
   if (!mounted || !open) return null;
 
   return createPortal(
@@ -92,24 +107,36 @@ export function CommentsDrawer({ postId, open, onClose, onCommentAdded }: Props)
               ) : comments.length === 0 ? (
                 <p className="text-white/40 text-sm text-center py-6">Aucun commentaire pour le moment. Sois le premier !</p>
               ) : (
-                comments.map((c) => (
-                  <div key={c.id} className="flex items-start gap-2.5">
-                    {c.user.avatarUrl ? (
-                      <img src={c.user.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
-                    ) : (
-                      <div className="w-8 h-8 rounded-full bg-[#a8ff35] flex items-center justify-center text-xs font-bold text-black shrink-0">
-                        {c.user.username[0]?.toUpperCase()}
+                comments.map((c) => {
+                  const canDelete = c.user.id === myId || isPostOwner;
+                  return (
+                    <div key={c.id} className="group flex items-start gap-2.5">
+                      {c.user.avatarUrl ? (
+                        <img src={c.user.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
+                      ) : (
+                        <div className="w-8 h-8 rounded-full bg-[#a8ff35] flex items-center justify-center text-xs font-bold text-black shrink-0">
+                          {c.user.username[0]?.toUpperCase()}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[13px] text-white leading-snug">
+                          <span className="font-semibold mr-1.5">{c.user.username}</span>
+                          <span className="text-white/80">{c.text}</span>
+                        </p>
+                        <p className="text-[11px] text-white/35 mt-0.5">{timeAgo(c.createdAt)}</p>
                       </div>
-                    )}
-                    <div className="min-w-0">
-                      <p className="text-[13px] text-white leading-snug">
-                        <span className="font-semibold mr-1.5">{c.user.username}</span>
-                        <span className="text-white/80">{c.text}</span>
-                      </p>
-                      <p className="text-[11px] text-white/35 mt-0.5">{timeAgo(c.createdAt)}</p>
+                      {canDelete && (
+                        <button
+                          onClick={() => deleteComment(c.id)}
+                          title="Supprimer ce commentaire"
+                          className="shrink-0 text-white/25 hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                        >
+                          <Trash2 size={14} />
+                        </button>
+                      )}
                     </div>
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
 

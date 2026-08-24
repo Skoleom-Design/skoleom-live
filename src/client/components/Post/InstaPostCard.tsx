@@ -324,9 +324,11 @@ export function InstaPostCard({ post, liked: likedProp = false }: Props) {
 
       <CommentsDrawer
         postId={post.id}
+        postCreatorId={post.creator.id}
         open={commentsOpen}
         onClose={() => setCommentsOpen(false)}
         onCommentAdded={() => setCommentCount((c) => c + 1)}
+        onCommentDeleted={() => setCommentCount((c) => Math.max(0, c - 1))}
       />
 
       <ShareModal
