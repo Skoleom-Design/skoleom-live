@@ -19,6 +19,9 @@ export class RealtimeGateway implements OnGatewayDisconnect {
   server: Server;
 
   private socketUser = new Map<string, string>();
+  // Index inverse — permet de savoir si un utilisateur a au moins un socket connecte (donc
+  // "en ligne"), meme s'il a plusieurs onglets/appareils ouverts en meme temps (voir isUserOnline).
+  private userSockets = new Map<string, Set<string>>();
 
   constructor(private jwtService: JwtService) {}
 
@@ -29,6 +32,8 @@ export class RealtimeGateway implements OnGatewayDisconnect {
       const payload = this.jwtService.verify(data.token);
       client.join(roomFor(payload.sub));
       this.socketUser.set(client.id, payload.sub);
+      if (!this.userSockets.has(payload.sub)) this.userSockets.set(payload.sub, new Set());
+      this.userSockets.get(payload.sub)!.add(client.id);
     } catch {
       // Token invalide/expire — le socket reste simplement non identifie, aucun evenement
       // personnel ne lui sera jamais poussé.
@@ -36,10 +41,27 @@ export class RealtimeGateway implements OnGatewayDisconnect {
   }
 
   handleDisconnect(client: Socket) {
+    const userId = this.socketUser.get(client.id);
     this.socketUser.delete(client.id);
+    if (userId) {
+      const sockets = this.userSockets.get(userId);
+      sockets?.delete(client.id);
+      if (sockets && sockets.size === 0) this.userSockets.delete(userId);
+    }
   }
 
   emitToUser(userId: string, event: string, payload: unknown): void {
     this.server.to(roomFor(userId)).emit(event, payload);
+  }
+
+  // Utilise par l'admin (voir AdminService.getUsers) pour afficher le statut de connexion —
+  // "en ligne" signifie au moins un socket /rt identifie actuellement ouvert, pas juste un
+  // compte non suspendu (voir User.isActive, qui a un sens totalement different).
+  isUserOnline(userId: string): boolean {
+    return (this.userSockets.get(userId)?.size ?? 0) > 0;
+  }
+
+  getOnlineUserIds(): string[] {
+    return [...this.userSockets.keys()];
   }
 }

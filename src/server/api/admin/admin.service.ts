@@ -11,6 +11,8 @@ import { WalletTransaction } from '../payments/wallet-transaction.entity';
 import { Message } from '../messages/message.entity';
 import { BoostsService } from '../boosts/boosts.service';
 import { UsersService } from '../users/users.service';
+import { RealtimeGateway } from '../realtime/realtime.gateway';
+import { LoginLog } from '../auth/login-log.entity';
 import { AdminActionLog, AdminActionType } from './admin-action-log.entity';
 import { OrderStatus, BoostStatus, PostStatus, UserPlan, UserRole, BoostScope, BoostObjective, WalletTransactionType } from '../../../shared/types/entities';
 
@@ -35,8 +37,11 @@ export class AdminService {
     private walletTxRepo: Repository<WalletTransaction>,
     @InjectRepository(Message)
     private messagesRepo: Repository<Message>,
+    @InjectRepository(LoginLog)
+    private loginLogsRepo: Repository<LoginLog>,
     private boostsService: BoostsService,
     private usersService: UsersService,
+    private realtimeGateway: RealtimeGateway,
   ) {}
 
   async getDashboardStats(period: 'day' | 'month' | 'quarter' | 'year' = 'month') {
@@ -140,14 +145,27 @@ export class AdminService {
     return { boosts, total, page, limit };
   }
 
-  async getUsers(page = 1, limit = 20, search?: string) {
+  async getUsers(
+    page = 1,
+    limit = 20,
+    search?: string,
+    sortBy: 'createdAt' | 'walletBalance' | 'totalEarnings' | 'username' = 'createdAt',
+    sortDir: 'ASC' | 'DESC' = 'DESC',
+    role?: UserRole,
+    isActive?: boolean,
+    plan?: UserPlan,
+  ) {
+    const SORTABLE = ['createdAt', 'walletBalance', 'totalEarnings', 'username'];
+    const orderColumn = SORTABLE.includes(sortBy) ? sortBy : 'createdAt';
+    const orderDir = sortDir === 'ASC' ? 'ASC' : 'DESC';
+
     const qb = this.usersRepo
       .createQueryBuilder('user')
       .select([
         'user.id', 'user.username', 'user.displayName', 'user.email', 'user.role',
         'user.isActive', 'user.plan', 'user.walletBalance', 'user.totalEarnings', 'user.createdAt',
       ])
-      .orderBy('user.createdAt', 'DESC')
+      .orderBy(`user.${orderColumn}`, orderDir)
       .skip((page - 1) * limit)
       .take(limit);
 
@@ -156,9 +174,16 @@ export class AdminService {
         search: `%${search.trim()}%`,
       });
     }
+    if (role) qb.andWhere('user.role = :role', { role });
+    if (isActive !== undefined) qb.andWhere('user.isActive = :isActive', { isActive });
+    if (plan) qb.andWhere('user.plan = :plan', { plan });
 
     const [users, total] = await qb.getManyAndCount();
-    return { users, total, page, limit };
+    // "En ligne" = au moins un socket /rt actuellement identifie (voir RealtimeGateway) — sans
+    // rapport avec isActive (qui veut dire "compte non suspendu"), voir le commentaire sur
+    // RealtimeGateway.isUserOnline.
+    const usersWithPresence = users.map((u) => ({ ...u, isOnline: this.realtimeGateway.isUserOnline(u.id) }));
+    return { users: usersWithPresence, total, page, limit };
   }
 
   async getPosts(page = 1, limit = 20, status?: string, search?: string) {
@@ -423,7 +448,7 @@ export class AdminService {
     const user = await this.usersRepo.findOne({ where: { id: userId } });
     if (!user) throw new BadRequestException('Utilisateur introuvable');
 
-    const [boosts, logs, giftsSent, messagesSentRaw] = await Promise.all([
+    const [boosts, logs, giftsSent, messagesSentRaw, loginLogs, loginCount] = await Promise.all([
       this.boostsRepo.find({
         where: { userId },
         order: { createdAt: 'DESC' },
@@ -447,6 +472,12 @@ export class AdminService {
         order: { createdAt: 'DESC' },
         take: 100,
       }),
+      this.loginLogsRepo.find({
+        where: { userId },
+        order: { createdAt: 'DESC' },
+        take: 50,
+      }),
+      this.loginLogsRepo.count({ where: { userId } }),
     ]);
 
     const messagesSent = messagesSentRaw.map((m) => {
@@ -459,6 +490,6 @@ export class AdminService {
       };
     });
 
-    return { user, boosts, logs, giftsSent, messagesSent };
+    return { user, boosts, logs, giftsSent, messagesSent, loginLogs, loginCount };
   }
 }

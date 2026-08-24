@@ -1,5 +1,5 @@
 import { Controller, Post, Get, Body, Query, Request, Res, UseGuards } from '@nestjs/common';
-import type { Response } from 'express';
+import type { Request as ExpressRequest, Response } from 'express';
 import { AuthService } from './auth.service';
 import { JwtAuthGuard } from './jwt-auth.guard';
 import { RegisterDto } from './register.dto';
@@ -14,9 +14,9 @@ export class AuthController {
   }
 
   @Post('login')
-  login(@Body() body: { email: string; password: string }) {
+  login(@Body() body: { email: string; password: string }, @Request() req: ExpressRequest) {
     // "email" accepte aussi un nom d'utilisateur (ex: le compte admin se connecte via son pseudo).
-    return this.authService.login(body.email, body.password);
+    return this.authService.login(body.email, body.password, req.ip, req.headers['user-agent']);
   }
 
   @Get('google')
@@ -31,9 +31,10 @@ export class AuthController {
     @Query('code') code: string | undefined,
     @Query('state') state: string | undefined,
     @Query('error') error: string | undefined,
+    @Request() req: ExpressRequest,
     @Res() res: Response,
   ) {
-    const redirectUrl = await this.authService.handleGoogleCallback(code, state, error);
+    const redirectUrl = await this.authService.handleGoogleCallback(code, state, error, req.ip, req.headers['user-agent']);
     res.redirect(redirectUrl);
   }
 

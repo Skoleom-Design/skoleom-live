@@ -2,7 +2,7 @@ import { Controller, Get, Post, Patch, Delete, Body, Param, Query, Request, UseG
 import { AdminService } from './admin.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from '../auth/admin.guard';
-import { PostStatus, BoostStatus, UserPlan, BoostObjective } from '../../../shared/types/entities';
+import { PostStatus, BoostStatus, UserPlan, UserRole, BoostObjective } from '../../../shared/types/entities';
 
 @Controller('admin')
 @UseGuards(JwtAuthGuard, AdminGuard)
@@ -29,8 +29,26 @@ export class AdminController {
   }
 
   @Get('users')
-  getUsers(@Query('page') page = 1, @Query('limit') limit = 20, @Query('search') search?: string) {
-    return this.adminService.getUsers(Number(page), Number(limit), search);
+  getUsers(
+    @Query('page') page = 1,
+    @Query('limit') limit = 20,
+    @Query('search') search?: string,
+    @Query('sortBy') sortBy?: 'createdAt' | 'walletBalance' | 'totalEarnings' | 'username',
+    @Query('sortDir') sortDir?: 'ASC' | 'DESC',
+    @Query('role') role?: UserRole,
+    @Query('isActive') isActive?: string,
+    @Query('plan') plan?: UserPlan,
+  ) {
+    return this.adminService.getUsers(
+      Number(page),
+      Number(limit),
+      search,
+      sortBy,
+      sortDir,
+      role,
+      isActive === undefined || isActive === '' ? undefined : isActive === 'true',
+      plan,
+    );
   }
 
   @Get('users/:id/detail')

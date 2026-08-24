@@ -10,15 +10,18 @@ import { WalletTransaction } from '../payments/wallet-transaction.entity';
 import { Message } from '../messages/message.entity';
 import { BoostsModule } from '../boosts/boosts.module';
 import { UsersModule } from '../users/users.module';
+import { RealtimeModule } from '../realtime/realtime.module';
+import { LoginLog } from '../auth/login-log.entity';
 import { AdminActionLog } from './admin-action-log.entity';
 import { AdminService } from './admin.service';
 import { AdminController } from './admin.controller';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([Order, Boost, User, Post, Gift, LiveSession, AdminActionLog, WalletTransaction, Message]),
+    TypeOrmModule.forFeature([Order, Boost, User, Post, Gift, LiveSession, AdminActionLog, WalletTransaction, Message, LoginLog]),
     BoostsModule,
     UsersModule,
+    RealtimeModule,
   ],
   providers: [AdminService],
   controllers: [AdminController],

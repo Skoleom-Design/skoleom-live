@@ -6,6 +6,7 @@ import * as bcrypt from 'bcryptjs';
 import axios from 'axios';
 import { randomUUID } from 'crypto';
 import { User } from '../users/user.entity';
+import { LoginLog } from './login-log.entity';
 import { UserPlan } from '../../../shared/types/entities';
 import { MonetizerService } from '../integrations/monetizer.service';
 
@@ -21,6 +22,8 @@ export class AuthService {
   constructor(
     @InjectRepository(User)
     private usersRepo: Repository<User>,
+    @InjectRepository(LoginLog)
+    private loginLogsRepo: Repository<LoginLog>,
     private jwtService: JwtService,
     private monetizerService: MonetizerService,
   ) {
@@ -60,7 +63,13 @@ export class AuthService {
     return { user: result, token: await this.issueSession(saved.id, saved.role) };
   }
 
-  async login(identifier: string, password: string) {
+  // Best-effort — n'a jamais le droit de faire echouer une connexion reussie (visible seulement
+  // dans le detail utilisateur admin, voir AdminService.getUserDetail).
+  private recordLogin(userId: string, ip?: string, userAgent?: string): void {
+    this.loginLogsRepo.save(this.loginLogsRepo.create({ userId, ip, userAgent })).catch(() => {});
+  }
+
+  async login(identifier: string, password: string, ip?: string, userAgent?: string) {
     const user = await this.usersRepo
       .createQueryBuilder('user')
       .addSelect('user.password')
@@ -71,6 +80,7 @@ export class AuthService {
       throw new UnauthorizedException('Invalid credentials');
     }
     const { password: _, ...result } = user;
+    this.recordLogin(user.id, ip, userAgent);
     return { user: result, token: await this.issueSession(user.id, user.role) };
   }
 
@@ -150,7 +160,13 @@ export class AuthService {
   // resout deja "/auth/..." par rapport a ce meme domaine. Un ancien bug utilisait
   // `${process.env.FRONTEND_URL || 'http://localhost:3001'}/...` : si FRONTEND_URL etait mal
   // configuree (ou absente) sur Render, ca renvoyait de vrais utilisateurs prod vers localhost.
-  async handleGoogleCallback(code: string | undefined, state: string | undefined, oauthError: string | undefined): Promise<string> {
+  async handleGoogleCallback(
+    code: string | undefined,
+    state: string | undefined,
+    oauthError: string | undefined,
+    ip?: string,
+    userAgent?: string,
+  ): Promise<string> {
     if (oauthError || !code || !state) {
       return '/auth/login?googleError=1';
     }
@@ -186,6 +202,7 @@ export class AuthService {
 
       const user = await this.findOrCreateGoogleUser({ googleId: sub, email, name, picture });
       const { password: _, ...result } = user;
+      this.recordLogin(user.id, ip, userAgent);
       const token = await this.issueSession(user.id, user.role);
       const payloadB64 = Buffer.from(JSON.stringify({ user: result, token })).toString('base64url');
 

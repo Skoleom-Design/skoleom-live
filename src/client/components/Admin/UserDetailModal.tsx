@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { X, Calendar, Wallet, TrendingUp, Zap, History, CreditCard, Gift as GiftIcon, MessageCircle } from 'lucide-react';
+import { X, Calendar, Wallet, TrendingUp, Zap, History, CreditCard, Gift as GiftIcon, MessageCircle, LogIn } from 'lucide-react';
 import { api } from '../../../shared/api/http';
 
 interface DetailUser {
@@ -49,12 +49,21 @@ interface DetailMessageSent {
   recipient: { id: string; username: string; displayName?: string };
 }
 
+interface DetailLoginLog {
+  id: string;
+  ip?: string;
+  userAgent?: string;
+  createdAt: string;
+}
+
 interface UserDetail {
   user: DetailUser;
   boosts: DetailBoost[];
   logs: DetailLog[];
   giftsSent: DetailGiftSent[];
   messagesSent: DetailMessageSent[];
+  loginLogs: DetailLoginLog[];
+  loginCount: number;
 }
 
 function fmt(date: string) {
@@ -125,6 +134,24 @@ export function UserDetailModal({ userId, onClose }: { userId: string; onClose: 
             <div className="flex items-center gap-1.5 text-xs text-gray-400">
               <Calendar size={13} />
               Membre depuis {fmt(detail.user.createdAt)}
+            </div>
+
+            <div>
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-gray-400 uppercase tracking-wide mb-2">
+                <LogIn size={13} /> Connexions ({detail.loginCount})
+              </div>
+              {detail.loginLogs.length === 0 ? (
+                <p className="text-gray-500 text-xs">Aucune connexion enregistrée.</p>
+              ) : (
+                <div className="space-y-1.5 max-h-40 overflow-y-auto scrollbar-hide">
+                  {detail.loginLogs.map((l) => (
+                    <div key={l.id} className="flex items-center justify-between bg-black/30 rounded-lg px-3 py-2 border border-white/5 text-xs">
+                      <span className="text-gray-300">{fmt(l.createdAt)}</span>
+                      {l.ip && <span className="text-gray-500 shrink-0 ml-2">{l.ip}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             <div className="grid grid-cols-2 gap-3">

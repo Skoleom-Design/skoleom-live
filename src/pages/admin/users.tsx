@@ -22,7 +22,23 @@ interface AdminUser {
   walletBalance: number;
   totalEarnings: number;
   createdAt: string;
+  isOnline: boolean;
 }
+
+// Rafraichit juste assez souvent pour que le statut "en ligne" reste a peu pres a jour sans
+// action de l'admin — meme principe que le polling des notifications dans Sidebar.tsx.
+const PRESENCE_POLL_MS = 20_000;
+
+const SORT_OPTIONS = [
+  { value: 'createdAt:DESC', label: 'Inscription (récent → ancien)' },
+  { value: 'createdAt:ASC', label: 'Inscription (ancien → récent)' },
+  { value: 'username:ASC', label: 'Pseudo (A → Z)' },
+  { value: 'username:DESC', label: 'Pseudo (Z → A)' },
+  { value: 'walletBalance:DESC', label: 'Solde wallet (haut → bas)' },
+  { value: 'walletBalance:ASC', label: 'Solde wallet (bas → haut)' },
+  { value: 'totalEarnings:DESC', label: 'Revenus (haut → bas)' },
+  { value: 'totalEarnings:ASC', label: 'Revenus (bas → haut)' },
+] as const;
 
 export default function AdminUsers() {
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -36,11 +52,20 @@ export default function AdminUsers() {
   const [toast, setToast] = useState<Toast | null>(null);
   const [detailTarget, setDetailTarget] = useState<string | null>(null);
   const [boostTarget, setBoostTarget] = useState<AdminUser | null>(null);
+  const [sort, setSort] = useState<string>('createdAt:DESC');
+  const [roleFilter, setRoleFilter] = useState('');
+  const [statusFilter, setStatusFilter] = useState('');
+  const [planFilter, setPlanFilter] = useState('');
 
   useEffect(() => {
     const debounce = setTimeout(load, 300);
     return () => clearTimeout(debounce);
-  }, [page, search]);
+  }, [page, search, sort, roleFilter, statusFilter, planFilter]);
+
+  useEffect(() => {
+    const interval = setInterval(load, PRESENCE_POLL_MS);
+    return () => clearInterval(interval);
+  }, [page, search, sort, roleFilter, statusFilter, planFilter]);
 
   useEffect(() => {
     if (!toast) return;
@@ -50,8 +75,12 @@ export default function AdminUsers() {
 
   function load() {
     setLoading(true);
-    const params = new URLSearchParams({ page: String(page), limit: '20' });
+    const [sortBy, sortDir] = sort.split(':');
+    const params = new URLSearchParams({ page: String(page), limit: '20', sortBy, sortDir });
     if (search.trim()) params.set('search', search.trim());
+    if (roleFilter) params.set('role', roleFilter);
+    if (statusFilter) params.set('isActive', statusFilter);
+    if (planFilter) params.set('plan', planFilter);
     api
       .get<{ users: AdminUser[]; total: number }>(`/admin/users?${params.toString()}`)
       .then((data) => {
@@ -141,6 +170,55 @@ export default function AdminUsers() {
           </div>
         </header>
 
+        <div className="px-6 pt-4 flex flex-wrap items-center gap-2 max-w-6xl mx-auto">
+          <select
+            value={sort}
+            onChange={(e) => { setPage(1); setSort(e.target.value); }}
+            className="bg-surface-card border border-white/10 rounded-xl px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand/50"
+          >
+            {SORT_OPTIONS.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+          <select
+            value={roleFilter}
+            onChange={(e) => { setPage(1); setRoleFilter(e.target.value); }}
+            className="bg-surface-card border border-white/10 rounded-xl px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand/50"
+          >
+            <option value="">Tous les rôles</option>
+            <option value="creator">Créateur</option>
+            <option value="buyer">Acheteur</option>
+            <option value="admin">Admin</option>
+          </select>
+          <select
+            value={statusFilter}
+            onChange={(e) => { setPage(1); setStatusFilter(e.target.value); }}
+            className="bg-surface-card border border-white/10 rounded-xl px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand/50"
+          >
+            <option value="">Tous les statuts</option>
+            <option value="true">Actif</option>
+            <option value="false">Suspendu</option>
+          </select>
+          <select
+            value={planFilter}
+            onChange={(e) => { setPage(1); setPlanFilter(e.target.value); }}
+            className="bg-surface-card border border-white/10 rounded-xl px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand/50"
+          >
+            <option value="">Tous les plans</option>
+            <option value="free">Free</option>
+            <option value="premium">Premium</option>
+            <option value="ultra">Ultra</option>
+          </select>
+          {(roleFilter || statusFilter || planFilter || sort !== 'createdAt:DESC') && (
+            <button
+              onClick={() => { setPage(1); setRoleFilter(''); setStatusFilter(''); setPlanFilter(''); setSort('createdAt:DESC'); }}
+              className="text-xs text-gray-400 hover:text-white underline"
+            >
+              Réinitialiser
+            </button>
+          )}
+        </div>
+
         <div className="p-6 max-w-6xl mx-auto">
           {loading ? (
             <div className="text-gray-500">Chargement...</div>
@@ -156,6 +234,7 @@ export default function AdminUsers() {
                     <th className="pb-3 pr-4">Plan</th>
                     <th className="pb-3 pr-4">Wallet</th>
                     <th className="pb-3 pr-4">Revenus</th>
+                    <th className="pb-3 pr-4">Inscrit</th>
                     <th className="pb-3">Actions</th>
                   </tr>
                 </thead>
@@ -163,10 +242,16 @@ export default function AdminUsers() {
                   {users.map((u) => (
                     <tr key={u.id} className="hover:bg-white/5 transition-colors">
                       <td className="py-3 pr-4">
-                        <Link href={`/profile/${u.id}`} className="font-semibold text-white hover:underline">
-                          {u.displayName || u.username}
-                        </Link>
-                        <p className="text-xs text-gray-500">@{u.username}</p>
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className={`w-2 h-2 rounded-full shrink-0 ${u.isOnline ? 'bg-green-400' : 'bg-gray-600'}`}
+                            title={u.isOnline ? 'En ligne' : 'Hors ligne'}
+                          />
+                          <Link href={`/profile/${u.id}`} className="font-semibold text-white hover:underline">
+                            {u.displayName || u.username}
+                          </Link>
+                        </div>
+                        <p className="text-xs text-gray-500 pl-3.5">@{u.username}</p>
                       </td>
                       <td className="py-3 pr-4 text-gray-400">{u.email}</td>
                       <td className="py-3 pr-4 text-gray-300">{u.role}</td>
@@ -192,6 +277,9 @@ export default function AdminUsers() {
                       </td>
                       <td className="py-3 pr-4 text-brand font-semibold">
                         {Number(u.totalEarnings).toFixed(2)} €
+                      </td>
+                      <td className="py-3 pr-4 text-gray-400 whitespace-nowrap">
+                        {new Date(u.createdAt).toLocaleDateString('fr-FR')}
                       </td>
                       <td className="py-3">
                         <div className="flex items-center gap-2">
