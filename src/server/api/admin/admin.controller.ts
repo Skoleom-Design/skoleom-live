@@ -38,6 +38,7 @@ export class AdminController {
     @Query('role') role?: UserRole,
     @Query('isActive') isActive?: string,
     @Query('plan') plan?: UserPlan,
+    @Query('isOnline') isOnline?: string,
   ) {
     return this.adminService.getUsers(
       Number(page),
@@ -48,6 +49,7 @@ export class AdminController {
       role,
       isActive === undefined || isActive === '' ? undefined : isActive === 'true',
       plan,
+      isOnline === undefined || isOnline === '' ? undefined : isOnline === 'true',
     );
   }
 

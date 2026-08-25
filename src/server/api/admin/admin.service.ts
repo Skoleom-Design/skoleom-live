@@ -154,10 +154,22 @@ export class AdminService {
     role?: UserRole,
     isActive?: boolean,
     plan?: UserPlan,
+    isOnline?: boolean,
   ) {
     const SORTABLE = ['createdAt', 'walletBalance', 'totalEarnings', 'username'];
     const orderColumn = SORTABLE.includes(sortBy) ? sortBy : 'createdAt';
     const orderDir = sortDir === 'ASC' ? 'ASC' : 'DESC';
+
+    // La présence vit en mémoire (RealtimeGateway), pas en base — un filtre "en ligne" doit donc
+    // se résoudre en une liste d'ids AVANT la pagination SQL, sinon skip/take ne porterait que
+    // sur la page courante au lieu de l'ensemble des utilisateurs.
+    let onlineIds: string[] | null = null;
+    if (isOnline !== undefined) {
+      onlineIds = this.realtimeGateway.getOnlineUserIds();
+      if (isOnline && onlineIds.length === 0) {
+        return { users: [], total: 0, page, limit };
+      }
+    }
 
     const qb = this.usersRepo
       .createQueryBuilder('user')
@@ -177,6 +189,10 @@ export class AdminService {
     if (role) qb.andWhere('user.role = :role', { role });
     if (isActive !== undefined) qb.andWhere('user.isActive = :isActive', { isActive });
     if (plan) qb.andWhere('user.plan = :plan', { plan });
+    if (onlineIds !== null) {
+      if (isOnline) qb.andWhere('user.id IN (:...onlineIds)', { onlineIds });
+      else qb.andWhere('user.id NOT IN (:...onlineIds)', { onlineIds: onlineIds.length ? onlineIds : ['00000000-0000-0000-0000-000000000000'] });
+    }
 
     const [users, total] = await qb.getManyAndCount();
     // "En ligne" = au moins un socket /rt actuellement identifie (voir RealtimeGateway) — sans

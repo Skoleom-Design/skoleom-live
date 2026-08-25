@@ -56,16 +56,17 @@ export default function AdminUsers() {
   const [roleFilter, setRoleFilter] = useState('');
   const [statusFilter, setStatusFilter] = useState('');
   const [planFilter, setPlanFilter] = useState('');
+  const [onlineFilter, setOnlineFilter] = useState('');
 
   useEffect(() => {
     const debounce = setTimeout(load, 300);
     return () => clearTimeout(debounce);
-  }, [page, search, sort, roleFilter, statusFilter, planFilter]);
+  }, [page, search, sort, roleFilter, statusFilter, planFilter, onlineFilter]);
 
   useEffect(() => {
     const interval = setInterval(load, PRESENCE_POLL_MS);
     return () => clearInterval(interval);
-  }, [page, search, sort, roleFilter, statusFilter, planFilter]);
+  }, [page, search, sort, roleFilter, statusFilter, planFilter, onlineFilter]);
 
   useEffect(() => {
     if (!toast) return;
@@ -81,6 +82,7 @@ export default function AdminUsers() {
     if (roleFilter) params.set('role', roleFilter);
     if (statusFilter) params.set('isActive', statusFilter);
     if (planFilter) params.set('plan', planFilter);
+    if (onlineFilter) params.set('isOnline', onlineFilter);
     api
       .get<{ users: AdminUser[]; total: number }>(`/admin/users?${params.toString()}`)
       .then((data) => {
@@ -209,9 +211,18 @@ export default function AdminUsers() {
             <option value="premium">Premium</option>
             <option value="ultra">Ultra</option>
           </select>
-          {(roleFilter || statusFilter || planFilter || sort !== 'createdAt:DESC') && (
+          <select
+            value={onlineFilter}
+            onChange={(e) => { setPage(1); setOnlineFilter(e.target.value); }}
+            className="bg-surface-card border border-white/10 rounded-xl px-3 py-1.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand/50"
+          >
+            <option value="">Connexion : tous</option>
+            <option value="true">En ligne</option>
+            <option value="false">Hors ligne</option>
+          </select>
+          {(roleFilter || statusFilter || planFilter || onlineFilter || sort !== 'createdAt:DESC') && (
             <button
-              onClick={() => { setPage(1); setRoleFilter(''); setStatusFilter(''); setPlanFilter(''); setSort('createdAt:DESC'); }}
+              onClick={() => { setPage(1); setRoleFilter(''); setStatusFilter(''); setPlanFilter(''); setOnlineFilter(''); setSort('createdAt:DESC'); }}
               className="text-xs text-gray-400 hover:text-white underline"
             >
               Réinitialiser
