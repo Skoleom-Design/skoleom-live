@@ -2,6 +2,7 @@ import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
   UpdateDateColumn, ManyToOne, ManyToMany, JoinColumn, JoinTable,
 } from 'typeorm';
+import { TIMESTAMP_COLUMN_TYPE } from '../../common/timestamp-column.type';
 import { LiveStatus, LiveMode } from '../../../shared/types/entities';
 import { User } from '../users/user.entity';
 import { Capsule } from '../capsules/capsule.entity';
@@ -33,10 +34,10 @@ export class LiveSession {
   @Column({ default: false })
   isPrivate: boolean;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: TIMESTAMP_COLUMN_TYPE, nullable: true })
   startedAt: Date;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: TIMESTAMP_COLUMN_TYPE, nullable: true })
   endedAt: Date;
 
   @ManyToMany(() => Capsule)
@@ -73,7 +74,7 @@ export class LiveSession {
   @Column({ nullable: true })
   currentBidderId: string;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: TIMESTAMP_COLUMN_TYPE, nullable: true })
   auctionEndsAt: Date;
 
   @Column({ default: false })
@@ -93,9 +94,9 @@ export class LiveSession {
   @Column({ default: 0 })
   auctionRoundsCount: number;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: TIMESTAMP_COLUMN_TYPE })
   createdAt: Date;
 
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn({ type: TIMESTAMP_COLUMN_TYPE })
   updatedAt: Date;
 }

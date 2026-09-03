@@ -2,6 +2,7 @@ import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
   UpdateDateColumn, OneToMany,
 } from 'typeorm';
+import { TIMESTAMP_COLUMN_TYPE } from '../../common/timestamp-column.type';
 import { UserRole, UserPlan } from '../../../shared/types/entities';
 import { Post } from '../posts/post.entity';
 import { Order } from '../orders/order.entity';
@@ -56,6 +57,12 @@ export class User {
   @Column({ default: true })
   isActive: boolean;
 
+  // Corbeille admin - distinct de isActive (suspension manuelle) : restaurable via
+  // AdminService.restoreUser tant qu'il n'a pas ete vide via permanentlyDeleteUser (meme
+  // principe que Post.status = DELETED, voir admin.service.ts).
+  @Column({ type: TIMESTAMP_COLUMN_TYPE, nullable: true })
+  deletedAt: Date | null;
+
   @Column({ type: 'decimal', precision: 10, scale: 2, default: 0, transformer: DecimalColumnTransformer })
   totalEarnings: number;
 
@@ -85,7 +92,7 @@ export class User {
   @Column({ nullable: true, select: false })
   instagramAccessToken: string;
 
-  @Column({ type: 'timestamptz', nullable: true })
+  @Column({ type: TIMESTAMP_COLUMN_TYPE, nullable: true })
   instagramTokenExpiresAt: Date;
 
   // Centres d'intérêt choisis à l'onboarding (slugs, voir client/constants/interests.ts) —
@@ -105,9 +112,9 @@ export class User {
   @OneToMany(() => Boost, (boost) => boost.user)
   boosts: Boost[];
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: TIMESTAMP_COLUMN_TYPE })
   createdAt: Date;
 
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn({ type: TIMESTAMP_COLUMN_TYPE })
   updatedAt: Date;
 }

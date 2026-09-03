@@ -1,7 +1,8 @@
-import {
+﻿import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
   UpdateDateColumn, ManyToOne, JoinColumn,
 } from 'typeorm';
+import { TIMESTAMP_COLUMN_TYPE } from '../../common/timestamp-column.type';
 import { OrderStatus } from '../../../shared/types/entities';
 import { User } from '../users/user.entity';
 import { Capsule } from '../capsules/capsule.entity';
@@ -64,9 +65,9 @@ export class Order {
   @Column()
   creatorId: string;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: TIMESTAMP_COLUMN_TYPE })
   createdAt: Date;
 
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn({ type: TIMESTAMP_COLUMN_TYPE })
   updatedAt: Date;
 }

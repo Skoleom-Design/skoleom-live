@@ -1,6 +1,7 @@
 import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
 } from 'typeorm';
+import { TIMESTAMP_COLUMN_TYPE } from '../../common/timestamp-column.type';
 import { WalletTransactionType } from '../../../shared/types/entities';
 import { DecimalColumnTransformer } from '../../common/decimal.transformer';
 
@@ -29,6 +30,6 @@ export class WalletTransaction {
   @Column({ nullable: true })
   reference: string;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: TIMESTAMP_COLUMN_TYPE })
   createdAt: Date;
 }

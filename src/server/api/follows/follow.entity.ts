@@ -1,6 +1,7 @@
-import {
+﻿import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, Index, Unique,
 } from 'typeorm';
+import { TIMESTAMP_COLUMN_TYPE } from '../../common/timestamp-column.type';
 import { User } from '../users/user.entity';
 
 @Entity('follows')
@@ -25,6 +26,6 @@ export class Follow {
   @JoinColumn({ name: 'followingId' })
   following: User;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: TIMESTAMP_COLUMN_TYPE })
   createdAt: Date;
 }

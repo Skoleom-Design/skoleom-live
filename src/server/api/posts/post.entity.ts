@@ -1,7 +1,8 @@
-import {
+﻿import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
   UpdateDateColumn, ManyToOne, ManyToMany, OneToMany, JoinColumn, JoinTable,
 } from 'typeorm';
+import { TIMESTAMP_COLUMN_TYPE } from '../../common/timestamp-column.type';
 import { PostType, PostStatus } from '../../../shared/types/entities';
 import { User } from '../users/user.entity';
 import { Capsule } from '../capsules/capsule.entity';
@@ -72,9 +73,9 @@ export class Post {
   @OneToMany(() => Boost, (boost) => boost.post)
   boosts: Boost[];
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: TIMESTAMP_COLUMN_TYPE })
   createdAt: Date;
 
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn({ type: TIMESTAMP_COLUMN_TYPE })
   updatedAt: Date;
 }

@@ -31,6 +31,6 @@ import { LivesGateway } from './lives.gateway';
   ],
   providers: [LivesService, LivesGateway],
   controllers: [LivesController],
-  exports: [LivesService],
+  exports: [LivesService, LivesGateway],
 })
 export class LivesModule {}

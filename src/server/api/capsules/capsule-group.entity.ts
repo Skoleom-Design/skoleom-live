@@ -2,6 +2,7 @@ import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
   UpdateDateColumn, OneToMany,
 } from 'typeorm';
+import { TIMESTAMP_COLUMN_TYPE } from '../../common/timestamp-column.type';
 import { Capsule } from './capsule.entity';
 
 // Une capsule est le "produit" que le créateur vend : elle a un nom, et regroupe
@@ -20,9 +21,9 @@ export class CapsuleGroup {
   @OneToMany(() => Capsule, (capsule) => capsule.group)
   products: Capsule[];
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: TIMESTAMP_COLUMN_TYPE })
   createdAt: Date;
 
-  @UpdateDateColumn({ type: 'timestamptz' })
+  @UpdateDateColumn({ type: TIMESTAMP_COLUMN_TYPE })
   updatedAt: Date;
 }

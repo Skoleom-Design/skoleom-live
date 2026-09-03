@@ -1,6 +1,7 @@
 import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn,
 } from 'typeorm';
+import { TIMESTAMP_COLUMN_TYPE } from '../../common/timestamp-column.type';
 import { User } from '../users/user.entity';
 
 export enum AdminActionType {
@@ -11,6 +12,8 @@ export enum AdminActionType {
   BOOST_CANCEL = 'boost_cancel',
   BOOST_APPROVE = 'boost_approve',
   ACCOUNT_DELETE = 'account_delete',
+  ACCOUNT_TRASH = 'account_trash',
+  ACCOUNT_RESTORE = 'account_restore',
 }
 
 @Entity('admin_action_logs')
@@ -34,6 +37,6 @@ export class AdminActionLog {
   @Column({ type: 'json', nullable: true })
   details: Record<string, unknown>;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: TIMESTAMP_COLUMN_TYPE })
   createdAt: Date;
 }

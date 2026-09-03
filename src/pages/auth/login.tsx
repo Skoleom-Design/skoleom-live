@@ -143,8 +143,7 @@ export default function LoginPage() {
             <ArrowLeft size={16} className="text-white/70" />
           </Link>
           <div className="flex items-center gap-2">
-            <img src="/skoleom-mark.png" alt="" className="w-6 h-6 object-contain" />
-            <span className="text-white font-bold text-sm">skoleomLive</span>
+            <img src="/logo.png" alt="skoleomLive" className="h-5 object-contain" />
           </div>
         </div>
 

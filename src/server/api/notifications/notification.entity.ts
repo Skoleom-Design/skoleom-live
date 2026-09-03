@@ -1,12 +1,13 @@
-import {
+﻿import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn, Index,
 } from 'typeorm';
+import { TIMESTAMP_COLUMN_TYPE } from '../../common/timestamp-column.type';
 import { NotificationType } from '../../../shared/types/entities';
 import { User } from '../users/user.entity';
 import { Post } from '../posts/post.entity';
 import { LiveSession } from '../lives/live-session.entity';
 
-// Notification (like/commentaire/follow/nouveau post/live demarre) — pousse en temps reel via
+// Notification (like/commentaire/follow/nouveau post/live demarre) â€” pousse en temps reel via
 // RealtimeGateway en plus d'etre persistee ; le badge cote profil se base sur le compteur non-lu.
 @Entity('notifications')
 export class Notification {
@@ -44,6 +45,6 @@ export class Notification {
   @Column({ default: false })
   read: boolean;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: TIMESTAMP_COLUMN_TYPE })
   createdAt: Date;
 }

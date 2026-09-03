@@ -113,13 +113,9 @@ function DesktopSidebar({
 
       <div className="relative px-3 pb-7 pt-2 flex items-center gap-2.5">
         <div className="relative shrink-0">
-          <div className="absolute -inset-1.5 rounded-full bg-skoleom-gradient-warm opacity-25 blur-xl animate-pulse-glow" />
-          <img src="/skoleom-mark.png" alt="" className="relative h-9 object-contain" />
+          <div className="absolute -inset-2 rounded-full bg-skoleom-gradient-warm opacity-20 blur-xl animate-pulse-glow" />
+          <img src="/logo.png" alt="skoleomLive" className="relative h-8 object-contain" />
         </div>
-        <span className="text-lg leading-none">
-          <span className="font-semibold text-white">skoleom</span>
-          <span className="font-extrabold text-[#a8ff35]">Live</span>
-        </span>
       </div>
 
       <nav className="relative flex-1 space-y-1">

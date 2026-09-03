@@ -1,6 +1,7 @@
 import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index, Unique,
 } from 'typeorm';
+import { TIMESTAMP_COLUMN_TYPE } from '../../common/timestamp-column.type';
 
 // Un invité actuellement autorisé à publier caméra/micro dans la room LiveKit d'un live, en
 // plus du créateur — remplace l'ancien slot unique `LiveSession.duoPartnerId` (une seule ligne
@@ -20,6 +21,6 @@ export class LiveGuest {
   @Column()
   userId: string;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: TIMESTAMP_COLUMN_TYPE })
   joinedAt: Date;
 }

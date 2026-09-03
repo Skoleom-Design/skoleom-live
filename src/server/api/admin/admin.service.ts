@@ -155,6 +155,7 @@ export class AdminService {
     isActive?: boolean,
     plan?: UserPlan,
     isOnline?: boolean,
+    trashed = false,
   ) {
     const SORTABLE = ['createdAt', 'walletBalance', 'totalEarnings', 'username'];
     const orderColumn = SORTABLE.includes(sortBy) ? sortBy : 'createdAt';
@@ -186,6 +187,10 @@ export class AdminService {
         search: `%${search.trim()}%`,
       });
     }
+    // La corbeille reste un espace separe — un compte supprime n'apparait que sous l'onglet
+    // dedie, jamais melange avec la liste normale (meme principe que getPosts/PostStatus.DELETED).
+    if (trashed) qb.andWhere('user.deletedAt IS NOT NULL');
+    else qb.andWhere('user.deletedAt IS NULL');
     if (role) qb.andWhere('user.role = :role', { role });
     if (isActive !== undefined) qb.andWhere('user.isActive = :isActive', { isActive });
     if (plan) qb.andWhere('user.plan = :plan', { plan });
@@ -376,11 +381,43 @@ export class AdminService {
     }));
   }
 
-  // Suppression definitive (pas de corbeille) — reutilise UsersService.deleteAccount, le meme
-  // chemin que "supprimer mon compte" cote utilisateur, qui nettoie deja toutes les tables
+  // Corbeille — soft-delete admin, distinct de isActive (suspension). Restaurable via
+  // restoreUser tant qu'il n'a pas ete vide via permanentlyDeleteUser (meme principe que
+  // deletePost/restorePost/permanentlyDeletePost ci-dessus).
+  async trashUser(userId: string, adminId: string): Promise<void> {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Utilisateur introuvable');
+    if (user.role === UserRole.ADMIN) {
+      throw new BadRequestException('Impossible de supprimer un compte administrateur.');
+    }
+
+    await this.usersRepo.update(userId, { deletedAt: new Date(), isActive: false });
+    await this.logsRepo.save(this.logsRepo.create({
+      action: AdminActionType.ACCOUNT_TRASH,
+      adminId,
+      targetUserId: userId,
+      details: { username: user.username, email: user.email },
+    }));
+  }
+
+  async restoreUser(userId: string, adminId: string): Promise<void> {
+    const user = await this.usersRepo.findOne({ where: { id: userId } });
+    if (!user) throw new NotFoundException('Utilisateur introuvable');
+
+    await this.usersRepo.update(userId, { deletedAt: null, isActive: true });
+    await this.logsRepo.save(this.logsRepo.create({
+      action: AdminActionType.ACCOUNT_RESTORE,
+      adminId,
+      targetUserId: userId,
+      details: { username: user.username, email: user.email },
+    }));
+  }
+
+  // Vide la corbeille pour ce compte — irreversible. Reutilise UsersService.deleteAccount, le
+  // meme chemin que "supprimer mon compte" cote utilisateur, qui nettoie deja toutes les tables
   // filles dans le bon ordre. Le log est ecrit avant la suppression : targetUserId n'a pas de
   // contrainte de cle etrangere, donc la trace d'audit survit volontairement a la suppression.
-  async deleteUser(userId: string, adminId: string): Promise<void> {
+  async permanentlyDeleteUser(userId: string, adminId: string): Promise<void> {
     const user = await this.usersRepo.findOne({ where: { id: userId } });
     if (!user) throw new NotFoundException('Utilisateur introuvable');
     if (user.role === UserRole.ADMIN) {

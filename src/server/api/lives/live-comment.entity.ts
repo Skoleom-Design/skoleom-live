@@ -1,6 +1,7 @@
-import {
+﻿import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn,
 } from 'typeorm';
+import { TIMESTAMP_COLUMN_TYPE } from '../../common/timestamp-column.type';
 import { User } from '../users/user.entity';
 import { LiveSession } from './live-session.entity';
 
@@ -26,6 +27,6 @@ export class LiveComment {
   @Column()
   liveSessionId: string;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: TIMESTAMP_COLUMN_TYPE })
   createdAt: Date;
 }

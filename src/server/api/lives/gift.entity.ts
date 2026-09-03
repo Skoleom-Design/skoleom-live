@@ -1,6 +1,7 @@
-import {
+﻿import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn,
 } from 'typeorm';
+import { TIMESTAMP_COLUMN_TYPE } from '../../common/timestamp-column.type';
 import { User } from '../users/user.entity';
 import { LiveSession } from './live-session.entity';
 import { DecimalColumnTransformer } from '../../common/decimal.transformer';
@@ -21,7 +22,7 @@ export class Gift {
   senderId: string;
 
   // Nuls pour un cadeau "hors-live" (ex: page vitrine /live demo, non rattachee a un vrai
-  // createur/LiveSession) — l'argent est alors integralement compte comme platformAmount.
+  // createur/LiveSession) â€” l'argent est alors integralement compte comme platformAmount.
   @ManyToOne(() => User, { eager: true, nullable: true })
   @JoinColumn({ name: 'receiverId' })
   receiver: User | null;
@@ -45,6 +46,6 @@ export class Gift {
   @Column({ type: 'decimal', precision: 10, scale: 2, transformer: DecimalColumnTransformer })
   platformAmount: number;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: TIMESTAMP_COLUMN_TYPE })
   createdAt: Date;
 }

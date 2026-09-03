@@ -1,3 +1,9 @@
+// Doit s'executer avant tout le reste : AppModule (importe juste en dessous) charge en cascade
+// toutes les entites, dont certaines lisent process.env.DB_HOST au chargement du module (voir
+// timestamp-column.type.ts) pour choisir leur type de colonne — sans ce chargement explicite et
+// synchrone du .env ici, ConfigModule.forRoot() ne le fait que plus tard, une fois les entites
+// deja evaluees avec des valeurs par defaut incorrectes.
+import 'dotenv/config';
 import 'reflect-metadata';
 import { join } from 'path';
 import * as express from 'express';
@@ -24,10 +30,16 @@ async function bootstrap() {
 
   app.setGlobalPrefix('api');
   app.useGlobalPipes(new ValidationPipe({ transform: true, whitelist: true }));
+  // NODE_ENV vaut "production" meme en dev local sur ce projet (voir .env — la base est un vrai
+  // Supabase de prod, pas une base jetable), donc on ne peut pas s'en servir pour distinguer
+  // "vrai" prod et dev local : FRONTEND_URL est toujours autorise, plus les ports locaux connus
+  // (3001 = site Next.js, 5001 = app mobile Flutter lancee en web via --web-port=5001).
+  const devOrigins = ['http://localhost:3001', 'http://localhost:5001'];
+  const allowedOrigins = [...new Set([process.env.FRONTEND_URL, ...devOrigins])].filter(
+    (o): o is string => Boolean(o),
+  );
   app.enableCors({
-    origin: process.env.NODE_ENV === 'production'
-      ? process.env.FRONTEND_URL
-      : ['http://localhost:3001'],
+    origin: allowedOrigins,
     credentials: true,
   });
 

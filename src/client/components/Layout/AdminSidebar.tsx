@@ -42,8 +42,7 @@ export function AdminSidebar() {
     <>
       <aside className="hidden md:flex flex-col w-[240px] h-screen sticky top-0 bg-black border-r border-[#f59e0b]/[0.15] px-3 py-5 shrink-0">
         <div className="flex items-center gap-2 px-3 pb-1 pt-2">
-          <img src="/skoleom-mark.png" alt="" className="h-6 object-contain" />
-          <span className="text-white font-bold text-sm">skoleomLive</span>
+          <img src="/logo.png" alt="skoleomLive" className="h-6 object-contain" />
         </div>
         <div className="flex items-center gap-1.5 px-3 pb-5 mt-1">
           <ShieldAlert size={13} className="text-[#f59e0b]" />

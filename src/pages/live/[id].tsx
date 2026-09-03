@@ -4,9 +4,10 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { io, Socket } from 'socket.io-client';
 import { Room, RoomEvent, Track, type RemoteTrack } from 'livekit-client';
-import { ArrowLeft, Users, Users2, Send, Gavel, Timer, Package, Crown, Gift, Wallet, Plus, Trophy, VolumeX, Check, X as XIcon, MoreVertical, UserX, AlertTriangle, Loader2, Lock } from 'lucide-react';
+import { ArrowLeft, Users, Users2, Send, Gavel, Timer, Package, Crown, Gift, Wallet, Plus, Trophy, VolumeX, Check, X as XIcon, MoreVertical, UserX, AlertTriangle, Loader2, Lock, Gamepad2 } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
+import { LiveGameDrawer } from '../../client/components/Game/LiveGameDrawer';
 import { GiftBurstOverlay, type ActiveGiftBurst } from '../../client/components/Live/GiftBurstOverlay';
 import { GIFTS, COIN_PACKS, giftById, type GiftDef } from '../../client/constants/gifts';
 import { api, ApiError, getToken, getStoredUser } from '../../shared/api/http';
@@ -194,6 +195,12 @@ export default function LiveViewerPage() {
   // ecran (voir le bloc md:hidden dans le JSX).
   const [mobileGiftsOpen, setMobileGiftsOpen] = useState(false);
 
+  // Mini-jeu (Undercover) lance depuis l'interieur du live — voir GameGateway.joinLiveGame.
+  // `gameActive` allume le badge sur le bouton des qu'une partie demarre, meme pour un spectateur
+  // qui n'a pas encore ouvert le tiroir.
+  const [gameDrawerOpen, setGameDrawerOpen] = useState(false);
+  const [gameActive, setGameActive] = useState(false);
+
   // Liste des spectateurs — visible par tout le monde ; le createur voit en plus un menu de
   // moderation par spectateur (exclure/muter), voir isOwner ci-dessous.
   const [viewersPanelOpen, setViewersPanelOpen] = useState(false);
@@ -328,6 +335,7 @@ export default function LiveViewerPage() {
     // invisible au compteur de spectateurs, a la liste de moderation et aux invitations de duo.
     socket.on('connect', () => socket.emit('join', { liveId: id, token: getToken() }));
     socket.on('viewerCount', (d: { count: number }) => setViewerCount(d.count));
+    socket.on('gameActive', () => setGameActive(true));
     socket.on('history', (h: LiveComment[]) => setComments(h));
     socket.on('comment', (c: LiveComment) => setComments((prev) => [...prev, c]));
     socket.on('commentDeleted', (d: { commentId: string }) => {
@@ -915,6 +923,16 @@ export default function LiveViewerPage() {
                     >
                       <Gift size={19} className="text-[#f59e0b]" />
                     </button>
+                    {(isOwner || gameActive) && (
+                      <button
+                        onClick={() => setGameDrawerOpen(true)}
+                        className="relative w-11 h-11 rounded-full bg-black/40 border border-white/15 backdrop-blur-sm flex items-center justify-center"
+                        title="Jeu"
+                      >
+                        <Gamepad2 size={19} className="text-[#a8ff35]" />
+                        {gameActive && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#a8ff35] border-2 border-black/80" />}
+                      </button>
+                    )}
                     {!isOwner && !amGuest && (
                       <button
                         onClick={() => (duoRequestStatus === 'pending' ? cancelDuoRequest() : requestDuo())}
@@ -993,6 +1011,23 @@ export default function LiveViewerPage() {
             </div>
 
             <div className="hidden md:w-[300px] md:shrink-0 md:flex flex-col gap-2">
+              {(isOwner || gameActive) && (
+                <button
+                  onClick={() => setGameDrawerOpen(true)}
+                  className="shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-[#a8ff35]/20 via-[#a8ff35]/10 to-transparent border border-[#a8ff35]/30 hover:border-[#a8ff35]/50 transition-all text-left"
+                >
+                  <span className="relative w-8 h-8 rounded-full bg-[#a8ff35]/20 flex items-center justify-center shrink-0">
+                    <Gamepad2 size={15} className="text-[#a8ff35]" />
+                    {gameActive && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#a8ff35] border-2 border-[#0d0d0f]" />}
+                  </span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-[#a8ff35]/80">Undercover</span>
+                    <span className="block text-[13px] font-semibold text-white truncate">
+                      {gameActive ? 'Une partie est en cours' : 'Lancer un jeu'}
+                    </span>
+                  </span>
+                </button>
+              )}
               <button
                 onClick={() => setTopDonorsOpen((o) => !o)}
                 className="shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-[#f59e0b]/20 via-[#f59e0b]/10 to-transparent border border-[#f59e0b]/30 hover:border-[#f59e0b]/50 transition-all text-left"
@@ -1278,6 +1313,10 @@ export default function LiveViewerPage() {
           open={capsuleDrawerOpen}
           onClose={() => setCapsuleDrawerOpen(false)}
         />
+      )}
+
+      {gameDrawerOpen && (
+        <LiveGameDrawer liveId={id as string} isLiveOwner={isOwner} onClose={() => setGameDrawerOpen(false)} />
       )}
 
       {/* Feuilles mobiles — top donateurs et cadeaux vivent dans le panneau desktop (voir plus

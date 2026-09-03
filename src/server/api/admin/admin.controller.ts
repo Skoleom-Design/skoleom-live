@@ -39,6 +39,7 @@ export class AdminController {
     @Query('isActive') isActive?: string,
     @Query('plan') plan?: UserPlan,
     @Query('isOnline') isOnline?: string,
+    @Query('trashed') trashed?: string,
   ) {
     return this.adminService.getUsers(
       Number(page),
@@ -50,6 +51,7 @@ export class AdminController {
       isActive === undefined || isActive === '' ? undefined : isActive === 'true',
       plan,
       isOnline === undefined || isOnline === '' ? undefined : isOnline === 'true',
+      trashed === 'true',
     );
   }
 
@@ -114,9 +116,21 @@ export class AdminController {
     return this.adminService.setUserActive(id, body.isActive, req.user.id);
   }
 
+  // Corbeille — supprime (soft) sans effacer les donnees, restaure, ou vide definitivement.
+  // Meme convention que posts/:id ci-dessus.
   @Delete('users/:id')
-  deleteUser(@Param('id') id: string, @Request() req) {
-    return this.adminService.deleteUser(id, req.user.id);
+  trashUser(@Param('id') id: string, @Request() req) {
+    return this.adminService.trashUser(id, req.user.id);
+  }
+
+  @Patch('users/:id/restore')
+  restoreUser(@Param('id') id: string, @Request() req) {
+    return this.adminService.restoreUser(id, req.user.id);
+  }
+
+  @Delete('users/:id/permanent')
+  permanentlyDeleteUser(@Param('id') id: string, @Request() req) {
+    return this.adminService.permanentlyDeleteUser(id, req.user.id);
   }
 
   @Patch('users/:id/plan')

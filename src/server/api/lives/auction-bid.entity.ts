@@ -1,11 +1,12 @@
-import {
+﻿import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn,
 } from 'typeorm';
+import { TIMESTAMP_COLUMN_TYPE } from '../../common/timestamp-column.type';
 import { User } from '../users/user.entity';
 import { LiveSession } from './live-session.entity';
 import { DecimalColumnTransformer } from '../../common/decimal.transformer';
 
-// Historique des mises d'une enchere — sert d'audit trail et alimente le fil "encheres" affiche
+// Historique des mises d'une enchere â€” sert d'audit trail et alimente le fil "encheres" affiche
 // aux spectateurs, en plus de currentBid/currentBidderId sur LiveSession (etat courant).
 @Entity('auction_bids')
 export class AuctionBid {
@@ -29,6 +30,6 @@ export class AuctionBid {
   @Column({ type: 'decimal', precision: 10, scale: 2, transformer: DecimalColumnTransformer })
   amount: number;
 
-  @CreateDateColumn({ type: 'timestamptz' })
+  @CreateDateColumn({ type: TIMESTAMP_COLUMN_TYPE })
   createdAt: Date;
 }
