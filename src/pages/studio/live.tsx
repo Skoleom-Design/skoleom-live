@@ -1234,7 +1234,7 @@ export default function StudioLivePage() {
                       incrustation sur la vidéo, au lieu du pavé opaque qui poussait tout vers le
                       bas et mangeait l'écran (voir le panneau desktop caché ici, plus bas). */}
                   <div
-                    className="md:hidden absolute left-0 right-3 bottom-16 z-10 max-h-[30%] overflow-y-auto scrollbar-hide flex flex-col gap-1 px-3 pb-1 pointer-events-none"
+                    className="md:hidden absolute left-0 right-3 bottom-[6.5rem] z-10 max-h-[30%] overflow-y-auto scrollbar-hide flex flex-col gap-1 px-3 pb-1 pointer-events-none"
                     style={{ WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 22%)', maskImage: 'linear-gradient(to bottom, transparent 0%, black 22%)' }}
                   >
                     {comments.map((c) => {
