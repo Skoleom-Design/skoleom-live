@@ -23,6 +23,10 @@ export class FilesService {
           accessKeyId: process.env.AWS_ACCESS_KEY_ID,
           secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
         },
+        // S3_ENDPOINT permet de pointer vers un stockage compatible S3 autre qu'AWS (ex: le
+        // Storage S3 de Supabase) — forcePathStyle est requis par la plupart de ces fournisseurs
+        // (bucket.endpoint/key ne fonctionne pas, il faut endpoint/bucket/key).
+        ...(process.env.S3_ENDPOINT ? { endpoint: process.env.S3_ENDPOINT, forcePathStyle: true } : {}),
       });
     }
     this.bucket = process.env.S3_BUCKET_NAME || 'skoleom-live';
