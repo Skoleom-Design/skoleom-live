@@ -72,7 +72,7 @@ export default function AuctionPage() {
                   <Link
                     key={live.id}
                     href={`/live/${live.id}`}
-                    className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-white/[0.04] border border-white/[0.08] group hover:border-[#a8ff35]/40 transition-all"
+                    className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-white/[0.04] border border-white/[0.08] group hover:border-[#ffc94d]/40 transition-all"
                   >
                     {live.auctionCapsule?.imageUrl ? (
                       <img src={live.auctionCapsule.imageUrl} alt="" className="w-full h-full object-cover" />
@@ -94,7 +94,7 @@ export default function AuctionPage() {
                       </p>
                       <p className="text-white/50 text-[11px] mb-1.5">@{live.creator.username}</p>
                       <div className="flex items-center justify-between">
-                        <p className="text-[#a8ff35] font-bold text-[14px]">
+                        <p className="text-[#ffc94d] font-bold text-[14px]">
                           {(live.currentBid ?? live.startingBid ?? 0).toFixed(2)} €
                         </p>
                         {live.auctionActive && live.auctionEndsAt && (

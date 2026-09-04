@@ -33,7 +33,7 @@ export default function CapsuleCheckoutPage() {
         <title>Paiement — skoleomLive</title>
       </Head>
 
-      <div className="min-h-screen bg-[#050505] flex items-center justify-center px-4">
+      <div className="min-h-screen bg-[#1c0c21] flex items-center justify-center px-4">
         <div className="w-full max-w-sm">
           {success ? (
             <div className="text-center space-y-4">

@@ -230,9 +230,9 @@ export default function StudioPage() {
         <main className="relative flex-1 flex flex-col overflow-y-auto overflow-x-hidden scrollbar-hide">
           {/* Halos d'ambiance — meme esprit que la sidebar, pour que le studio ne soit plus
               un simple aplat noir autour d'une colonne etroite. */}
-          <div className="cosmic-orb w-64 h-64 bg-[#a8ff35]/[0.07] -top-16 -right-20 animate-float" style={{ animationDelay: '0s' }} />
-          <div className="cosmic-orb w-48 h-48 bg-[#00ffff]/[0.06] top-1/3 -left-24 animate-float" style={{ animationDelay: '-4s' }} />
-          <div className="cosmic-orb w-56 h-56 bg-[#faee21]/[0.04] bottom-0 right-0 animate-float" style={{ animationDelay: '-2s' }} />
+          <div className="cosmic-orb w-64 h-64 bg-[#ffc94d]/[0.07] -top-16 -right-20 animate-float" style={{ animationDelay: '0s' }} />
+          <div className="cosmic-orb w-48 h-48 bg-[#ff5470]/[0.06] top-1/3 -left-24 animate-float" style={{ animationDelay: '-4s' }} />
+          <div className="cosmic-orb w-56 h-56 bg-[#ffc94d]/[0.04] bottom-0 right-0 animate-float" style={{ animationDelay: '-2s' }} />
 
           <div className="relative flex items-center gap-3 px-4 py-4">
             <Link
@@ -246,7 +246,7 @@ export default function StudioPage() {
             {me && (
               <div className="ml-auto flex items-center gap-2">
                 <span className="text-white/40 text-xs font-medium">{me.displayName || me.username}</span>
-                <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-[#a8ff35] to-[#6fe600] flex items-center justify-center text-xs font-bold text-black shrink-0">
+                <div className="w-8 h-8 rounded-full overflow-hidden bg-gradient-to-br from-[#ffc94d] to-[#ff5470] flex items-center justify-center text-xs font-bold text-black shrink-0">
                   {me.avatarUrl ? (
                     <img src={me.avatarUrl} alt={me.username} className="w-full h-full object-cover" />
                   ) : (
@@ -282,7 +282,7 @@ export default function StudioPage() {
                     onClick={() => router.push('/studio/live')}
                     className="group relative aspect-square rounded-3xl p-[1.5px] bg-gradient-to-br from-red-400/50 via-red-500/25 to-transparent hover:from-red-400/80 hover:via-red-500/40 transition-all"
                   >
-                    <div className="relative w-full h-full rounded-3xl bg-[#0d0d0f] overflow-hidden flex flex-col items-center justify-center gap-3">
+                    <div className="relative w-full h-full rounded-3xl bg-[#341839] overflow-hidden flex flex-col items-center justify-center gap-3">
                       <div className="absolute w-20 h-20 bg-red-500/25 rounded-full blur-2xl group-hover:bg-red-500/40 transition-all" />
                       <span className="relative w-12 h-12 rounded-full bg-red-500/15 border border-red-400/30 flex items-center justify-center">
                         <Radio size={20} className="text-red-400" />
@@ -293,12 +293,12 @@ export default function StudioPage() {
                   <button
                     type="button"
                     onClick={() => router.push('/studio/live?mode=auction')}
-                    className="group relative aspect-square rounded-3xl p-[1.5px] bg-gradient-to-br from-[#a8ff35]/50 via-[#6fe600]/25 to-transparent hover:from-[#a8ff35]/80 hover:via-[#6fe600]/40 transition-all"
+                    className="group relative aspect-square rounded-3xl p-[1.5px] bg-gradient-to-br from-[#ffc94d]/50 via-[#ff5470]/25 to-transparent hover:from-[#ffc94d]/80 hover:via-[#ff5470]/40 transition-all"
                   >
-                    <div className="relative w-full h-full rounded-3xl bg-[#0d0d0f] overflow-hidden flex flex-col items-center justify-center gap-3">
-                      <div className="absolute w-20 h-20 bg-[#a8ff35]/20 rounded-full blur-2xl group-hover:bg-[#a8ff35]/35 transition-all" />
-                      <span className="relative w-12 h-12 rounded-full bg-[#a8ff35]/15 border border-[#a8ff35]/30 flex items-center justify-center">
-                        <Gavel size={20} className="text-[#a8ff35]" />
+                    <div className="relative w-full h-full rounded-3xl bg-[#341839] overflow-hidden flex flex-col items-center justify-center gap-3">
+                      <div className="absolute w-20 h-20 bg-[#ffc94d]/20 rounded-full blur-2xl group-hover:bg-[#ffc94d]/35 transition-all" />
+                      <span className="relative w-12 h-12 rounded-full bg-[#ffc94d]/15 border border-[#ffc94d]/30 flex items-center justify-center">
+                        <Gavel size={20} className="text-[#ffc94d]" />
                       </span>
                       <span className="relative text-white text-sm font-bold">{t('studio.startAuction')}</span>
                     </div>
@@ -344,26 +344,26 @@ export default function StudioPage() {
                   <div className="grid grid-cols-2 gap-3">
                     {/* Bordure degradee cyan/lime (meme esprit "cosmique" que le filet de la
                         sidebar) au lieu d'un simple border-white/10 qui se voyait a peine. */}
-                    <div className="group relative aspect-square rounded-3xl p-[1.5px] bg-gradient-to-br from-[#00ffff]/50 via-[#a8ff35]/45 to-[#00ffff]/15 hover:from-[#00ffff]/80 hover:via-[#a8ff35]/65 hover:to-[#00ffff]/30 transition-all">
+                    <div className="group relative aspect-square rounded-3xl p-[1.5px] bg-gradient-to-br from-[#ff5470]/50 via-[#ffc94d]/45 to-[#ff5470]/15 hover:from-[#ff5470]/80 hover:via-[#ffc94d]/65 hover:to-[#ff5470]/30 transition-all">
                       <button
                         type="button"
                         onClick={() => setCameraOpen(true)}
-                        className="relative w-full h-full rounded-3xl bg-[#0d0d0f] overflow-hidden hover:bg-[#111113] flex flex-col items-center justify-center gap-3 transition-all"
+                        className="relative w-full h-full rounded-3xl bg-[#341839] overflow-hidden hover:bg-[#111113] flex flex-col items-center justify-center gap-3 transition-all"
                       >
-                        <div className="absolute w-16 h-16 bg-[#00ffff]/15 rounded-full blur-2xl group-hover:bg-[#00ffff]/25 transition-all" />
+                        <div className="absolute w-16 h-16 bg-[#ff5470]/15 rounded-full blur-2xl group-hover:bg-[#ff5470]/25 transition-all" />
                         <span className="relative w-11 h-11 rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center">
                           <Camera size={20} className="text-white/80" />
                         </span>
                         <span className="relative text-white/80 text-sm font-semibold">{t('studio.createPost')}</span>
                       </button>
                     </div>
-                    <div className="group relative aspect-square rounded-3xl p-[1.5px] bg-gradient-to-br from-[#00ffff]/50 via-[#a8ff35]/45 to-[#00ffff]/15 hover:from-[#00ffff]/80 hover:via-[#a8ff35]/65 hover:to-[#00ffff]/30 transition-all">
+                    <div className="group relative aspect-square rounded-3xl p-[1.5px] bg-gradient-to-br from-[#ff5470]/50 via-[#ffc94d]/45 to-[#ff5470]/15 hover:from-[#ff5470]/80 hover:via-[#ffc94d]/65 hover:to-[#ff5470]/30 transition-all">
                       <button
                         type="button"
                         onClick={() => importInputRef.current?.click()}
-                        className="relative w-full h-full rounded-3xl bg-[#0d0d0f] overflow-hidden hover:bg-[#111113] flex flex-col items-center justify-center gap-3 transition-all"
+                        className="relative w-full h-full rounded-3xl bg-[#341839] overflow-hidden hover:bg-[#111113] flex flex-col items-center justify-center gap-3 transition-all"
                       >
-                        <div className="absolute w-16 h-16 bg-[#a8ff35]/15 rounded-full blur-2xl group-hover:bg-[#a8ff35]/25 transition-all" />
+                        <div className="absolute w-16 h-16 bg-[#ffc94d]/15 rounded-full blur-2xl group-hover:bg-[#ffc94d]/25 transition-all" />
                         <span className="relative w-11 h-11 rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center">
                           <ImageIcon size={20} className="text-white/80" />
                         </span>
@@ -393,7 +393,7 @@ export default function StudioPage() {
                   onChange={(e) => setCaption(e.target.value)}
                   placeholder={t('studio.captionPlaceholder')}
                   rows={3}
-                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all resize-none"
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30 transition-all resize-none"
                 />
 
                 <div>
@@ -409,13 +409,13 @@ export default function StudioPage() {
                         }
                       }}
                       placeholder={t('studio.addTagPlaceholder')}
-                      className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                      className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30 transition-all"
                     />
                     <button
                       type="button"
                       onClick={addTag}
                       disabled={!tagInput.trim()}
-                      className="w-11 h-11 shrink-0 rounded-xl bg-white/[0.05] border border-white/[0.08] hover:bg-white/[0.08] flex items-center justify-center text-[#a8ff35] disabled:opacity-30 transition-all"
+                      className="w-11 h-11 shrink-0 rounded-xl bg-white/[0.05] border border-white/[0.08] hover:bg-white/[0.08] flex items-center justify-center text-[#ffc94d] disabled:opacity-30 transition-all"
                     >
                       <Plus size={18} />
                     </button>
@@ -426,13 +426,13 @@ export default function StudioPage() {
                       {tags.map((tag) => (
                         <span
                           key={tag}
-                          className="flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full bg-[#a8ff35]/10 border border-[#a8ff35]/25 text-[#a8ff35] text-xs font-medium"
+                          className="flex items-center gap-1 pl-2.5 pr-1.5 py-1 rounded-full bg-[#ffc94d]/10 border border-[#ffc94d]/25 text-[#ffc94d] text-xs font-medium"
                         >
                           #{tag}
                           <button
                             type="button"
                             onClick={() => removeTag(tag)}
-                            className="w-4 h-4 rounded-full hover:bg-[#a8ff35]/20 flex items-center justify-center transition-colors"
+                            className="w-4 h-4 rounded-full hover:bg-[#ffc94d]/20 flex items-center justify-center transition-colors"
                           >
                             <X size={11} />
                           </button>
@@ -454,7 +454,7 @@ export default function StudioPage() {
                         <div
                           key={track.id}
                           className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all ${
-                            selected ? 'border-[#a8ff35]/50 bg-[#a8ff35]/10' : 'border-white/[0.08] bg-white/[0.02]'
+                            selected ? 'border-[#ffc94d]/50 bg-[#ffc94d]/10' : 'border-white/[0.08] bg-white/[0.02]'
                           }`}
                         >
                           <button
@@ -469,13 +469,13 @@ export default function StudioPage() {
                             onClick={() => selectMusic(track.id)}
                             className="flex-1 min-w-0 text-left"
                           >
-                            <p className={`text-[13px] font-medium truncate ${selected ? 'text-[#a8ff35]' : 'text-white'}`}>
+                            <p className={`text-[13px] font-medium truncate ${selected ? 'text-[#ffc94d]' : 'text-white'}`}>
                               {track.name}
                             </p>
                             <p className="text-[11px] text-white/35 truncate">{track.artist}</p>
                           </button>
                           {selected && (
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#a8ff35] shrink-0">
+                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#ffc94d] shrink-0">
                               {t('studio.musicSelected')}
                             </span>
                           )}
@@ -551,7 +551,7 @@ export default function StudioPage() {
                               onClick={() => setSelectedCapsuleId(c.id)}
                               className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
                                 selectedCapsuleId === c.id
-                                  ? 'border-[#a8ff35] bg-[#a8ff35]/10'
+                                  ? 'border-[#ffc94d] bg-[#ffc94d]/10'
                                   : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06]'
                               }`}
                             >

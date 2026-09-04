@@ -89,7 +89,7 @@ export default function ProfilePage() {
   if (loading || checkingSelf) {
     return (
       <div className="flex h-screen cosmic-bg items-center justify-center">
-        <div className="w-8 h-8 border-2 border-white/20 border-t-[#a8ff35] rounded-full animate-spin" />
+        <div className="w-8 h-8 border-2 border-white/20 border-t-[#ffc94d] rounded-full animate-spin" />
       </div>
     );
   }
@@ -98,7 +98,7 @@ export default function ProfilePage() {
     return (
       <div className="flex h-screen cosmic-bg items-center justify-center text-white gap-4 flex-col">
         <p className="text-white/50 text-sm">Profil introuvable</p>
-        <Link href="/" className="text-[#a8ff35] text-sm">← Retour au feed</Link>
+        <Link href="/" className="text-[#ffc94d] text-sm">← Retour au feed</Link>
       </div>
     );
   }
@@ -121,7 +121,7 @@ export default function ProfilePage() {
 
             {/* ── Profile header ── */}
             <div className="flex items-center gap-6 mb-8">
-              <div className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-extrabold text-black shrink-0 bg-gradient-to-br from-[#a8ff35] to-[#6fe600] overflow-hidden">
+              <div className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-extrabold text-black shrink-0 bg-gradient-to-br from-[#ffc94d] to-[#ff5470] overflow-hidden">
                 {user.avatarUrl ? (
                   <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
                 ) : (

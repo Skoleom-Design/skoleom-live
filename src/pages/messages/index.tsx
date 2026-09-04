@@ -36,8 +36,8 @@ export default function MessagesIndexPage() {
       <div className="flex h-screen cosmic-bg overflow-hidden relative">
         {/* Orbes d'ambiance — meme traitement que la sidebar/le studio, pour ne pas laisser
             cette page a plat par rapport au reste de l'app. */}
-        <div className="cosmic-orb w-40 h-40 bg-[#a8ff35]/[0.07] -top-10 right-10 animate-float" style={{ animationDelay: '0s' }} />
-        <div className="cosmic-orb w-32 h-32 bg-[#00ffff]/[0.05] bottom-10 left-1/3 animate-float" style={{ animationDelay: '-4s' }} />
+        <div className="cosmic-orb w-40 h-40 bg-[#ffc94d]/[0.07] -top-10 right-10 animate-float" style={{ animationDelay: '0s' }} />
+        <div className="cosmic-orb w-32 h-32 bg-[#ff5470]/[0.05] bottom-10 left-1/3 animate-float" style={{ animationDelay: '-4s' }} />
 
         <AppSidebar />
 
@@ -47,7 +47,7 @@ export default function MessagesIndexPage() {
 
             {loading ? (
               <div className="flex justify-center py-16">
-                <div className="w-7 h-7 border-2 border-white/15 border-t-[#a8ff35] rounded-full animate-spin" />
+                <div className="w-7 h-7 border-2 border-white/15 border-t-[#ffc94d] rounded-full animate-spin" />
               </div>
             ) : conversations.length === 0 ? (
               <div className="text-center py-20 text-white/40 text-sm flex flex-col items-center gap-3">
@@ -64,12 +64,12 @@ export default function MessagesIndexPage() {
                     href={`/messages/${c.id}`}
                     className={`flex items-center gap-3 rounded-2xl px-3.5 py-3 border transition-all ${
                       c.unreadCount > 0
-                        ? 'bg-white/[0.05] border-white/[0.1] hover:border-[#a8ff35]/30'
+                        ? 'bg-white/[0.05] border-white/[0.1] hover:border-[#ffc94d]/30'
                         : 'bg-white/[0.02] border-white/[0.06] hover:bg-white/[0.04] hover:border-white/[0.1]'
                     }`}
                   >
-                    <div className={`w-12 h-12 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-sm font-extrabold text-black bg-gradient-to-br from-[#a8ff35] to-[#6fe600] ${
-                      c.unreadCount > 0 ? 'ring-2 ring-[#a8ff35]/50 ring-offset-2 ring-offset-black' : ''
+                    <div className={`w-12 h-12 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-sm font-extrabold text-black bg-gradient-to-br from-[#ffc94d] to-[#ff5470] ${
+                      c.unreadCount > 0 ? 'ring-2 ring-[#ffc94d]/50 ring-offset-2 ring-offset-black' : ''
                     }`}>
                       {c.otherUser.avatarUrl ? (
                         <img src={c.otherUser.avatarUrl} alt="" className="w-full h-full object-cover" />
@@ -88,7 +88,7 @@ export default function MessagesIndexPage() {
                     <div className="flex flex-col items-end gap-1.5 shrink-0">
                       {c.lastMessageAt && <span className="text-[11px] text-white/30">{timeAgo(c.lastMessageAt)}</span>}
                       {c.unreadCount > 0 && (
-                        <span className="min-w-[19px] h-[19px] px-1 rounded-full bg-gradient-to-br from-[#a8ff35] to-[#6fe600] text-black text-[10px] font-bold flex items-center justify-center shadow-[0_0_10px_rgba(168,255,53,0.5)]">
+                        <span className="min-w-[19px] h-[19px] px-1 rounded-full bg-gradient-to-br from-[#ffc94d] to-[#ff5470] text-black text-[10px] font-bold flex items-center justify-center shadow-[0_0_10px_rgba(255, 201, 77,0.5)]">
                           {c.unreadCount}
                         </span>
                       )}

@@ -133,7 +133,7 @@ function ProductView({
                 onClick={() => setImgIdx(i)}
                 className={`w-12 h-12 rounded-lg overflow-hidden shrink-0 transition-all border-2 ${
                   imgIdx === i
-                    ? 'border-[#a8ff35] opacity-100'
+                    ? 'border-[#ffc94d] opacity-100'
                     : 'border-white/10 opacity-50 hover:opacity-80'
                 }`}
               >
@@ -149,7 +149,7 @@ function ProductView({
         {/* Title */}
         <div>
           {(capsule.group?.name || capsule.brand) && (
-            <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#a8ff35]/80 mb-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#ffc94d]/80 mb-1">
               {[capsule.group?.name, capsule.brand].filter(Boolean).join(' · ')}
             </p>
           )}
@@ -160,7 +160,7 @@ function ProductView({
 
         {/* Price */}
         <div className="flex items-baseline gap-2">
-          <span className="text-[#a8ff35] font-bold text-2xl">
+          <span className="text-[#ffc94d] font-bold text-2xl">
             {capsule.price.toFixed(2)}€
           </span>
         </div>
@@ -178,7 +178,7 @@ function ProductView({
             </div>
           )}
           {capsule.condition && (
-            <div className="flex items-center gap-1.5 text-xs text-[#a8ff35] bg-[#a8ff35]/10 border border-[#a8ff35]/20 rounded-full px-3 py-1">
+            <div className="flex items-center gap-1.5 text-xs text-[#ffc94d] bg-[#ffc94d]/10 border border-[#ffc94d]/20 rounded-full px-3 py-1">
               {conditionLabel(t, capsule.condition)}
             </div>
           )}
@@ -243,7 +243,7 @@ function ProductView({
                     {variant.name}
                   </span>
                   {selectedOptions[variant.name] && (
-                    <span className="text-[11px] font-bold text-[#a8ff35]">
+                    <span className="text-[11px] font-bold text-[#ffc94d]">
                       {selectedOptions[variant.name]}
                     </span>
                   )}
@@ -259,7 +259,7 @@ function ProductView({
                         }
                         className={`px-4 py-2 rounded-[10px] text-sm font-medium transition-all duration-200 border min-w-[44px] ${
                           isSelected
-                            ? 'bg-[#a8ff35] text-black border-[#a8ff35] shadow-[0_0_16px_rgba(168,255,53,0.35)]'
+                            ? 'bg-[#ffc94d] text-black border-[#ffc94d] shadow-[0_0_16px_rgba(255, 201, 77,0.35)]'
                             : 'bg-white/[0.04] text-white/75 border-white/10 hover:bg-white/[0.08] hover:border-white/20'
                         }`}
                       >
@@ -279,7 +279,7 @@ function ProductView({
           <div className="text-sm text-red-400 bg-red-400/10 border border-red-400/20 rounded-xl px-4 py-2.5 mb-1">
             {buyError}
             {buyError.toLowerCase().includes('solde') && (
-              <a href="/profile/me?tab=wallet" className="block underline font-semibold mt-1 text-[#a8ff35]">
+              <a href="/profile/me?tab=wallet" className="block underline font-semibold mt-1 text-[#ffc94d]">
                 {t('capsuleDrawer.topUpWallet')}
               </a>
             )}
@@ -296,7 +296,7 @@ function ProductView({
               : addedToCart
               ? 'bg-green-500 text-white shadow-[0_0_30px_rgba(34,197,94,0.4)]'
               : allSelected
-              ? 'bg-gradient-to-r from-[#a8ff35] to-[#6fe600] text-black hover:shadow-[0_0_30px_rgba(168,255,53,0.5)] hover:brightness-110 active:scale-[0.98]'
+              ? 'bg-gradient-to-r from-[#ffc94d] to-[#ff5470] text-black hover:shadow-[0_0_30px_rgba(255, 201, 77,0.5)] hover:brightness-110 active:scale-[0.98]'
               : 'bg-white/[0.06] text-white/30 cursor-not-allowed'
           }`}
         >
@@ -372,9 +372,9 @@ export function CapsuleDrawer({ capsules, open, onClose }: Props) {
           }`}
         >
           {/* Blue glow line */}
-          <div className="h-[1px] bg-gradient-to-r from-transparent via-[#a8ff35] to-transparent" />
+          <div className="h-[1px] bg-gradient-to-r from-transparent via-[#ffc94d] to-transparent" />
 
-          <div className="relative bg-[#0d0d0f]/97 backdrop-blur-2xl rounded-t-[24px] border-t border-x border-white/[0.06] overflow-hidden"
+          <div className="relative bg-[#341839]/97 backdrop-blur-2xl rounded-t-[24px] border-t border-x border-white/[0.06] overflow-hidden"
             style={{ maxHeight: '88vh' }}
           >
             {/* Drag handle */}
@@ -434,7 +434,7 @@ export function CapsuleDrawer({ capsules, open, onClose }: Props) {
                           <p className="text-xs text-white/35 line-clamp-1 mt-0.5">{capsule.description}</p>
                         )}
                         <div className="flex items-center gap-2 mt-1.5">
-                          <span className="text-[#a8ff35] font-bold text-sm">€{capsule.price.toFixed(2)}</span>
+                          <span className="text-[#ffc94d] font-bold text-sm">€{capsule.price.toFixed(2)}</span>
                           {capsule.status === 'sold_out' ? (
                             <span className="text-xs text-red-400">{t('capsuleDrawer.soldOut')}</span>
                           ) : (

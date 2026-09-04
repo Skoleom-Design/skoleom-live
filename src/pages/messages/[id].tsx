@@ -85,8 +85,8 @@ export default function ConversationPage() {
         <main className="relative flex-1 flex flex-col overflow-hidden pb-16 md:pb-0">
           {/* Orbes d'ambiance, tres discrets — la zone de chat reste lisible/dense, pas de
               distraction visuelle derriere les bulles. */}
-          <div className="cosmic-orb w-56 h-56 bg-[#a8ff35]/[0.05] -top-16 -right-16 animate-float" style={{ animationDelay: '0s' }} />
-          <div className="cosmic-orb w-40 h-40 bg-[#00ffff]/[0.04] bottom-24 -left-10 animate-float" style={{ animationDelay: '-5s' }} />
+          <div className="cosmic-orb w-56 h-56 bg-[#ffc94d]/[0.05] -top-16 -right-16 animate-float" style={{ animationDelay: '0s' }} />
+          <div className="cosmic-orb w-40 h-40 bg-[#ff5470]/[0.04] bottom-24 -left-10 animate-float" style={{ animationDelay: '-5s' }} />
 
           <div className="relative z-10 flex items-center gap-3 px-4 py-3 border-b border-white/[0.06] shrink-0 bg-black/20 backdrop-blur-sm">
             <button onClick={() => router.push('/messages')} className="w-9 h-9 rounded-full bg-white/[0.06] hover:bg-white/10 flex items-center justify-center shrink-0 transition-colors">
@@ -94,7 +94,7 @@ export default function ConversationPage() {
             </button>
             {otherUser && (
               <Link href={`/profile/${otherUser.id}`} className="flex items-center gap-2.5 min-w-0">
-                <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-xs font-extrabold text-black bg-gradient-to-br from-[#a8ff35] to-[#6fe600] ring-1 ring-white/10">
+                <div className="w-9 h-9 rounded-full overflow-hidden shrink-0 flex items-center justify-center text-xs font-extrabold text-black bg-gradient-to-br from-[#ffc94d] to-[#ff5470] ring-1 ring-white/10">
                   {otherUser.avatarUrl ? (
                     <img src={otherUser.avatarUrl} alt="" className="w-full h-full object-cover" />
                   ) : (
@@ -109,7 +109,7 @@ export default function ConversationPage() {
           <div className="relative z-10 flex-1 overflow-y-auto scrollbar-hide px-4 py-5">
             {loading ? (
               <div className="flex justify-center py-12">
-                <div className="w-6 h-6 border-2 border-white/15 border-t-[#a8ff35] rounded-full animate-spin" />
+                <div className="w-6 h-6 border-2 border-white/15 border-t-[#ffc94d] rounded-full animate-spin" />
               </div>
             ) : messages.length === 0 ? (
               <div className="flex flex-col items-center gap-3 text-center py-20 text-white/40 text-sm">
@@ -126,7 +126,7 @@ export default function ConversationPage() {
                     <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
                       <div className={`max-w-[75%] px-4 py-2.5 rounded-[20px] text-[13px] leading-snug ${
                         mine
-                          ? 'bg-gradient-to-br from-[#a8ff35] to-[#6fe600] text-black shadow-[0_0_16px_rgba(168,255,53,0.18)]'
+                          ? 'bg-gradient-to-br from-[#ffc94d] to-[#ff5470] text-black shadow-[0_0_16px_rgba(255, 201, 77,0.18)]'
                           : 'bg-white/[0.07] border border-white/[0.08] text-white'
                       }`}>
                         {m.text}
@@ -149,7 +149,7 @@ export default function ConversationPage() {
                 value={text}
                 onChange={(e) => setText(e.target.value)}
                 placeholder={t('messages.typeMessage')}
-                className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-full px-4 py-2.5 text-white placeholder:text-white/25 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-full px-4 py-2.5 text-white placeholder:text-white/25 text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30 transition-all"
               />
               <button
                 type="submit"

@@ -114,7 +114,7 @@ export function CommentsDrawer({ postId, postCreatorId, open, onClose, onComment
                       {c.user.avatarUrl ? (
                         <img src={c.user.avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover shrink-0" />
                       ) : (
-                        <div className="w-8 h-8 rounded-full bg-[#a8ff35] flex items-center justify-center text-xs font-bold text-black shrink-0">
+                        <div className="w-8 h-8 rounded-full bg-[#ffc94d] flex items-center justify-center text-xs font-bold text-black shrink-0">
                           {c.user.username[0]?.toUpperCase()}
                         </div>
                       )}
@@ -153,7 +153,7 @@ export function CommentsDrawer({ postId, postCreatorId, open, onClose, onComment
                 <button
                   type="submit"
                   disabled={submitting || !text.trim()}
-                  className="text-[#a8ff35] hover:text-[#c3ff70] transition-colors disabled:opacity-30 shrink-0"
+                  className="text-[#ffc94d] hover:text-[#c3ff70] transition-colors disabled:opacity-30 shrink-0"
                 >
                   <Send size={16} />
                 </button>

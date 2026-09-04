@@ -108,7 +108,7 @@ export default function PostDetailPage() {
         <AppSidebar />
         <main className="flex-1 flex flex-col items-center justify-center gap-3 text-white/50 text-sm">
           <p>Post introuvable</p>
-          <Link href="/" className="text-[#a8ff35] underline">← Retour au feed</Link>
+          <Link href="/" className="text-[#ffc94d] underline">← Retour au feed</Link>
         </main>
       </div>
     );
@@ -138,14 +138,14 @@ export default function PostDetailPage() {
             {/* Un vrai cadre "carte" — comme les posts affichés sur Explorer — avec une bordure
                 colorée bien visible (au lieu d'un simple border-white/[0.08] qui se fond dans le
                 fond noir et ne ressort pas). */}
-            <article className="cosmic-modal rounded-2xl overflow-hidden border border-[#a8ff35]/30 shadow-glow-lime-sm">
+            <article className="cosmic-modal rounded-2xl overflow-hidden border border-[#ffc94d]/30 shadow-glow-lime-sm">
               {/* Header */}
               <div className="flex items-center justify-between px-3 py-3">
                 <Link href={`/profile/${post.creator.id}`} className="flex items-center gap-2.5 min-w-0">
                   {post.creator.avatarUrl ? (
                     <img src={post.creator.avatarUrl} alt={post.creator.username} className="w-8 h-8 rounded-full object-cover ring-1 ring-white/20 shrink-0" />
                   ) : (
-                    <div className="w-8 h-8 rounded-full bg-[#a8ff35] flex items-center justify-center text-xs font-bold text-black shrink-0">
+                    <div className="w-8 h-8 rounded-full bg-[#ffc94d] flex items-center justify-center text-xs font-bold text-black shrink-0">
                       {post.creator.username[0].toUpperCase()}
                     </div>
                   )}
@@ -265,7 +265,7 @@ export default function PostDetailPage() {
               {post.tags && post.tags.length > 0 && (
                 <div className="px-3 py-0.5 flex gap-1.5 flex-wrap">
                   {post.tags.map((tag) => (
-                    <span key={tag} className="text-[12px] text-[#a8ff35]/80 font-medium">#{tag}</span>
+                    <span key={tag} className="text-[12px] text-[#ffc94d]/80 font-medium">#{tag}</span>
                   ))}
                 </div>
               )}

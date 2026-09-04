@@ -51,7 +51,7 @@ export default function LivePage() {
                   <Link
                     key={live.id}
                     href={`/live/${live.id}`}
-                    className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-white/[0.04] border border-white/[0.08] group hover:border-[#a8ff35]/40 transition-all"
+                    className="relative aspect-[3/4] rounded-2xl overflow-hidden bg-white/[0.04] border border-white/[0.08] group hover:border-[#ffc94d]/40 transition-all"
                   >
                     {live.featuredCapsule?.imageUrl ? (
                       <img src={live.featuredCapsule.imageUrl} alt="" className="w-full h-full object-cover" />
@@ -78,7 +78,7 @@ export default function LivePage() {
                       </p>
                       <p className="text-white/50 text-[11px] mb-1.5">@{live.creator.username}</p>
                       {live.featuredCapsule && (
-                        <p className="text-[#a8ff35] font-bold text-[14px]">
+                        <p className="text-[#ffc94d] font-bold text-[14px]">
                           {live.featuredCapsule.price.toFixed(2)} €
                         </p>
                       )}

@@ -170,8 +170,8 @@ export function BoostModal({ post, open, onClose }: Props) {
 
         {confirming ? (
           <div className="text-center animate-fade-in">
-            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#a8ff35]/25 to-[#22c55e]/10 border border-[#a8ff35]/30 flex items-center justify-center mx-auto mb-4 animate-pulse-glow">
-              <TrendingUp size={26} className="text-[#a8ff35]" />
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-[#ffc94d]/25 to-[#22c55e]/10 border border-[#ffc94d]/30 flex items-center justify-center mx-auto mb-4 animate-pulse-glow">
+              <TrendingUp size={26} className="text-[#ffc94d]" />
             </div>
             <p className="text-white font-bold text-[17px] mb-1.5">
               Tu es sur le point de booster tes ventes !
@@ -212,7 +212,7 @@ export function BoostModal({ post, open, onClose }: Props) {
                 <button
                   onClick={handleBoost}
                   disabled={loading}
-                  className="flex-[2] py-3.5 bg-gradient-to-r from-[#a8ff35] to-[#6fe600] text-black font-bold rounded-2xl shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.97] transition-all disabled:opacity-50 disabled:shadow-none animate-pulse-glow"
+                  className="flex-[2] py-3.5 bg-gradient-to-r from-[#ffc94d] to-[#ff5470] text-black font-bold rounded-2xl shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.97] transition-all disabled:opacity-50 disabled:shadow-none animate-pulse-glow"
                 >
                   {loading ? 'Traitement...' : 'Oui, je fonce ! ⚡'}
                 </button>

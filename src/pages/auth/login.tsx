@@ -16,7 +16,7 @@ const DEMO_PASSWORD = 'Demo1234!';
 
 const DEMO_ACCOUNTS = [
   { plan: 'free', label: 'Free', email: 'demo-free@skoleom.live', username: 'demo_free', color: 'white' },
-  { plan: 'premium', label: 'Premium', email: 'demo-premium@skoleom.live', username: 'demo_premium', color: '#00ffff' },
+  { plan: 'premium', label: 'Premium', email: 'demo-premium@skoleom.live', username: 'demo_premium', color: '#ff5470' },
   { plan: 'ultra', label: 'Ultra', email: 'demo-ultra@skoleom.live', username: 'demo_ultra', color: '#f59e0b' },
 ] as const;
 
@@ -165,7 +165,7 @@ export default function LoginPage() {
 
             {/* Carte — regroupe tout le formulaire (avant : bascule/Google/champs/comptes demo
                 flottaient directement sur le fond, sans structure visuelle claire). */}
-            <div className="bg-[#0d0d0f] border border-white/[0.08] rounded-[24px] p-6">
+            <div className="bg-[#341839] border border-white/[0.08] rounded-[24px] p-6">
 
             {/* Tab toggle — pastille glissante au lieu d'un swap de fond instantane */}
             <div className="relative flex bg-white/[0.05] rounded-full p-1 mb-7">
@@ -226,7 +226,7 @@ export default function LoginPage() {
                     placeholder={t('auth.usernamePlaceholder')}
                     autoComplete="username"
                     tabIndex={tab === 'register' ? 0 : -1}
-                    className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                    className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30 transition-all"
                   />
                 </div>
               </div>
@@ -241,7 +241,7 @@ export default function LoginPage() {
                   onChange={(e) => setEmail(e.target.value)}
                   placeholder={tab === 'login' ? t('auth.emailOrUsernamePlaceholder') : t('auth.emailPlaceholder')}
                   autoComplete="email"
-                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30 transition-all"
                 />
               </div>
 
@@ -256,7 +256,7 @@ export default function LoginPage() {
                     onChange={(e) => setPassword(e.target.value)}
                     placeholder="••••••••"
                     autoComplete={tab === 'login' ? 'current-password' : 'new-password'}
-                    className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 pr-11 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                    className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 pr-11 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30 transition-all"
                   />
                   <button
                     type="button"

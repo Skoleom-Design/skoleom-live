@@ -5,36 +5,36 @@ module.exports = {
     extend: {
       colors: {
         brand: {
-          DEFAULT: '#a8ff35',
-          dark: '#6fe600',
-          light: '#c3ff70',
+          DEFAULT: '#ffc94d',
+          dark: '#ff5470',
+          light: '#ffe0a3',
         },
         surface: {
-          DEFAULT: '#050505',
-          card: '#0d0d0f',
-          elevated: '#141416',
+          DEFAULT: '#1c0c21',
+          card: '#341839',
+          elevated: '#3d1f44',
         },
-        // Palette Skoleom Universe
+        // Palette "Ticket Show"
         skoleom: {
-          lime: '#a8ff35',
-          green: '#6fe600',
-          cyan: '#00ffff',
-          yellow: '#faee21',
+          lime: '#ffc94d',
+          green: '#ff5470',
+          cyan: '#ff5470',
+          yellow: '#ffc94d',
           silver: '#98989D',
         },
       },
       fontFamily: {
         sans: ['Poppins', 'system-ui', 'sans-serif'],
-        display: ['Anton', 'system-ui', 'sans-serif'],
+        display: ['Bebas Neue', 'system-ui', 'sans-serif'],
       },
       backgroundImage: {
-        'skoleom-gradient': 'linear-gradient(135deg, #faee21 0%, #6fe600 50%, #00ffff 100%)',
-        'skoleom-gradient-warm': 'linear-gradient(90deg, #a8ff35 0%, #6fe600 100%)',
+        'skoleom-gradient': 'linear-gradient(135deg, #ffc94d 0%, #ff5470 55%, #b33951 100%)',
+        'skoleom-gradient-warm': 'linear-gradient(90deg, #ffc94d 0%, #ff5470 100%)',
       },
       boxShadow: {
-        'glow-lime': '0 0 40px rgba(168, 255, 53, 0.4)',
-        'glow-lime-sm': '0 0 20px rgba(168, 255, 53, 0.25)',
-        'glow-lime-lg': '0 0 60px rgba(168, 255, 53, 0.35)',
+        'glow-lime': '0 0 40px rgba(255, 201, 77, 0.4)',
+        'glow-lime-sm': '0 0 20px rgba(255, 201, 77, 0.25)',
+        'glow-lime-lg': '0 0 60px rgba(255, 201, 77, 0.35)',
       },
       animation: {
         'slide-up': 'slideUp 0.3s cubic-bezier(0.32, 0.72, 0, 1)',
@@ -60,8 +60,8 @@ module.exports = {
           '50%': { transform: 'translateY(-10px)' },
         },
         pulseGlow: {
-          '0%, 100%': { boxShadow: '0 0 0 0 rgba(168, 255, 53, 0.3)' },
-          '50%': { boxShadow: '0 0 0 20px rgba(168, 255, 53, 0)' },
+          '0%, 100%': { boxShadow: '0 0 0 0 rgba(255, 201, 77, 0.3)' },
+          '50%': { boxShadow: '0 0 0 20px rgba(255, 201, 77, 0)' },
         },
       },
     },

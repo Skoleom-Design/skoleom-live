@@ -121,7 +121,7 @@ export function ShareModal({ postId, caption, open, onClose }: Props) {
               {typeof navigator !== 'undefined' && !!navigator.share && (
                 <button
                   onClick={nativeShare}
-                  className="w-full flex items-center justify-center gap-2 mb-4 py-3 rounded-full bg-[#a8ff35] text-black font-semibold text-sm hover:brightness-95 transition-all"
+                  className="w-full flex items-center justify-center gap-2 mb-4 py-3 rounded-full bg-[#ffc94d] text-black font-semibold text-sm hover:brightness-95 transition-all"
                 >
                   <ShareIcon size={16} />
                   Partager via...
@@ -148,7 +148,7 @@ export function ShareModal({ postId, caption, open, onClose }: Props) {
                 className="w-full flex items-center gap-3 px-4 py-3 rounded-xl bg-white/[0.05] border border-white/[0.08] hover:bg-white/[0.08] transition-colors"
               >
                 {copied ? (
-                  <Check size={16} className="text-[#a8ff35] shrink-0" />
+                  <Check size={16} className="text-[#ffc94d] shrink-0" />
                 ) : (
                   <Link2 size={16} className="text-white/60 shrink-0" />
                 )}

@@ -27,26 +27,26 @@
     outline: none;
   }
   button:focus-visible {
-    outline: 2px solid rgba(168, 255, 53, 0.6);
+    outline: 2px solid rgba(255, 201, 77, 0.6);
     outline-offset: 2px;
   }
 }
 
 /* ── Direction artistique Skoleom Universe ──────────────────────── */
 
-/* Fond "univers cosmique" — degrade radial tres subtil (vert/cyan/jaune) sur le noir de base,
-   au lieu d'un noir plat façon sidebar Instagram/TikTok.
+/* Fond "Ticket Show" — degrade radial tres subtil (or/corail) sur l'aubergine de base, au lieu
+   d'un noir plat façon sidebar Instagram/TikTok.
    Rayons en px (pas en %) : sur un conteneur tres large (desktop), un rayon en % s'etire
    jusqu'a devenir invisible entre les taches — un rayon fixe garde une taille de glow constante
    et on multiplie les points d'ancrage pour couvrir toute la largeur, pas juste un coin. */
 .cosmic-bg {
-  background-color: #070907;
+  background-color: #24102a;
   background-image:
-    radial-gradient(circle 480px at 0% 0%, rgba(168, 255, 53, 0.12), transparent 70%),
-    radial-gradient(circle 420px at 100% 8%, rgba(0, 255, 255, 0.09), transparent 70%),
-    radial-gradient(circle 460px at 0% 100%, rgba(250, 238, 33, 0.07), transparent 70%),
-    radial-gradient(circle 460px at 100% 95%, rgba(168, 255, 53, 0.08), transparent 70%),
-    radial-gradient(circle 520px at 50% 50%, rgba(0, 255, 255, 0.04), transparent 75%);
+    radial-gradient(circle 480px at 0% 0%, rgba(255, 201, 77, 0.12), transparent 70%),
+    radial-gradient(circle 420px at 100% 8%, rgba(255, 84, 112, 0.09), transparent 70%),
+    radial-gradient(circle 460px at 0% 100%, rgba(255, 201, 77, 0.07), transparent 70%),
+    radial-gradient(circle 460px at 100% 95%, rgba(255, 201, 77, 0.08), transparent 70%),
+    radial-gradient(circle 520px at 50% 50%, rgba(255, 84, 112, 0.04), transparent 75%);
 }
 
 .cosmic-orb {
@@ -56,21 +56,21 @@
   pointer-events: none;
 }
 
-/* Meme esprit "univers" applique aux cartes/modals — glow discret au lieu du plat #0d0d0f. */
+/* Meme esprit "univers" applique aux cartes/modals — glow discret au lieu du plat #341839. */
 .cosmic-modal {
   position: relative;
   background:
-    radial-gradient(circle at 0% 0%, rgba(168, 255, 53, 0.07), transparent 55%),
-    radial-gradient(circle at 100% 100%, rgba(0, 255, 255, 0.05), transparent 55%),
-    #0d0d0f;
+    radial-gradient(circle at 0% 0%, rgba(255, 201, 77, 0.07), transparent 55%),
+    radial-gradient(circle at 100% 100%, rgba(255, 84, 112, 0.05), transparent 55%),
+    #341839;
 }
 /* Variante translucide pour les drawers/bottom-sheets qui gardent leur flou d'arriere-plan. */
 .cosmic-modal-glass {
   position: relative;
   background:
-    radial-gradient(circle at 0% 0%, rgba(168, 255, 53, 0.07), transparent 55%),
-    radial-gradient(circle at 100% 0%, rgba(0, 255, 255, 0.05), transparent 55%),
-    rgba(13, 13, 15, 0.97);
+    radial-gradient(circle at 0% 0%, rgba(255, 201, 77, 0.07), transparent 55%),
+    radial-gradient(circle at 100% 0%, rgba(255, 84, 112, 0.05), transparent 55%),
+    rgba(52, 24, 57, 0.97);
 }
 
 .cosmic-modal::before,
@@ -81,7 +81,7 @@
   left: 0;
   right: 0;
   height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(168, 255, 53, 0.6), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 201, 77, 0.6), transparent);
 }
 
 .glass {
@@ -92,16 +92,16 @@
 }
 
 .text-gradient {
-  background: linear-gradient(135deg, #faee21 0%, #6fe600 48%, #00ffff 100%);
+  background: linear-gradient(135deg, #ffc94d 0%, #ff5470 55%, #b33951 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .display-text {
-  font-family: 'Anton', system-ui, sans-serif;
+  font-family: 'Bebas Neue', system-ui, sans-serif;
   font-weight: 400;
-  letter-spacing: -0.02em;
+  letter-spacing: 0.02em;
   line-height: 0.92;
   text-transform: uppercase;
 }
@@ -112,11 +112,11 @@
   justify-content: center;
   font-weight: 600;
   color: #000;
-  background: linear-gradient(135deg, #a8ff35, #6fe600);
+  background: linear-gradient(135deg, #ffc94d, #ff5470);
   transition: box-shadow 0.3s, transform 0.3s;
 }
 .btn-skoleom:hover {
-  box-shadow: 0 0 40px rgba(168, 255, 53, 0.4);
+  box-shadow: 0 0 40px rgba(255, 201, 77, 0.4);
   transform: translateY(-1px);
 }
 
@@ -125,17 +125,20 @@
   align-items: center;
   justify-content: center;
   font-weight: 600;
-  color: #a8ff35;
+  color: #ffc94d;
   background: transparent;
-  border: 1px solid #a8ff35;
+  border: 1px solid #ffc94d;
   transition: all 0.3s;
 }
 .btn-skoleom-outline:hover {
-  background: linear-gradient(135deg, #a8ff35, #6fe600);
+  background: linear-gradient(135deg, #ffc94d, #ff5470);
   color: #000;
 }
 
 /* ── Skoleom Capsule Button (importé de SeSport) ─────────────────── */
+/* Bordure pointillée façon billet de spectacle (direction "Ticket Show") plutôt qu'un simple
+   liseré plein — c'est le bouton le plus visible du site (capsule en vedette, CTA live), donc
+   le meilleur endroit pour porter la signature visuelle. */
 .skoleom-capsule-btn {
   display: flex;
   align-items: center;
@@ -143,7 +146,7 @@
   padding: 8px 16px;
   border-radius: 999px;
   background: #00000047;
-  border: 1px solid #ffffff47;
+  border: 1.5px dashed #ffc94d80;
   -webkit-backdrop-filter: blur(8px);
   backdrop-filter: blur(8px);
   color: #fff;
@@ -160,7 +163,7 @@
 .skoleom-capsule-btn:hover {
   transform: translateY(-1px);
   background: #000000c7 !important;
-  border-color: #ffffff80 !important;
+  border-color: #ffc94dcc !important;
 }
 
 .skoleom-capsule-btn:active {
@@ -185,8 +188,8 @@
 }
 
 @keyframes capsule-glow {
-  0%, 100% { box-shadow: 0 0 8px 2px #4bdd2c33; }
-  50%       { box-shadow: 0 0 20px 6px #4bdd2c55; }
+  0%, 100% { box-shadow: 0 0 8px 2px #ff547033; }
+  50%       { box-shadow: 0 0 20px 6px #ff547055; }
 }
 
 .skoleom-capsule-btn--glow {
@@ -231,6 +234,6 @@
   }
 
   .capsule-glow {
-    box-shadow: 0 0 20px rgba(255, 45, 85, 0.4);
+    box-shadow: 0 0 20px rgba(255, 84, 112, 0.4);
   }
 }

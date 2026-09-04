@@ -118,7 +118,7 @@ export function InstaPostCard({ post, liked: likedProp = false }: Props) {
           {post.creator.avatarUrl ? (
             <div className={`w-8 h-8 rounded-full overflow-hidden shrink-0 ${
               post.isBoosted
-                ? 'ring-2 ring-[#a8ff35] ring-offset-1 ring-offset-black'
+                ? 'ring-2 ring-[#ffc94d] ring-offset-1 ring-offset-black'
                 : 'ring-1 ring-white/20'
             }`}>
               <img
@@ -128,7 +128,7 @@ export function InstaPostCard({ post, liked: likedProp = false }: Props) {
               />
             </div>
           ) : (
-            <div className="w-8 h-8 rounded-full bg-[#a8ff35] flex items-center justify-center text-xs font-bold text-black shrink-0">
+            <div className="w-8 h-8 rounded-full bg-[#ffc94d] flex items-center justify-center text-xs font-bold text-black shrink-0">
               {post.creator.username[0].toUpperCase()}
             </div>
           )}
@@ -287,7 +287,7 @@ export function InstaPostCard({ post, liked: likedProp = false }: Props) {
             <Link
               key={tag}
               href={`/?q=${encodeURIComponent(tag)}`}
-              className="text-[12px] text-[#a8ff35]/80 font-medium hover:text-[#a8ff35] hover:underline"
+              className="text-[12px] text-[#ffc94d]/80 font-medium hover:text-[#ffc94d] hover:underline"
             >
               #{tag}
             </Link>

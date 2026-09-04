@@ -57,7 +57,7 @@ export function InterestsGate({ onDone }: InterestsGateProps) {
                 onClick={() => toggle(slug)}
                 className={`flex flex-col items-center justify-center gap-1.5 py-4 rounded-2xl border text-sm font-medium transition-all active:scale-[0.96] ${
                   active
-                    ? 'bg-[#a8ff35]/12 border-[#a8ff35]/50 text-white shadow-glow-lime-sm'
+                    ? 'bg-[#ffc94d]/12 border-[#ffc94d]/50 text-white shadow-glow-lime-sm'
                     : 'bg-white/[0.04] border-white/[0.08] text-white/60 hover:bg-white/[0.07]'
                 }`}
               >

@@ -7,7 +7,7 @@ import { useGameSocket, GameRole, GameType, PublicPlayer } from './useGameSocket
 
 const ROLE_STYLES: Record<GameRole, { ring: string; text: string; bg: string }> = {
   civilian: { ring: 'ring-white/20', text: 'text-white', bg: 'bg-white/[0.06]' },
-  undercover: { ring: 'ring-[#00ffff]/40', text: 'text-[#00ffff]', bg: 'bg-[#00ffff]/[0.08]' },
+  undercover: { ring: 'ring-[#ff5470]/40', text: 'text-[#ff5470]', bg: 'bg-[#ff5470]/[0.08]' },
   mrwhite: { ring: 'ring-red-400/40', text: 'text-red-400', bg: 'bg-red-400/[0.08]' },
   villager: { ring: 'ring-white/20', text: 'text-white', bg: 'bg-white/[0.06]' },
   werewolf: { ring: 'ring-purple-400/40', text: 'text-purple-300', bg: 'bg-purple-400/[0.08]' },
@@ -82,7 +82,7 @@ export function LiveGameDrawer({
   const content = (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4" onClick={onClose}>
       <div
-        className="w-full max-w-lg max-h-[90vh] overflow-y-auto scrollbar-hide bg-[#0d0d0f] border border-white/10 rounded-[24px] p-6 relative"
+        className="w-full max-w-lg max-h-[90vh] overflow-y-auto scrollbar-hide bg-[#341839] border border-white/10 rounded-[24px] p-6 relative"
         onClick={(e) => e.stopPropagation()}
       >
         <button onClick={onClose} className="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center z-10">
@@ -90,7 +90,7 @@ export function LiveGameDrawer({
         </button>
 
         {revealBanner && (
-          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[10000] bg-[#0d0d0f] border border-white/10 rounded-2xl px-5 py-3 shadow-glow-lime-sm animate-fade-in max-w-[90vw]">
+          <div className="fixed top-6 left-1/2 -translate-x-1/2 z-[10000] bg-[#341839] border border-white/10 rounded-2xl px-5 py-3 shadow-glow-lime-sm animate-fade-in max-w-[90vw]">
             <p className="text-white text-sm font-medium text-center">{revealBanner}</p>
           </div>
         )}
@@ -150,16 +150,16 @@ function GameTypePicker({ t, onChoose }: { t: (key: string) => string; onChoose:
   return (
     <div className="pt-2">
       <div className="flex items-center gap-2 mb-6">
-        <Gamepad2 size={18} className="text-[#a8ff35]" />
+        <Gamepad2 size={18} className="text-[#ffc94d]" />
         <h1 className="text-lg font-bold text-white display-text">{t('game.gameType.choose')}</h1>
       </div>
       <div className="grid grid-cols-1 gap-3">
         <button
           onClick={() => onChoose('undercover')}
-          className="text-left glass-card p-5 hover:bg-white/[0.06] transition-colors border border-white/[0.08] hover:border-[#00ffff]/30 rounded-2xl"
+          className="text-left glass-card p-5 hover:bg-white/[0.06] transition-colors border border-white/[0.08] hover:border-[#ff5470]/30 rounded-2xl"
         >
           <div className="flex items-center gap-2 mb-1.5">
-            <Gamepad2 size={16} className="text-[#00ffff]" />
+            <Gamepad2 size={16} className="text-[#ff5470]" />
             <span className="text-white font-bold text-sm">{t('game.gameType.undercover')}</span>
           </div>
           <p className="text-white/40 text-xs leading-relaxed">{t('game.gameType.undercoverDesc')}</p>
@@ -185,7 +185,7 @@ function RoomBody({ room, game, me, isHost, onClose, copyCode, copied, clueText,
   return (
     <div className="pt-2">
       <div className="flex items-center gap-2 mb-6">
-        {isWerewolf ? <Moon size={18} className="text-purple-300" /> : <Gamepad2 size={18} className="text-[#a8ff35]" />}
+        {isWerewolf ? <Moon size={18} className="text-purple-300" /> : <Gamepad2 size={18} className="text-[#ffc94d]" />}
         <h1 className="text-lg font-bold text-white display-text">{isWerewolf ? t('game.gameType.werewolf') : t('game.title')}</h1>
       </div>
 
@@ -249,7 +249,7 @@ function PlayerStrip({ players, currentTurnUserId }: { players: PublicPlayer[]; 
     <div className="flex items-center justify-center gap-2 flex-wrap mt-8 pt-6 border-t border-white/[0.06]">
       {players.map((p) => (
         <div key={p.userId} className="flex flex-col items-center gap-1">
-          <div className={`rounded-full ${p.userId === currentTurnUserId ? 'ring-2 ring-[#a8ff35] shadow-glow-lime-sm' : ''}`}>
+          <div className={`rounded-full ${p.userId === currentTurnUserId ? 'ring-2 ring-[#ffc94d] shadow-glow-lime-sm' : ''}`}>
             <Avatar player={p} size={36} />
           </div>
           <span className={`text-[10px] max-w-[48px] truncate ${p.alive ? 'text-white/50' : 'text-white/25 line-through'}`}>{p.username}</span>
@@ -289,7 +289,7 @@ function LobbyView({ room, isHost, game, copyCode, copied, t, dict }: any) {
         className="w-full flex items-center justify-center gap-3 bg-white/[0.05] border border-white/[0.08] rounded-2xl py-4 mb-6 hover:bg-white/[0.08] transition-colors"
       >
         <span className="text-3xl font-bold text-white tracking-[0.3em]">{room.code}</span>
-        {copied ? <Check size={18} className="text-[#a8ff35]" /> : <Copy size={18} className="text-white/40" />}
+        {copied ? <Check size={18} className="text-[#ffc94d]" /> : <Copy size={18} className="text-white/40" />}
       </button>
 
       <div className="glass-card p-5 mb-4">
@@ -303,7 +303,7 @@ function LobbyView({ room, isHost, game, copyCode, copied, t, dict }: any) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span className="text-white text-sm font-medium truncate">{p.username}</span>
-                  {p.isHost && <Crown size={13} className="text-[#faee21] shrink-0" />}
+                  {p.isHost && <Crown size={13} className="text-[#ffc94d] shrink-0" />}
                   {!p.connected && <WifiOff size={12} className="text-white/30 shrink-0" />}
                 </div>
               </div>
@@ -367,7 +367,7 @@ function LobbyView({ room, isHost, game, copyCode, copied, t, dict }: any) {
                 disabled={!isHost}
                 onClick={() => game.updateSettings(room.code, { mrWhiteCount: room.settings.mrWhiteCount > 0 ? 0 : 1 })}
                 className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors disabled:opacity-50 ${
-                  room.settings.mrWhiteCount > 0 ? 'bg-[#a8ff35] text-black' : 'bg-white/[0.06] text-white/50'
+                  room.settings.mrWhiteCount > 0 ? 'bg-[#ffc94d] text-black' : 'bg-white/[0.06] text-white/50'
                 }`}
               >
                 {room.settings.mrWhiteCount > 0 ? t('game.lobby.mrWhiteEnabled') : t('game.lobby.mrWhiteDisabled')}
@@ -444,7 +444,7 @@ function ClueView({ room, me, game, clueText, setClueText, t }: any) {
             onChange={(e) => setClueText(e.target.value)}
             placeholder={t('game.clue.placeholder')}
             maxLength={60}
-            className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30"
+            className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30"
           />
           <button type="submit" disabled={!clueText.trim()} className="btn-skoleom px-5 rounded-xl disabled:opacity-60 shrink-0 text-sm">
             {t('game.clue.submit')}
@@ -529,7 +529,7 @@ function VotingView({ room, me, game, t }: any) {
               key={p.userId}
               onClick={() => vote(p.userId)}
               className={`flex flex-col items-center gap-2 py-5 rounded-2xl border transition-all ${
-                votedFor === p.userId ? 'border-[#a8ff35] bg-[#a8ff35]/10 shadow-glow-lime-sm' : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06]'
+                votedFor === p.userId ? 'border-[#ffc94d] bg-[#ffc94d]/10 shadow-glow-lime-sm' : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06]'
               }`}
             >
               <Avatar player={p} size={48} />
@@ -537,7 +537,7 @@ function VotingView({ room, me, game, t }: any) {
             </button>
           ))}
       </div>
-      {votedFor && <p className="text-[#a8ff35] text-xs text-center mt-4">{t('game.voting.voted')}</p>}
+      {votedFor && <p className="text-[#ffc94d] text-xs text-center mt-4">{t('game.voting.voted')}</p>}
     </div>
   );
 }

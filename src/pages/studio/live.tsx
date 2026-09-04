@@ -1001,7 +1001,7 @@ export default function StudioLivePage() {
                 >
                   <Users size={13} /> {viewerCount}
                 </button>
-                <span className="hidden sm:flex items-center gap-1.5 text-[#a8ff35]">
+                <span className="hidden sm:flex items-center gap-1.5 text-[#ffc94d]">
                   <ShoppingBag size={13} /> {sales.count} vente{sales.count > 1 ? 's' : ''} · {sales.revenue.toFixed(2)} €
                 </span>
                 {/* Seul acces a "Terminer le live" sur mobile — le panneau de bureau (hidden
@@ -1113,7 +1113,7 @@ export default function StudioLivePage() {
                     <div className="absolute top-14 left-3 right-3 z-10 flex items-center justify-between bg-black/55 backdrop-blur-sm rounded-2xl px-3.5 py-2.5 pointer-events-none">
                       <div>
                         <p className="text-white/50 text-[10px] uppercase tracking-wider">Mise actuelle</p>
-                        <p className="text-[#a8ff35] font-extrabold text-[17px] leading-none">{currentBid.toFixed(2)} €</p>
+                        <p className="text-[#ffc94d] font-extrabold text-[17px] leading-none">{currentBid.toFixed(2)} €</p>
                         {currentBidderName && (
                           <p className="text-white/40 text-[10px] mt-0.5">par {currentBidderName}</p>
                         )}
@@ -1147,7 +1147,7 @@ export default function StudioLivePage() {
                         <button
                           onClick={openDuoPanel}
                           className={`relative w-11 h-11 rounded-full flex items-center justify-center transition-all ${
-                            guests.length > 0 ? 'bg-[#a8ff35] text-black' : 'bg-white/10 hover:bg-white/20 text-white'
+                            guests.length > 0 ? 'bg-[#ffc94d] text-black' : 'bg-white/10 hover:bg-white/20 text-white'
                           }`}
                           title="Gérer les invités"
                         >
@@ -1163,15 +1163,15 @@ export default function StudioLivePage() {
                           className="relative w-11 h-11 rounded-full flex items-center justify-center transition-all bg-white/10 hover:bg-white/20 text-white"
                           title="Jeu"
                         >
-                          <Gamepad2 size={18} className="text-[#a8ff35]" />
-                          {gameActive && <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[#a8ff35] border-2 border-black" />}
+                          <Gamepad2 size={18} className="text-[#ffc94d]" />
+                          {gameActive && <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[#ffc94d] border-2 border-black" />}
                         </button>
                       )}
                       {live && (
                         <button
                           onClick={() => setMusicPanelOpen(true)}
                           className={`relative w-11 h-11 rounded-full flex items-center justify-center transition-all ${
-                            musicState ? 'bg-[#a8ff35] text-black' : 'bg-white/10 hover:bg-white/20 text-white'
+                            musicState ? 'bg-[#ffc94d] text-black' : 'bg-white/10 hover:bg-white/20 text-white'
                           }`}
                           title="Musique"
                         >
@@ -1181,7 +1181,7 @@ export default function StudioLivePage() {
                       <button
                         onClick={() => setFilterPanelOpen(true)}
                         className={`relative w-11 h-11 rounded-full flex items-center justify-center transition-all ${
-                          filtersActive(filterConfig) ? 'bg-[#a8ff35] text-black' : 'bg-white/10 hover:bg-white/20 text-white'
+                          filtersActive(filterConfig) ? 'bg-[#ffc94d] text-black' : 'bg-white/10 hover:bg-white/20 text-white'
                         }`}
                         title="Filtres"
                       >
@@ -1194,13 +1194,13 @@ export default function StudioLivePage() {
                       inverse d'"Inviter en duo"). On ne montre que la premiere ici, les autres
                       (s'il y en a) sont visibles dans le panneau "Spectateurs". */}
                   {duoRequests.length > 0 && (
-                    <div className="absolute top-14 left-3 right-3 z-30 flex items-center justify-between gap-2 bg-black/80 backdrop-blur-sm border border-[#a8ff35]/40 rounded-2xl px-3.5 py-2.5">
+                    <div className="absolute top-14 left-3 right-3 z-30 flex items-center justify-between gap-2 bg-black/80 backdrop-blur-sm border border-[#ffc94d]/40 rounded-2xl px-3.5 py-2.5">
                       <p className="text-white text-[12px] font-medium min-w-0">
-                        <span className="font-bold text-[#a8ff35]">@{duoRequests[0].username}</span> demande à faire un duo
+                        <span className="font-bold text-[#ffc94d]">@{duoRequests[0].username}</span> demande à faire un duo
                         {duoRequests.length > 1 ? ` (+${duoRequests.length - 1} autre${duoRequests.length > 2 ? 's' : ''})` : ''}
                       </p>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <button onClick={() => respondDuoRequest(duoRequests[0].userId, true)} className="w-8 h-8 rounded-full bg-[#a8ff35] text-black flex items-center justify-center">
+                        <button onClick={() => respondDuoRequest(duoRequests[0].userId, true)} className="w-8 h-8 rounded-full bg-[#ffc94d] text-black flex items-center justify-center">
                           <Check size={14} />
                         </button>
                         <button onClick={() => respondDuoRequest(duoRequests[0].userId, false)} className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center">
@@ -1214,13 +1214,13 @@ export default function StudioLivePage() {
                       duo ci-dessus mais pour "regarder", pas "publier". Décalée sous la bannière
                       duo si les deux sont visibles en même temps. */}
                   {viewRequests.length > 0 && (
-                    <div className={`absolute left-3 right-3 z-30 flex items-center justify-between gap-2 bg-black/80 backdrop-blur-sm border border-[#a8ff35]/40 rounded-2xl px-3.5 py-2.5 ${duoRequests.length > 0 ? 'top-[6.5rem]' : 'top-14'}`}>
+                    <div className={`absolute left-3 right-3 z-30 flex items-center justify-between gap-2 bg-black/80 backdrop-blur-sm border border-[#ffc94d]/40 rounded-2xl px-3.5 py-2.5 ${duoRequests.length > 0 ? 'top-[6.5rem]' : 'top-14'}`}>
                       <p className="text-white text-[12px] font-medium min-w-0">
-                        <span className="font-bold text-[#a8ff35]">@{viewRequests[0].username}</span> demande à rejoindre ce live privé
+                        <span className="font-bold text-[#ffc94d]">@{viewRequests[0].username}</span> demande à rejoindre ce live privé
                         {viewRequests.length > 1 ? ` (+${viewRequests.length - 1} autre${viewRequests.length > 2 ? 's' : ''})` : ''}
                       </p>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <button onClick={() => respondViewRequest(viewRequests[0].userId, true)} className="w-8 h-8 rounded-full bg-[#a8ff35] text-black flex items-center justify-center">
+                        <button onClick={() => respondViewRequest(viewRequests[0].userId, true)} className="w-8 h-8 rounded-full bg-[#ffc94d] text-black flex items-center justify-center">
                           <Check size={14} />
                         </button>
                         <button onClick={() => respondViewRequest(viewRequests[0].userId, false)} className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center">
@@ -1251,14 +1251,14 @@ export default function StudioLivePage() {
                       if (c.isBid) {
                         return (
                           <p key={c.id} className="text-[12.5px] leading-snug [text-shadow:0_1px_4px_rgba(0,0,0,0.9)]">
-                            <span className="font-bold text-[#a8ff35]">{c.username}</span>{' '}
-                            <span className="text-[#a8ff35]/90 font-medium">{c.text}</span>
+                            <span className="font-bold text-[#ffc94d]">{c.username}</span>{' '}
+                            <span className="text-[#ffc94d]/90 font-medium">{c.text}</span>
                           </p>
                         );
                       }
                       return (
                         <p key={c.id} className="text-[12.5px] leading-snug [text-shadow:0_1px_4px_rgba(0,0,0,0.9)]">
-                          <span className={`font-bold ${isHost ? 'text-[#f59e0b]' : 'text-[#a8ff35]'}`}>{c.username}</span>
+                          <span className={`font-bold ${isHost ? 'text-[#f59e0b]' : 'text-[#ffc94d]'}`}>{c.username}</span>
                           {isHost && <Crown size={10} className="inline text-[#f59e0b] mx-1 -translate-y-px" />}
                           <span className="text-white/95"> {c.text}</span>
                         </p>
@@ -1282,10 +1282,10 @@ export default function StudioLivePage() {
                       value={commentInput}
                       onChange={(e) => setCommentInput(e.target.value)}
                       placeholder="Commenter…"
-                      className="flex-1 bg-black/45 border border-white/20 rounded-full px-3.5 py-2 text-white placeholder:text-white/50 text-[13px] backdrop-blur-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 transition-all"
+                      className="flex-1 bg-black/45 border border-white/20 rounded-full px-3.5 py-2 text-white placeholder:text-white/50 text-[13px] backdrop-blur-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 transition-all"
                     />
                     <button type="submit" className="w-9 h-9 rounded-full bg-black/45 border border-white/20 backdrop-blur-sm flex items-center justify-center shrink-0">
-                      <Send size={14} className="text-[#a8ff35]" />
+                      <Send size={14} className="text-[#ffc94d]" />
                     </button>
                   </form>
 
@@ -1309,8 +1309,8 @@ export default function StudioLivePage() {
                 {guests.length > 0 && (
                   <div className="mt-2 space-y-1.5">
                     {guests.map((g) => (
-                      <div key={g.id} className="flex items-center justify-between bg-[#a8ff35]/10 border border-[#a8ff35]/25 rounded-xl px-3.5 py-2">
-                        <p className="text-[12px] text-[#a8ff35] font-semibold">Invité @{g.username}</p>
+                      <div key={g.id} className="flex items-center justify-between bg-[#ffc94d]/10 border border-[#ffc94d]/25 rounded-xl px-3.5 py-2">
+                        <p className="text-[12px] text-[#ffc94d] font-semibold">Invité @{g.username}</p>
                         <button onClick={() => endDuo(g.id)} className="text-[11px] text-white/50 hover:text-white underline">
                           Terminer
                         </button>
@@ -1326,7 +1326,7 @@ export default function StudioLivePage() {
                         type="button"
                         onClick={() => setMode('live')}
                         className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold transition-all ${
-                          mode === 'live' ? 'bg-[#a8ff35] text-black border-[#a8ff35]' : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08]'
+                          mode === 'live' ? 'bg-[#ffc94d] text-black border-[#ffc94d]' : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08]'
                         }`}
                       >
                         <Radio size={14} /> Live classique
@@ -1335,7 +1335,7 @@ export default function StudioLivePage() {
                         type="button"
                         onClick={() => setMode('auction')}
                         className={`flex items-center justify-center gap-2 py-2.5 rounded-xl border text-sm font-semibold transition-all ${
-                          mode === 'auction' ? 'bg-[#a8ff35] text-black border-[#a8ff35]' : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08]'
+                          mode === 'auction' ? 'bg-[#ffc94d] text-black border-[#ffc94d]' : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08]'
                         }`}
                       >
                         <Gavel size={14} /> Enchère
@@ -1347,7 +1347,7 @@ export default function StudioLivePage() {
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
                       placeholder="Titre du live (optionnel)"
-                      className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                      className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30 transition-all"
                     />
 
                     <button
@@ -1356,11 +1356,11 @@ export default function StudioLivePage() {
                       className="w-full flex items-center justify-between gap-3 bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-left transition-all hover:bg-white/[0.08]"
                     >
                       <span className="flex items-center gap-2.5 text-sm text-white">
-                        <Lock size={15} className={isPrivate ? 'text-[#a8ff35]' : 'text-white/40'} />
+                        <Lock size={15} className={isPrivate ? 'text-[#ffc94d]' : 'text-white/40'} />
                         Live privé
                         <span className="text-white/35 text-xs font-normal">— accès sur invitation ou demande</span>
                       </span>
-                      <span className={`relative w-9 h-5 rounded-full shrink-0 transition-colors ${isPrivate ? 'bg-[#a8ff35]' : 'bg-white/15'}`}>
+                      <span className={`relative w-9 h-5 rounded-full shrink-0 transition-colors ${isPrivate ? 'bg-[#ffc94d]' : 'bg-white/15'}`}>
                         <span className={`absolute top-0.5 left-0.5 w-4 h-4 rounded-full bg-black transition-transform ${isPrivate ? 'translate-x-4' : ''}`} />
                       </span>
                     </button>
@@ -1409,7 +1409,7 @@ export default function StudioLivePage() {
                     {live.mode === 'auction' ? (
                       <>
                         {auctionResult && (
-                          <p className={`text-[12px] font-semibold text-center py-1.5 ${auctionResult.winnerId ? 'text-[#a8ff35]' : 'text-white/40'}`}>
+                          <p className={`text-[12px] font-semibold text-center py-1.5 ${auctionResult.winnerId ? 'text-[#ffc94d]' : 'text-white/40'}`}>
                             {auctionResult.winnerId
                               ? `Manche précédente remportée à ${auctionResult.amount?.toFixed(2)} € 🎉`
                               : 'Manche précédente terminée sans mise.'}
@@ -1420,7 +1420,7 @@ export default function StudioLivePage() {
                           <div className="bg-white/[0.03] border border-white/[0.07] rounded-2xl p-4 space-y-1">
                             <p className="text-[13px] font-semibold text-white">{activeAuctionCapsule?.name || 'Produit aux enchères'}</p>
                             {currentBidderName ? (
-                              <p className="text-[12px] text-white/40">Plus offrant : <span className="text-[#a8ff35] font-semibold">{currentBidderName}</span></p>
+                              <p className="text-[12px] text-white/40">Plus offrant : <span className="text-[#ffc94d] font-semibold">{currentBidderName}</span></p>
                             ) : (
                               <p className="text-[12px] text-white/40">En attente de la première enchère…</p>
                             )}
@@ -1463,7 +1463,7 @@ export default function StudioLivePage() {
                                       type="button"
                                       onClick={() => { setAuctionCapsuleId(c.id); setStartingBidInput(String(c.price)); }}
                                       className={`w-full flex items-center gap-2.5 p-2 rounded-xl border text-left transition-all ${
-                                        auctionCapsuleId === c.id ? 'border-[#a8ff35] bg-[#a8ff35]/10' : 'border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.06]'
+                                        auctionCapsuleId === c.id ? 'border-[#ffc94d] bg-[#ffc94d]/10' : 'border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.06]'
                                       }`}
                                     >
                                       <div className="w-9 h-9 rounded-lg bg-white/[0.05] overflow-hidden shrink-0 flex items-center justify-center">
@@ -1491,7 +1491,7 @@ export default function StudioLivePage() {
                                     step="0.01"
                                     value={startingBidInput}
                                     onChange={(e) => setStartingBidInput(e.target.value)}
-                                    className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                                    className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30 transition-all"
                                   />
                                 </div>
 
@@ -1506,7 +1506,7 @@ export default function StudioLivePage() {
                                         type="button"
                                         onClick={() => setDurationMinutes(min)}
                                         className={`flex-1 py-2 rounded-xl text-xs font-semibold border transition-all ${
-                                          durationMinutes === min ? 'bg-[#a8ff35] text-black border-[#a8ff35]' : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08]'
+                                          durationMinutes === min ? 'bg-[#ffc94d] text-black border-[#ffc94d]' : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08]'
                                         }`}
                                       >
                                         {min} min
@@ -1543,14 +1543,14 @@ export default function StudioLivePage() {
                           <button
                             type="button"
                             onClick={() => setCapsulePickerOpen(true)}
-                            className="flex items-center gap-1 text-[11px] font-semibold text-[#a8ff35] hover:brightness-110 transition-all"
+                            className="flex items-center gap-1 text-[11px] font-semibold text-[#ffc94d] hover:brightness-110 transition-all"
                           >
                             <Plus size={12} /> Ajouter
                           </button>
                         </div>
 
                         {live.featuredCapsule ? (
-                          <div className="flex items-center gap-3 p-2.5 rounded-xl border border-[#a8ff35]/40 bg-[#a8ff35]/10">
+                          <div className="flex items-center gap-3 p-2.5 rounded-xl border border-[#ffc94d]/40 bg-[#ffc94d]/10">
                             <div className="w-11 h-11 rounded-lg bg-white/[0.05] overflow-hidden shrink-0 flex items-center justify-center">
                               {live.featuredCapsule.imageUrl ? (
                                 <img src={live.featuredCapsule.imageUrl} alt="" className="w-full h-full object-cover" />
@@ -1559,10 +1559,10 @@ export default function StudioLivePage() {
                               )}
                             </div>
                             <div className="flex-1 min-w-0">
-                              <p className="text-[10px] font-bold uppercase tracking-wider text-[#a8ff35]">En vente maintenant</p>
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-[#ffc94d]">En vente maintenant</p>
                               <p className="text-sm font-semibold text-white truncate">{live.featuredCapsule.name}</p>
                             </div>
-                            <span className="text-[#a8ff35] font-bold text-sm shrink-0">{live.featuredCapsule.price.toFixed(2)} €</span>
+                            <span className="text-[#ffc94d] font-bold text-sm shrink-0">{live.featuredCapsule.price.toFixed(2)} €</span>
                           </div>
                         ) : (
                           <button
@@ -1640,7 +1640,7 @@ export default function StudioLivePage() {
                 </button>
 
                 {topDonorsOpen && (
-                  <div className="shrink-0 bg-[#0d0d0f] border border-[#f59e0b]/25 rounded-2xl p-3 max-h-64 overflow-y-auto scrollbar-hide">
+                  <div className="shrink-0 bg-[#341839] border border-[#f59e0b]/25 rounded-2xl p-3 max-h-64 overflow-y-auto scrollbar-hide">
                     {topDonors.length === 0 ? (
                       <p className="text-white/30 text-xs text-center py-4">Aucun cadeau reçu pour l&apos;instant sur ce live.</p>
                     ) : (
@@ -1690,12 +1690,12 @@ export default function StudioLivePage() {
                     if (c.isBid) {
                       return (
                         <div key={c.id} className="flex items-center gap-2 text-[13px] leading-snug bg-white/[0.03] rounded-xl px-2 py-1.5">
-                          <span className="w-5 h-5 rounded-full bg-[#a8ff35]/15 flex items-center justify-center shrink-0">
-                            <Gavel size={11} className="text-[#a8ff35]" />
+                          <span className="w-5 h-5 rounded-full bg-[#ffc94d]/15 flex items-center justify-center shrink-0">
+                            <Gavel size={11} className="text-[#ffc94d]" />
                           </span>
                           <p className="min-w-0">
-                            <span className="font-semibold mr-1 text-[#a8ff35]">{c.username}</span>
-                            <span className="text-[#a8ff35]/80 break-words font-medium">{c.text}</span>
+                            <span className="font-semibold mr-1 text-[#ffc94d]">{c.username}</span>
+                            <span className="text-[#ffc94d]/80 break-words font-medium">{c.text}</span>
                           </p>
                         </div>
                       );
@@ -1703,7 +1703,7 @@ export default function StudioLivePage() {
                     return (
                       <div key={c.id} className="group flex items-start justify-between gap-2 text-[13px] leading-snug">
                         <p className="min-w-0">
-                          <span className={`font-semibold mr-1 ${isHost ? 'text-[#f59e0b]' : 'text-[#a8ff35]'}`}>
+                          <span className={`font-semibold mr-1 ${isHost ? 'text-[#f59e0b]' : 'text-[#ffc94d]'}`}>
                             {c.username}
                           </span>
                           {isHost && (
@@ -1744,13 +1744,13 @@ export default function StudioLivePage() {
                     value={commentInput}
                     onChange={(e) => setCommentInput(e.target.value)}
                     placeholder="Commenter..."
-                    className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-full px-3.5 py-2 text-white placeholder:text-white/25 text-[13px] focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 transition-all"
+                    className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-full px-3.5 py-2 text-white placeholder:text-white/25 text-[13px] focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 transition-all"
                   />
                   <button
                     type="submit"
                     className="w-9 h-9 rounded-full bg-white/[0.06] hover:bg-white/10 flex items-center justify-center shrink-0 transition-all"
                   >
-                    <Send size={14} className="text-[#a8ff35]" />
+                    <Send size={14} className="text-[#ffc94d]" />
                   </button>
                 </form>
                 </div>
@@ -1762,7 +1762,7 @@ export default function StudioLivePage() {
 
       {capsulePickerOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
-          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5">
+          <div className="w-full max-w-sm bg-[#341839] border border-white/[0.08] rounded-[20px] p-5">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-white font-bold text-base">Mettre en avant une capsule</h2>
               <button onClick={() => setCapsulePickerOpen(false)}
@@ -1783,7 +1783,7 @@ export default function StudioLivePage() {
                     onClick={() => selectCapsule(c)}
                     className={`w-full flex items-center gap-3 p-3 rounded-xl border text-left transition-all ${
                       live?.featuredCapsuleId === c.id
-                        ? 'border-[#a8ff35] bg-[#a8ff35]/10'
+                        ? 'border-[#ffc94d] bg-[#ffc94d]/10'
                         : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06]'
                     }`}
                   >
@@ -1820,7 +1820,7 @@ export default function StudioLivePage() {
 
       {musicPanelOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4" onClick={() => setMusicPanelOpen(false)}>
-          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-sm bg-[#341839] border border-white/[0.08] rounded-[20px] p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-white font-bold text-base flex items-center gap-2">
                 <Music size={16} /> Musique
@@ -1833,8 +1833,8 @@ export default function StudioLivePage() {
               Colle un lien YouTube — chaque spectateur l&apos;entendra en même temps que toi, en parallèle de la vidéo (pas mixé dans ton micro).
             </p>
             {musicState && (
-              <div className="flex items-center justify-between bg-[#a8ff35]/10 border border-[#a8ff35]/25 rounded-xl px-3.5 py-2.5 mb-4">
-                <p className="text-[12px] text-[#a8ff35] font-semibold">{musicState.playing ? 'En cours de lecture' : 'En pause'}</p>
+              <div className="flex items-center justify-between bg-[#ffc94d]/10 border border-[#ffc94d]/25 rounded-xl px-3.5 py-2.5 mb-4">
+                <p className="text-[12px] text-[#ffc94d] font-semibold">{musicState.playing ? 'En cours de lecture' : 'En pause'}</p>
                 <div className="flex items-center gap-2">
                   <button onClick={toggleMusicPlay} className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white">
                     {musicState.playing ? <Pause size={14} /> : <Play size={14} />}
@@ -1851,7 +1851,7 @@ export default function StudioLivePage() {
                 onChange={(e) => { setMusicInput(e.target.value); setMusicInputError(''); }}
                 onKeyDown={(e) => e.key === 'Enter' && setMusicTrack()}
                 placeholder="https://youtube.com/watch?v=…"
-                className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30"
+                className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30"
               />
               <button onClick={setMusicTrack} className="btn-skoleom px-4 rounded-xl text-sm shrink-0">
                 {musicState ? 'Changer' : 'Lancer'}
@@ -1864,7 +1864,7 @@ export default function StudioLivePage() {
 
       {filterPanelOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4" onClick={() => setFilterPanelOpen(false)}>
-          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-sm bg-[#341839] border border-white/[0.08] rounded-[20px] p-5 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-white font-bold text-base flex items-center gap-2">
                 <Wand2 size={16} /> Filtres
@@ -1885,7 +1885,7 @@ export default function StudioLivePage() {
                   key={f.id}
                   onClick={() => setFilterConfig((c) => ({ ...c, color: f.id }))}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-                    filterConfig.color === f.id ? 'bg-[#a8ff35] text-black border-[#a8ff35]' : 'bg-white/[0.05] text-white/70 border-white/10 hover:bg-white/[0.08]'
+                    filterConfig.color === f.id ? 'bg-[#ffc94d] text-black border-[#ffc94d]' : 'bg-white/[0.05] text-white/70 border-white/10 hover:bg-white/[0.08]'
                   }`}
                 >
                   {f.label}
@@ -1900,7 +1900,7 @@ export default function StudioLivePage() {
                   key={f.id}
                   onClick={() => setFilterConfig((c) => ({ ...c, background: f.id }))}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-                    filterConfig.background === f.id ? 'bg-[#a8ff35] text-black border-[#a8ff35]' : 'bg-white/[0.05] text-white/70 border-white/10 hover:bg-white/[0.08]'
+                    filterConfig.background === f.id ? 'bg-[#ffc94d] text-black border-[#ffc94d]' : 'bg-white/[0.05] text-white/70 border-white/10 hover:bg-white/[0.08]'
                   }`}
                 >
                   {f.label}
@@ -1915,7 +1915,7 @@ export default function StudioLivePage() {
                   key={f.id}
                   onClick={() => setFilterConfig((c) => ({ ...c, face: f.id }))}
                   className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
-                    filterConfig.face === f.id ? 'bg-[#a8ff35] text-black border-[#a8ff35]' : 'bg-white/[0.05] text-white/70 border-white/10 hover:bg-white/[0.08]'
+                    filterConfig.face === f.id ? 'bg-[#ffc94d] text-black border-[#ffc94d]' : 'bg-white/[0.05] text-white/70 border-white/10 hover:bg-white/[0.08]'
                   }`}
                 >
                   {f.emoji} {f.label}
@@ -1929,7 +1929,7 @@ export default function StudioLivePage() {
       {duoPanelOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
           onClick={() => setDuoPanelOpen(false)}>
-          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-sm bg-[#341839] border border-white/[0.08] rounded-[20px] p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-white font-bold text-base flex items-center gap-2">
                 <Users size={16} /> Invités {guests.length > 0 ? `(${guests.length})` : ''}
@@ -1950,7 +1950,7 @@ export default function StudioLivePage() {
                   key={tab.key}
                   onClick={() => setInvitePanelTab(tab.key)}
                   className={`flex-1 py-1.5 rounded-lg text-[11px] font-semibold transition-all ${
-                    invitePanelTab === tab.key ? 'bg-[#a8ff35] text-black' : 'text-white/50 hover:text-white'
+                    invitePanelTab === tab.key ? 'bg-[#ffc94d] text-black' : 'text-white/50 hover:text-white'
                   }`}
                 >
                   {tab.label}
@@ -1960,9 +1960,9 @@ export default function StudioLivePage() {
 
             {guests.length > 0 && (
               <div className="mb-4 space-y-1.5">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-[#a8ff35]/80 px-1">Invités actuels</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[#ffc94d]/80 px-1">Invités actuels</p>
                 {guests.map((g) => (
-                  <div key={g.id} className="flex items-center gap-2.5 p-2.5 rounded-xl border border-[#a8ff35]/25 bg-[#a8ff35]/[0.06]">
+                  <div key={g.id} className="flex items-center gap-2.5 p-2.5 rounded-xl border border-[#ffc94d]/25 bg-[#ffc94d]/[0.06]">
                     <div className="w-8 h-8 rounded-full bg-white/[0.08] overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold text-white/60">
                       {g.avatarUrl ? <img src={g.avatarUrl} alt="" className="w-full h-full object-cover" /> : g.username[0]?.toUpperCase()}
                     </div>
@@ -1977,14 +1977,14 @@ export default function StudioLivePage() {
 
             {duoRequests.length > 0 && (
               <div className="mb-4 space-y-1.5">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-[#a8ff35]/80 px-1">Demandes de duo</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[#ffc94d]/80 px-1">Demandes de duo</p>
                 {duoRequests.map((r) => (
-                  <div key={r.userId} className="flex items-center gap-2.5 p-2.5 rounded-xl border border-[#a8ff35]/25 bg-[#a8ff35]/[0.06]">
+                  <div key={r.userId} className="flex items-center gap-2.5 p-2.5 rounded-xl border border-[#ffc94d]/25 bg-[#ffc94d]/[0.06]">
                     <div className="w-8 h-8 rounded-full bg-white/[0.08] overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold text-white/60">
                       {r.avatarUrl ? <img src={r.avatarUrl} alt="" className="w-full h-full object-cover" /> : r.username[0]?.toUpperCase()}
                     </div>
                     <span className="text-sm font-medium text-white flex-1 truncate">@{r.username}</span>
-                    <button onClick={() => respondDuoRequest(r.userId, true)} className="w-8 h-8 rounded-full bg-[#a8ff35] text-black flex items-center justify-center shrink-0">
+                    <button onClick={() => respondDuoRequest(r.userId, true)} className="w-8 h-8 rounded-full bg-[#ffc94d] text-black flex items-center justify-center shrink-0">
                       <Check size={14} />
                     </button>
                     <button onClick={() => respondDuoRequest(r.userId, false)} className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center shrink-0">
@@ -1997,14 +1997,14 @@ export default function StudioLivePage() {
 
             {viewRequests.length > 0 && (
               <div className="mb-4 space-y-1.5">
-                <p className="text-[11px] font-semibold uppercase tracking-wider text-[#a8ff35]/80 px-1">Demandes d'accès (live privé)</p>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-[#ffc94d]/80 px-1">Demandes d'accès (live privé)</p>
                 {viewRequests.map((r) => (
-                  <div key={r.userId} className="flex items-center gap-2.5 p-2.5 rounded-xl border border-[#a8ff35]/25 bg-[#a8ff35]/[0.06]">
+                  <div key={r.userId} className="flex items-center gap-2.5 p-2.5 rounded-xl border border-[#ffc94d]/25 bg-[#ffc94d]/[0.06]">
                     <div className="w-8 h-8 rounded-full bg-white/[0.08] overflow-hidden shrink-0 flex items-center justify-center text-xs font-bold text-white/60">
                       {r.avatarUrl ? <img src={r.avatarUrl} alt="" className="w-full h-full object-cover" /> : r.username[0]?.toUpperCase()}
                     </div>
                     <span className="text-sm font-medium text-white flex-1 truncate">@{r.username}</span>
-                    <button onClick={() => respondViewRequest(r.userId, true)} className="w-8 h-8 rounded-full bg-[#a8ff35] text-black flex items-center justify-center shrink-0">
+                    <button onClick={() => respondViewRequest(r.userId, true)} className="w-8 h-8 rounded-full bg-[#ffc94d] text-black flex items-center justify-center shrink-0">
                       <Check size={14} />
                     </button>
                     <button onClick={() => respondViewRequest(r.userId, false)} className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center shrink-0">
@@ -2071,7 +2071,7 @@ export default function StudioLivePage() {
                             title={grantedViewerIds.has(v.userId) ? 'Accès autorisé' : 'Autoriser à regarder'}
                             className={`w-7 h-7 rounded-full flex items-center justify-center border transition-colors ${
                               grantedViewerIds.has(v.userId)
-                                ? 'border-[#a8ff35]/40 text-[#a8ff35]'
+                                ? 'border-[#ffc94d]/40 text-[#ffc94d]'
                                 : 'border-white/15 text-white/60 hover:text-white hover:bg-white/10'
                             }`}
                           >
@@ -2085,7 +2085,7 @@ export default function StudioLivePage() {
                             title="Inviter à jouer"
                             className={`w-7 h-7 rounded-full flex items-center justify-center border transition-colors ${
                               gameInviteSentTo === v.userId
-                                ? 'border-[#a8ff35]/40 text-[#a8ff35]'
+                                ? 'border-[#ffc94d]/40 text-[#ffc94d]'
                                 : 'border-white/15 text-white/60 hover:text-white hover:bg-white/10'
                             }`}
                           >
@@ -2121,7 +2121,7 @@ export default function StudioLivePage() {
                   value={inviteQuery}
                   onChange={(e) => setInviteQuery(e.target.value)}
                   placeholder="Chercher un pseudo…"
-                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-full px-3.5 py-2 text-white placeholder:text-white/30 text-[13px] focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50"
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-full px-3.5 py-2 text-white placeholder:text-white/30 text-[13px] focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50"
                 />
                 <div className="space-y-1.5 max-h-64 overflow-y-auto scrollbar-hide">
                   {inviteQuery.trim() && inviteSearchResults.length === 0 && (
@@ -2140,7 +2140,7 @@ export default function StudioLivePage() {
                           title={grantedViewerIds.has(u.id) ? 'Accès autorisé' : 'Autoriser à regarder'}
                           className={`w-7 h-7 rounded-full flex items-center justify-center border shrink-0 transition-colors ${
                             grantedViewerIds.has(u.id)
-                              ? 'border-[#a8ff35]/40 text-[#a8ff35]'
+                              ? 'border-[#ffc94d]/40 text-[#ffc94d]'
                               : 'border-white/15 text-white/60 hover:text-white hover:bg-white/10'
                           }`}
                         >
@@ -2150,7 +2150,7 @@ export default function StudioLivePage() {
                       <button
                         onClick={() => inviteDuo(u.id)}
                         disabled={guests.some((g) => g.id === u.id) || duoInviteStatus === 'inviting'}
-                        className="text-[11px] font-semibold text-black bg-[#a8ff35] px-3 py-1.5 rounded-full disabled:opacity-40 shrink-0"
+                        className="text-[11px] font-semibold text-black bg-[#ffc94d] px-3 py-1.5 rounded-full disabled:opacity-40 shrink-0"
                       >
                         {guests.some((g) => g.id === u.id) ? 'Invité' : 'Inviter'}
                       </button>
@@ -2178,7 +2178,7 @@ export default function StudioLivePage() {
                           title={grantedViewerIds.has(u.id) ? 'Accès autorisé' : 'Autoriser à regarder'}
                           className={`w-7 h-7 rounded-full flex items-center justify-center border shrink-0 transition-colors ${
                             grantedViewerIds.has(u.id)
-                              ? 'border-[#a8ff35]/40 text-[#a8ff35]'
+                              ? 'border-[#ffc94d]/40 text-[#ffc94d]'
                               : 'border-white/15 text-white/60 hover:text-white hover:bg-white/10'
                           }`}
                         >
@@ -2188,7 +2188,7 @@ export default function StudioLivePage() {
                       <button
                         onClick={() => inviteDuo(u.id)}
                         disabled={guests.some((g) => g.id === u.id) || duoInviteStatus === 'inviting'}
-                        className="text-[11px] font-semibold text-black bg-[#a8ff35] px-3 py-1.5 rounded-full disabled:opacity-40 shrink-0"
+                        className="text-[11px] font-semibold text-black bg-[#ffc94d] px-3 py-1.5 rounded-full disabled:opacity-40 shrink-0"
                       >
                         {guests.some((g) => g.id === u.id) ? 'Invité' : 'Inviter'}
                       </button>
@@ -2206,7 +2206,7 @@ export default function StudioLivePage() {
           className="md:hidden fixed inset-0 z-[9999] flex items-end bg-black/70 backdrop-blur-sm"
           onClick={() => setMobileTopDonorsOpen(false)}
         >
-          <div className="w-full bg-[#0d0d0f] border-t border-[#f59e0b]/25 rounded-t-[24px] p-5 max-h-[75vh] overflow-y-auto scrollbar-hide" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full bg-[#341839] border-t border-[#f59e0b]/25 rounded-t-[24px] p-5 max-h-[75vh] overflow-y-auto scrollbar-hide" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-center mb-3">
               <div className="w-10 h-1 rounded-full bg-white/20" />
             </div>
@@ -2246,7 +2246,7 @@ export default function StudioLivePage() {
 
       {leaveConfirmOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
-          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5">
+          <div className="w-full max-w-sm bg-[#341839] border border-white/[0.08] rounded-[20px] p-5">
             <div className="w-11 h-11 rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center mb-3">
               <AlertTriangle size={18} className="text-red-400" />
             </div>

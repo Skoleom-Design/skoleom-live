@@ -61,7 +61,7 @@ export function GoogleProfileSetup({ initialUsername, googleAvatarUrl, onDone }:
           value={username}
           onChange={(e) => setUsername(e.target.value)}
           placeholder={t('auth.usernamePlaceholder')}
-          className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all mb-6"
+          className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30 transition-all mb-6"
         />
 
         <p className="text-[11px] text-white/40 mb-2.5 font-medium uppercase tracking-wider">

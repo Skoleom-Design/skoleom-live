@@ -24,7 +24,7 @@ function VideoCard({ item }: { item: VideoItem }) {
 
   return (
     <div
-      className="relative rounded-xl overflow-hidden cursor-pointer bg-[#0d0d0f] group"
+      className="relative rounded-xl overflow-hidden cursor-pointer bg-[#341839] group"
       style={{ aspectRatio: '9/16' }}
       onMouseEnter={onEnter}
       onMouseLeave={onLeave}

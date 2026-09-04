@@ -653,7 +653,7 @@ export default function LiveViewerPage() {
         <AppSidebar />
         <main className="flex-1 flex flex-col items-center justify-center gap-3 text-white/50 text-sm">
           <p>Ce live est introuvable ou déjà terminé.</p>
-          <Link href="/live" className="text-[#a8ff35] underline">Retour aux lives</Link>
+          <Link href="/live" className="text-[#ffc94d] underline">Retour aux lives</Link>
         </main>
       </div>
     );
@@ -736,7 +736,7 @@ export default function LiveViewerPage() {
                 onClick={() => (duoRequestStatus === 'pending' ? cancelDuoRequest() : requestDuo())}
                 className={`hidden md:flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition-all ${
                   duoRequestStatus === 'pending'
-                    ? 'bg-[#a8ff35]/15 border-[#a8ff35]/40 text-[#a8ff35]'
+                    ? 'bg-[#ffc94d]/15 border-[#ffc94d]/40 text-[#ffc94d]'
                     : duoRequestStatus === 'declined' || duoRequestStatus === 'error'
                     ? 'bg-red-500/10 border-red-400/30 text-red-300'
                     : 'bg-white/[0.06] border-white/15 text-white/70 hover:text-white hover:border-white/30'
@@ -817,7 +817,7 @@ export default function LiveViewerPage() {
                   {soundBlocked && (
                     <button
                       onClick={() => audioElRef.current?.play().then(() => setSoundBlocked(false)).catch(() => {})}
-                      className="absolute top-3 right-3 z-30 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1.5 text-white text-[12px] font-semibold hover:border-[#a8ff35]/50 transition-all"
+                      className="absolute top-3 right-3 z-30 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm border border-white/20 rounded-full px-3 py-1.5 text-white text-[12px] font-semibold hover:border-[#ffc94d]/50 transition-all"
                     >
                       <VolumeX size={14} />
                       Activer le son
@@ -825,12 +825,12 @@ export default function LiveViewerPage() {
                   )}
 
                   {duoInvite && (
-                    <div className="absolute top-14 left-3 right-3 z-30 flex items-center justify-between gap-2 bg-black/80 backdrop-blur-sm border border-[#a8ff35]/40 rounded-2xl px-3.5 py-2.5">
+                    <div className="absolute top-14 left-3 right-3 z-30 flex items-center justify-between gap-2 bg-black/80 backdrop-blur-sm border border-[#ffc94d]/40 rounded-2xl px-3.5 py-2.5">
                       <p className="text-white text-[12px] font-medium min-w-0">
-                        <span className="font-bold text-[#a8ff35]">@{duoInvite.fromUsername}</span> t'invite en duo
+                        <span className="font-bold text-[#ffc94d]">@{duoInvite.fromUsername}</span> t'invite en duo
                       </p>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        <button onClick={() => respondDuo(true)} className="w-8 h-8 rounded-full bg-[#a8ff35] text-black flex items-center justify-center">
+                        <button onClick={() => respondDuo(true)} className="w-8 h-8 rounded-full bg-[#ffc94d] text-black flex items-center justify-center">
                           <Check size={14} />
                         </button>
                         <button onClick={() => respondDuo(false)} className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center">
@@ -841,14 +841,14 @@ export default function LiveViewerPage() {
                   )}
 
                   {gameInvite && (
-                    <div className={`absolute left-3 right-3 z-30 flex items-center justify-between gap-2 bg-black/80 backdrop-blur-sm border border-[#a8ff35]/40 rounded-2xl px-3.5 py-2.5 ${duoInvite ? 'top-[6.5rem]' : 'top-14'}`}>
+                    <div className={`absolute left-3 right-3 z-30 flex items-center justify-between gap-2 bg-black/80 backdrop-blur-sm border border-[#ffc94d]/40 rounded-2xl px-3.5 py-2.5 ${duoInvite ? 'top-[6.5rem]' : 'top-14'}`}>
                       <p className="text-white text-[12px] font-medium min-w-0">
-                        <span className="font-bold text-[#a8ff35]">@{gameInvite.fromUsername}</span> t'invite à jouer
+                        <span className="font-bold text-[#ffc94d]">@{gameInvite.fromUsername}</span> t'invite à jouer
                       </p>
                       <div className="flex items-center gap-1.5 shrink-0">
                         <button
                           onClick={() => { setGameDrawerOpen(true); setGameInvite(null); }}
-                          className="px-3 py-1.5 rounded-full bg-[#a8ff35] text-black text-[12px] font-semibold flex items-center gap-1"
+                          className="px-3 py-1.5 rounded-full bg-[#ffc94d] text-black text-[12px] font-semibold flex items-center gap-1"
                         >
                           <Gamepad2 size={13} /> Rejoindre
                         </button>
@@ -892,7 +892,7 @@ export default function LiveViewerPage() {
                   </div>
 
                   <div className="absolute top-3 right-3 flex items-center gap-1.5 bg-black/50 backdrop-blur-sm rounded-full px-2.5 py-1">
-                    <div className="w-5 h-5 rounded-full bg-[#a8ff35] flex items-center justify-center text-[9px] font-bold text-black shrink-0">
+                    <div className="w-5 h-5 rounded-full bg-[#ffc94d] flex items-center justify-center text-[9px] font-bold text-black shrink-0">
                       {(live.creator.displayName || live.creator.username)[0]?.toUpperCase()}
                     </div>
                     <span className="text-white text-[12px] font-semibold">{live.creator.username}</span>
@@ -902,7 +902,7 @@ export default function LiveViewerPage() {
                     <div className="absolute top-14 left-3 right-3 flex items-center justify-between bg-black/55 backdrop-blur-sm rounded-2xl px-3.5 py-2.5">
                       <div>
                         <p className="text-white/50 text-[10px] uppercase tracking-wider">Mise actuelle</p>
-                        <p className="text-[#a8ff35] font-extrabold text-[17px] leading-none">{currentBid.toFixed(2)} €</p>
+                        <p className="text-[#ffc94d] font-extrabold text-[17px] leading-none">{currentBid.toFixed(2)} €</p>
                         {currentBidderName && (
                           <p className="text-white/40 text-[10px] mt-0.5">par {currentBidderName}</p>
                         )}
@@ -960,7 +960,7 @@ export default function LiveViewerPage() {
                         className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-black/70 flex items-center justify-center"
                         title={musicMuted ? 'Activer la musique' : 'Couper la musique'}
                       >
-                        {musicMuted ? <VolumeX size={12} className="text-white" /> : <Volume2 size={12} className="text-[#a8ff35]" />}
+                        {musicMuted ? <VolumeX size={12} className="text-white" /> : <Volume2 size={12} className="text-[#ffc94d]" />}
                       </button>
                       <span className="absolute top-1 left-1 bg-black/60 rounded-full p-0.5">
                         <Music size={10} className="text-white/80" />
@@ -992,14 +992,14 @@ export default function LiveViewerPage() {
                       if (c.isBid) {
                         return (
                           <p key={c.id} className="text-[12.5px] leading-snug [text-shadow:0_1px_4px_rgba(0,0,0,0.9)]">
-                            <span className="font-bold text-[#a8ff35]">{c.username}</span>{' '}
-                            <span className="text-[#a8ff35]/90 font-medium">{c.text}</span>
+                            <span className="font-bold text-[#ffc94d]">{c.username}</span>{' '}
+                            <span className="text-[#ffc94d]/90 font-medium">{c.text}</span>
                           </p>
                         );
                       }
                       return (
                         <p key={c.id} className="text-[12.5px] leading-snug [text-shadow:0_1px_4px_rgba(0,0,0,0.9)]">
-                          <span className={`font-bold ${isHost ? 'text-[#f59e0b]' : 'text-[#a8ff35]'}`}>{c.username}</span>
+                          <span className={`font-bold ${isHost ? 'text-[#f59e0b]' : 'text-[#ffc94d]'}`}>{c.username}</span>
                           {isHost && <Crown size={10} className="inline text-[#f59e0b] mx-1 -translate-y-px" />}
                           <span className="text-white/95"> {c.text}</span>
                         </p>
@@ -1033,8 +1033,8 @@ export default function LiveViewerPage() {
                         className="relative w-11 h-11 rounded-full bg-black/40 border border-white/15 backdrop-blur-sm flex items-center justify-center"
                         title="Jeu"
                       >
-                        <Gamepad2 size={19} className="text-[#a8ff35]" />
-                        {gameActive && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#a8ff35] border-2 border-black/80" />}
+                        <Gamepad2 size={19} className="text-[#ffc94d]" />
+                        {gameActive && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#ffc94d] border-2 border-black/80" />}
                       </button>
                     )}
                     {!isOwner && !amGuest && (
@@ -1046,7 +1046,7 @@ export default function LiveViewerPage() {
                         <span
                           className={`w-11 h-11 rounded-full border backdrop-blur-sm flex items-center justify-center transition-all ${
                             duoRequestStatus === 'pending'
-                              ? 'bg-[#a8ff35] border-[#a8ff35] animate-pulse'
+                              ? 'bg-[#ffc94d] border-[#ffc94d] animate-pulse'
                               : duoRequestStatus === 'declined' || duoRequestStatus === 'error'
                               ? 'bg-red-500/70 border-red-400/60'
                               : 'bg-black/40 border-white/15'
@@ -1085,14 +1085,14 @@ export default function LiveViewerPage() {
                   <div className="mt-4 space-y-1 text-center">
                     <p className="text-white text-sm font-semibold">{activeCapsule?.name}</p>
                     {currentBidderName && (
-                      <p className="text-white/40 text-xs">Plus offrant : <span className="text-[#a8ff35] font-semibold">{currentBidderName}</span></p>
+                      <p className="text-white/40 text-xs">Plus offrant : <span className="text-[#ffc94d] font-semibold">{currentBidderName}</span></p>
                     )}
                   </div>
                 )}
 
                 {isAuction && auctionResult && (
                   <div className="mt-4 space-y-1 text-center">
-                    <p className={`text-sm font-semibold ${auctionResult.winnerId ? 'text-[#a8ff35]' : 'text-white/40'}`}>
+                    <p className={`text-sm font-semibold ${auctionResult.winnerId ? 'text-[#ffc94d]' : 'text-white/40'}`}>
                       {auctionResult.winnerId === myId
                         ? `Tu as remporté l'enchère à ${auctionResult.amount?.toFixed(2)} € 🎉`
                         : auctionResult.winnerId
@@ -1108,14 +1108,14 @@ export default function LiveViewerPage() {
               {(isOwner || gameActive) && (
                 <button
                   onClick={() => setGameDrawerOpen(true)}
-                  className="shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-[#a8ff35]/20 via-[#a8ff35]/10 to-transparent border border-[#a8ff35]/30 hover:border-[#a8ff35]/50 transition-all text-left"
+                  className="shrink-0 flex items-center gap-2 px-3.5 py-2.5 rounded-2xl bg-gradient-to-r from-[#ffc94d]/20 via-[#ffc94d]/10 to-transparent border border-[#ffc94d]/30 hover:border-[#ffc94d]/50 transition-all text-left"
                 >
-                  <span className="relative w-8 h-8 rounded-full bg-[#a8ff35]/20 flex items-center justify-center shrink-0">
-                    <Gamepad2 size={15} className="text-[#a8ff35]" />
-                    {gameActive && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#a8ff35] border-2 border-[#0d0d0f]" />}
+                  <span className="relative w-8 h-8 rounded-full bg-[#ffc94d]/20 flex items-center justify-center shrink-0">
+                    <Gamepad2 size={15} className="text-[#ffc94d]" />
+                    {gameActive && <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-[#ffc94d] border-2 border-[#341839]" />}
                   </span>
                   <span className="flex-1 min-w-0">
-                    <span className="block text-[10px] font-bold uppercase tracking-wider text-[#a8ff35]/80">Undercover</span>
+                    <span className="block text-[10px] font-bold uppercase tracking-wider text-[#ffc94d]/80">Undercover</span>
                     <span className="block text-[13px] font-semibold text-white truncate">
                       {gameActive ? 'Une partie est en cours' : 'Lancer un jeu'}
                     </span>
@@ -1138,7 +1138,7 @@ export default function LiveViewerPage() {
               </button>
 
               {topDonorsOpen && (
-                <div className="shrink-0 bg-[#0d0d0f] border border-[#f59e0b]/25 rounded-2xl p-3 max-h-64 overflow-y-auto scrollbar-hide">
+                <div className="shrink-0 bg-[#341839] border border-[#f59e0b]/25 rounded-2xl p-3 max-h-64 overflow-y-auto scrollbar-hide">
                   {topDonors.length === 0 ? (
                     <p className="text-white/30 text-xs text-center py-4">Aucun cadeau envoyé pour l&apos;instant — sois le premier à soutenir {live.creator.username} !</p>
                   ) : (
@@ -1169,7 +1169,7 @@ export default function LiveViewerPage() {
                 <button
                   onClick={() => setSidebarTab('chat')}
                   className={`flex-1 py-2.5 text-[12px] font-bold uppercase tracking-wider transition-colors border-b-2 ${
-                    sidebarTab === 'chat' ? 'border-[#a8ff35] text-white' : 'border-transparent text-white/35 hover:text-white/60'
+                    sidebarTab === 'chat' ? 'border-[#ffc94d] text-white' : 'border-transparent text-white/35 hover:text-white/60'
                   }`}
                 >
                   Commentaires
@@ -1206,19 +1206,19 @@ export default function LiveViewerPage() {
                       if (c.isBid) {
                         return (
                           <div key={c.id} className="flex items-center gap-2 text-[13px] leading-snug bg-white/[0.03] rounded-xl px-2 py-1.5">
-                            <span className="w-5 h-5 rounded-full bg-[#a8ff35]/15 flex items-center justify-center shrink-0">
-                              <Gavel size={11} className="text-[#a8ff35]" />
+                            <span className="w-5 h-5 rounded-full bg-[#ffc94d]/15 flex items-center justify-center shrink-0">
+                              <Gavel size={11} className="text-[#ffc94d]" />
                             </span>
                             <p className="min-w-0">
-                              <span className="font-semibold mr-1 text-[#a8ff35]">{c.username}</span>
-                              <span className="text-[#a8ff35]/80 break-words font-medium">{c.text}</span>
+                              <span className="font-semibold mr-1 text-[#ffc94d]">{c.username}</span>
+                              <span className="text-[#ffc94d]/80 break-words font-medium">{c.text}</span>
                             </p>
                           </div>
                         );
                       }
                       return (
                         <div key={c.id} className="text-[13px] leading-snug">
-                          <span className={`font-semibold mr-1 ${isHost ? 'text-[#f59e0b]' : 'text-[#a8ff35]'}`}>{c.username}</span>
+                          <span className={`font-semibold mr-1 ${isHost ? 'text-[#f59e0b]' : 'text-[#ffc94d]'}`}>{c.username}</span>
                           {isHost && <Crown size={11} className="inline text-[#f59e0b] mr-1 -translate-y-px" />}
                           <span className="text-white/80 break-words">{c.text}</span>
                         </div>
@@ -1237,10 +1237,10 @@ export default function LiveViewerPage() {
                         value={commentInput}
                         onChange={(e) => setCommentInput(e.target.value)}
                         placeholder="Commenter…"
-                        className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-full px-3.5 py-2 text-white placeholder:text-white/25 text-[13px] focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 transition-all"
+                        className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-full px-3.5 py-2 text-white placeholder:text-white/25 text-[13px] focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 transition-all"
                       />
                       <button type="submit" className="w-9 h-9 rounded-full bg-white/[0.06] hover:bg-white/10 flex items-center justify-center shrink-0 transition-all">
-                        <Send size={14} className="text-[#a8ff35]" />
+                        <Send size={14} className="text-[#ffc94d]" />
                       </button>
                     </form>
                   )}
@@ -1334,7 +1334,7 @@ export default function LiveViewerPage() {
 
       {bidOpen && isAuction && (
         <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/70 backdrop-blur-sm">
-          <div className="w-full max-w-md bg-[#0d0d0f] border-t border-x border-white/[0.08] rounded-t-[24px] p-5">
+          <div className="w-full max-w-md bg-[#341839] border-t border-x border-white/[0.08] rounded-t-[24px] p-5">
             <div className="flex justify-center mb-3">
               <div className="w-10 h-1 rounded-full bg-white/20" />
             </div>
@@ -1352,7 +1352,7 @@ export default function LiveViewerPage() {
 
             <div className="bg-white/[0.04] border border-white/[0.08] rounded-2xl p-4 mb-4 text-center">
               <p className="text-[11px] text-white/40 uppercase tracking-wider mb-1">Mise actuelle</p>
-              <p className="text-[32px] font-extrabold text-[#a8ff35]">{currentBid.toFixed(2)} €</p>
+              <p className="text-[32px] font-extrabold text-[#ffc94d]">{currentBid.toFixed(2)} €</p>
               {currentBidderName && (
                 <p className="text-white/40 text-xs mt-1">par <span className="text-white/70 font-medium">{currentBidderName}</span></p>
               )}
@@ -1367,7 +1367,7 @@ export default function LiveViewerPage() {
                 <button
                   key={step}
                   onClick={() => placeBid(currentBid + step)}
-                  className="py-3 rounded-xl bg-white/[0.06] border border-white/10 text-white font-semibold text-sm hover:bg-[#a8ff35]/15 hover:border-[#a8ff35]/40 hover:text-[#a8ff35] transition-all"
+                  className="py-3 rounded-xl bg-white/[0.06] border border-white/10 text-white font-semibold text-sm hover:bg-[#ffc94d]/15 hover:border-[#ffc94d]/40 hover:text-[#ffc94d] transition-all"
                 >
                   +{step}€
                 </button>
@@ -1380,7 +1380,7 @@ export default function LiveViewerPage() {
                 placeholder={`Montant libre (min ${minNextBid.toFixed(0)}€)`}
                 value={bidCustom}
                 onChange={(e) => setBidCustom(e.target.value)}
-                className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/25 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/25 text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30 transition-all"
               />
               <button
                 onClick={() => {
@@ -1420,7 +1420,7 @@ export default function LiveViewerPage() {
           className="md:hidden fixed inset-0 z-[9999] flex items-end bg-black/70 backdrop-blur-sm"
           onClick={() => setTopDonorsOpen(false)}
         >
-          <div className="w-full bg-[#0d0d0f] border-t border-[#f59e0b]/25 rounded-t-[24px] p-5 max-h-[75vh] overflow-y-auto scrollbar-hide" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full bg-[#341839] border-t border-[#f59e0b]/25 rounded-t-[24px] p-5 max-h-[75vh] overflow-y-auto scrollbar-hide" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-center mb-3">
               <div className="w-10 h-1 rounded-full bg-white/20" />
             </div>
@@ -1463,7 +1463,7 @@ export default function LiveViewerPage() {
           className="md:hidden fixed inset-0 z-[9999] flex items-end bg-black/70 backdrop-blur-sm"
           onClick={() => setMobileChatOpen(false)}
         >
-          <div className="w-full bg-[#0d0d0f] border-t border-white/[0.08] rounded-t-[24px] h-[75vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full bg-[#341839] border-t border-white/[0.08] rounded-t-[24px] h-[75vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-center pt-3 pb-1 shrink-0">
               <div className="w-10 h-1 rounded-full bg-white/20" />
             </div>
@@ -1490,19 +1490,19 @@ export default function LiveViewerPage() {
                 if (c.isBid) {
                   return (
                     <div key={c.id} className="flex items-center gap-2 text-[13px] leading-snug bg-white/[0.03] rounded-xl px-2 py-1.5">
-                      <span className="w-5 h-5 rounded-full bg-[#a8ff35]/15 flex items-center justify-center shrink-0">
-                        <Gavel size={11} className="text-[#a8ff35]" />
+                      <span className="w-5 h-5 rounded-full bg-[#ffc94d]/15 flex items-center justify-center shrink-0">
+                        <Gavel size={11} className="text-[#ffc94d]" />
                       </span>
                       <p className="min-w-0">
-                        <span className="font-semibold mr-1 text-[#a8ff35]">{c.username}</span>
-                        <span className="text-[#a8ff35]/80 break-words font-medium">{c.text}</span>
+                        <span className="font-semibold mr-1 text-[#ffc94d]">{c.username}</span>
+                        <span className="text-[#ffc94d]/80 break-words font-medium">{c.text}</span>
                       </p>
                     </div>
                   );
                 }
                 return (
                   <p key={c.id} className="text-[13px] leading-snug">
-                    <span className={`font-semibold mr-1 ${isHost ? 'text-[#f59e0b]' : 'text-[#a8ff35]'}`}>{c.username}</span>
+                    <span className={`font-semibold mr-1 ${isHost ? 'text-[#f59e0b]' : 'text-[#ffc94d]'}`}>{c.username}</span>
                     {isHost && <Crown size={11} className="inline text-[#f59e0b] mr-1 -translate-y-px" />}
                     <span className="text-white/80 break-words">{c.text}</span>
                   </p>
@@ -1521,10 +1521,10 @@ export default function LiveViewerPage() {
                     value={commentInput}
                     onChange={(e) => setCommentInput(e.target.value)}
                     placeholder="Commenter…"
-                    className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-full px-3.5 py-2.5 text-white placeholder:text-white/25 text-[13px] focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 transition-all"
+                    className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-full px-3.5 py-2.5 text-white placeholder:text-white/25 text-[13px] focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 transition-all"
                   />
                   <button type="submit" className="w-10 h-10 rounded-full bg-white/[0.06] hover:bg-white/10 flex items-center justify-center shrink-0 transition-all">
-                    <Send size={16} className="text-[#a8ff35]" />
+                    <Send size={16} className="text-[#ffc94d]" />
                   </button>
                 </form>
               )}
@@ -1538,7 +1538,7 @@ export default function LiveViewerPage() {
           className="md:hidden fixed inset-0 z-[9999] flex items-end bg-black/70 backdrop-blur-sm"
           onClick={() => setMobileGiftsOpen(false)}
         >
-          <div className="w-full bg-[#0d0d0f] border-t border-[#f59e0b]/25 rounded-t-[24px] max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full bg-[#341839] border-t border-[#f59e0b]/25 rounded-t-[24px] max-h-[80vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
             <div className="flex justify-center pt-3 pb-1 shrink-0">
               <div className="w-10 h-1 rounded-full bg-white/20" />
             </div>
@@ -1626,7 +1626,7 @@ export default function LiveViewerPage() {
       {viewersPanelOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
           onClick={() => { setViewersPanelOpen(false); setOpenViewerMenuId(null); }}>
-          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="w-full max-w-sm bg-[#341839] border border-white/[0.08] rounded-[20px] p-5" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-white font-bold text-base flex items-center gap-2">
                 <Users size={16} /> Spectateurs
@@ -1690,7 +1690,7 @@ export default function LiveViewerPage() {
 
       {kickedMessage && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/85 backdrop-blur-sm px-4">
-          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-6 text-center">
+          <div className="w-full max-w-sm bg-[#341839] border border-white/[0.08] rounded-[20px] p-6 text-center">
             <div className="w-11 h-11 mx-auto rounded-full bg-red-500/15 border border-red-500/30 flex items-center justify-center mb-3">
               <AlertTriangle size={18} className="text-red-400" />
             </div>

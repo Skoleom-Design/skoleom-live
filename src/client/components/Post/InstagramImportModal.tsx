@@ -100,7 +100,7 @@ export function InstagramImportModal({ open, onClose, onImported }: Props) {
       <div className="cosmic-modal w-full max-w-lg max-h-[85vh] flex flex-col overflow-hidden border border-white/[0.08] rounded-[20px] p-5">
         <div className="flex items-center justify-between mb-5 shrink-0">
           <div className="flex items-center gap-2">
-            <InstagramIcon size={18} className="text-[#a8ff35]" />
+            <InstagramIcon size={18} className="text-[#ffc94d]" />
             <h2 className="text-white font-bold text-base">Importer depuis Instagram</h2>
           </div>
           <button onClick={onClose}
@@ -154,7 +154,7 @@ export function InstagramImportModal({ open, onClose, onImported }: Props) {
                         onClick={() => toggle(m.id)}
                         disabled={phase === 'importing'}
                         className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
-                          isSelected ? 'border-[#a8ff35]' : 'border-transparent'
+                          isSelected ? 'border-[#ffc94d]' : 'border-transparent'
                         }`}
                       >
                         {thumb ? (
@@ -176,7 +176,7 @@ export function InstagramImportModal({ open, onClose, onImported }: Props) {
                         )}
                         {isSelected && (
                           <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                            <div className="w-6 h-6 rounded-full bg-[#a8ff35] flex items-center justify-center">
+                            <div className="w-6 h-6 rounded-full bg-[#ffc94d] flex items-center justify-center">
                               <Check size={13} strokeWidth={3} className="text-black" />
                             </div>
                           </div>

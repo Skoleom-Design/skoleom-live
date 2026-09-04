@@ -145,7 +145,7 @@ export default function FeedPage() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder={t('explore.searchPlaceholder')}
-                className="w-full bg-white/[0.05] border border-white/[0.08] rounded-full pl-11 pr-4 py-3 text-white placeholder:text-white/25 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                className="w-full bg-white/[0.05] border border-white/[0.08] rounded-full pl-11 pr-4 py-3 text-white placeholder:text-white/25 text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30 transition-all"
               />
             </div>
 
@@ -175,7 +175,7 @@ export default function FeedPage() {
                             <div className="min-w-0">
                               <div className="flex items-center gap-1">
                                 <p className="text-white text-[13px] font-semibold truncate">{u.displayName || u.username}</p>
-                                {u.isVerified && <BadgeCheck size={13} className="text-[#a8ff35] shrink-0" />}
+                                {u.isVerified && <BadgeCheck size={13} className="text-[#ffc94d] shrink-0" />}
                               </div>
                               <p className="text-white/35 text-xs truncate">@{u.username}</p>
                             </div>
@@ -230,7 +230,7 @@ export default function FeedPage() {
                           key={post.id}
                           href={`/post/${post.id}`}
                           className={`relative aspect-square bg-white/[0.04] overflow-hidden group ${
-                            post.isBoosted ? 'ring-2 ring-[#a8ff35]/60' : ''
+                            post.isBoosted ? 'ring-2 ring-[#ffc94d]/60' : ''
                           }`}
                         >
                           {post.thumbnailUrl || post.type === 'photo' ? (

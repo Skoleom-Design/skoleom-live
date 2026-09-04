@@ -29,8 +29,8 @@ export function AppGateScreen() {
   return (
     <div className="fixed inset-0 z-[100] cosmic-bg flex flex-col items-center justify-center px-6 py-10 overflow-y-auto animate-fade-in">
       {/* Orbes d'ambiance — meme traitement que le reste de l'app */}
-      <div className="cosmic-orb w-64 h-64 bg-[#a8ff35]/[0.08] -top-16 -left-16 animate-float" style={{ animationDelay: '0s' }} />
-      <div className="cosmic-orb w-56 h-56 bg-[#00ffff]/[0.06] bottom-0 right-0 animate-float" style={{ animationDelay: '-4s' }} />
+      <div className="cosmic-orb w-64 h-64 bg-[#ffc94d]/[0.08] -top-16 -left-16 animate-float" style={{ animationDelay: '0s' }} />
+      <div className="cosmic-orb w-56 h-56 bg-[#ff5470]/[0.06] bottom-0 right-0 animate-float" style={{ animationDelay: '-4s' }} />
 
       <div className="relative w-full max-w-sm text-center my-auto">
         <div className="flex justify-center mb-5">
@@ -60,7 +60,7 @@ export function AppGateScreen() {
         <div className="flex items-center gap-3 p-3.5 rounded-2xl bg-white/[0.03] border border-white/[0.07]">
           <div className="relative w-12 h-12 rounded-xl bg-white flex items-center justify-center shrink-0">
             <QrCode size={30} strokeWidth={1.3} className="text-black/85" />
-            <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#a8ff35] flex items-center justify-center">
+            <div className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-[#ffc94d] flex items-center justify-center">
               <Sparkles size={9} className="text-black" />
             </div>
           </div>

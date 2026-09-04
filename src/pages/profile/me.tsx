@@ -36,7 +36,7 @@ interface MeUser {
 
 const PLAN_BADGE: Record<PlanKey, { label: string; color: string }> = {
   free: { label: 'Free', color: 'rgba(255,255,255,0.5)' },
-  premium: { label: 'Premium', color: '#00ffff' },
+  premium: { label: 'Premium', color: '#ff5470' },
   ultra: { label: 'Ultra', color: '#f59e0b' },
 };
 
@@ -682,7 +682,7 @@ export default function ProfilePage() {
     return (
       <div className="flex h-screen flex-col items-center justify-center gap-3 bg-black text-white/60">
         <p>{error || 'Profil introuvable.'}</p>
-        <Link href="/auth/login" className="text-[#a8ff35] underline text-sm">Se reconnecter</Link>
+        <Link href="/auth/login" className="text-[#ffc94d] underline text-sm">Se reconnecter</Link>
       </div>
     );
   }
@@ -707,7 +707,7 @@ export default function ProfilePage() {
 
             {/* Profile header */}
             <div className="flex items-center gap-6 mb-8">
-              <div className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-extrabold text-black shrink-0 bg-gradient-to-br from-[#a8ff35] to-[#6fe600] overflow-hidden">
+              <div className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-extrabold text-black shrink-0 bg-gradient-to-br from-[#ffc94d] to-[#ff5470] overflow-hidden">
                 {user.avatarUrl ? (
                   <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
                 ) : (
@@ -750,7 +750,7 @@ export default function ProfilePage() {
                     title={t('profile.boostAccount')}
                     className="w-9 h-9 rounded-full border border-white/10 hover:bg-white/10 flex items-center justify-center transition-all"
                   >
-                    <Zap size={15} className="text-[#a8ff35]" />
+                    <Zap size={15} className="text-[#ffc94d]" />
                   </button>
                   <button
                     onClick={() => setSettingsOpen(true)}
@@ -801,7 +801,7 @@ export default function ProfilePage() {
                   {analytics.posts.map((post) => (
                     <div key={post.id} className="relative aspect-square group">
                       {/* Bordure degradee cyan/lime — meme traitement que sur /post/[id] et le studio */}
-                      <div className="absolute inset-0 rounded-lg p-[1.5px] bg-gradient-to-br from-[#00ffff]/50 via-[#a8ff35]/45 to-[#00ffff]/15">
+                      <div className="absolute inset-0 rounded-lg p-[1.5px] bg-gradient-to-br from-[#ff5470]/50 via-[#ffc94d]/45 to-[#ff5470]/15">
                         <div className="w-full h-full rounded-lg overflow-hidden bg-white/[0.04]">
                           <Link href={`/post/${post.id}`} className="block w-full h-full">
                             {post.thumbnailUrl || post.type === 'photo' ? (
@@ -817,7 +817,7 @@ export default function ProfilePage() {
                         title={t('profile.boostPost')}
                         className="absolute top-1.5 right-1.5 w-7 h-7 rounded-full bg-black/60 backdrop-blur-sm border border-white/10 flex items-center justify-center opacity-0 group-hover:opacity-100 hover:bg-black/80 transition-all"
                       >
-                        <Zap size={13} className="text-[#a8ff35]" />
+                        <Zap size={13} className="text-[#ffc94d]" />
                       </button>
                       <div
                         className={`absolute top-1.5 left-1.5 transition-opacity ${
@@ -832,7 +832,7 @@ export default function ProfilePage() {
                           <MoreVertical size={13} className="text-white" />
                         </button>
                         {openMenuPostId === post.id && (
-                          <div className="absolute top-9 left-0 w-44 bg-[#0d0d0f] border border-white/[0.08] rounded-xl shadow-xl overflow-hidden">
+                          <div className="absolute top-9 left-0 w-44 bg-[#341839] border border-white/[0.08] rounded-xl shadow-xl overflow-hidden">
                             <button
                               onClick={() => openEditPost(post)}
                               className="w-full flex items-center gap-2 px-3.5 py-2.5 text-[13px] text-white hover:bg-white/[0.08] transition-all"
@@ -871,7 +871,7 @@ export default function ProfilePage() {
                           disabled={planSaving}
                           className={`text-left p-4 rounded-[16px] border transition-all disabled:opacity-60 ${
                             active
-                              ? 'border-[#a8ff35] bg-[#a8ff35]/10 shadow-glow-lime-sm'
+                              ? 'border-[#ffc94d] bg-[#ffc94d]/10 shadow-glow-lime-sm'
                               : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06]'
                           }`}
                         >
@@ -882,7 +882,7 @@ export default function ProfilePage() {
                             >
                               {PLAN_BADGE[p.key].label}
                             </span>
-                            {active && <span className="text-[10px] font-bold text-[#a8ff35]">{t('profile.current')}</span>}
+                            {active && <span className="text-[10px] font-bold text-[#ffc94d]">{t('profile.current')}</span>}
                           </div>
                           <p className="text-[12px] text-white/40 mb-2">{p.price}{t('profile.perMonth')}</p>
                           <ul className="space-y-1">
@@ -914,7 +914,7 @@ export default function ProfilePage() {
                     {capsuleGroups.map((group) => (
                     <div key={group.key} className="bg-white/[0.03] border border-white/[0.07] rounded-[16px] p-3 space-y-2">
                       {group.name && (
-                        <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#a8ff35] px-1">
+                        <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#ffc94d] px-1">
                           Capsule · {group.name}
                         </p>
                       )}
@@ -1073,7 +1073,7 @@ export default function ProfilePage() {
                             <button
                               onClick={() => handleMarkDelivered(o.id)}
                               disabled={deliveringId === o.id}
-                              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#a8ff35] text-black text-[11px] font-bold hover:brightness-110 disabled:opacity-50 transition-all"
+                              className="shrink-0 flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#ffc94d] text-black text-[11px] font-bold hover:brightness-110 disabled:opacity-50 transition-all"
                             >
                               {deliveringId === o.id ? <Loader2 size={12} className="animate-spin" /> : <Truck size={12} />}
                               {t('profile.markDelivered')}
@@ -1118,7 +1118,7 @@ export default function ProfilePage() {
                   <button
                     onClick={() => setStatsView('creator')}
                     className={`flex-1 py-2 rounded-full text-[13px] font-semibold border transition-all ${
-                      statsView === 'creator' ? 'bg-[#a8ff35] text-black border-[#a8ff35]' : 'bg-white/[0.04] text-white/60 border-white/10 hover:border-white/25'
+                      statsView === 'creator' ? 'bg-[#ffc94d] text-black border-[#ffc94d]' : 'bg-white/[0.04] text-white/60 border-white/10 hover:border-white/25'
                     }`}
                   >
                     {t('profile.statsCreator')}
@@ -1126,7 +1126,7 @@ export default function ProfilePage() {
                   <button
                     onClick={() => setStatsView('buyer')}
                     className={`flex-1 py-2 rounded-full text-[13px] font-semibold border transition-all ${
-                      statsView === 'buyer' ? 'bg-[#a8ff35] text-black border-[#a8ff35]' : 'bg-white/[0.04] text-white/60 border-white/10 hover:border-white/25'
+                      statsView === 'buyer' ? 'bg-[#ffc94d] text-black border-[#ffc94d]' : 'bg-white/[0.04] text-white/60 border-white/10 hover:border-white/25'
                     }`}
                   >
                     {t('profile.statsBuyer')}
@@ -1167,17 +1167,17 @@ export default function ProfilePage() {
                       const totalSpent = buyerStats?.totalSpent ?? 0;
                       const { next, progress, remaining } = getSpendProgress(totalSpent);
                       return (
-                        <div className="bg-gradient-to-r from-[#a8ff35]/10 to-[#6fe600]/5 border border-[#a8ff35]/20 rounded-[16px] p-4">
+                        <div className="bg-gradient-to-r from-[#ffc94d]/10 to-[#ff5470]/5 border border-[#ffc94d]/20 rounded-[16px] p-4">
                           <div className="flex items-center justify-between mb-2">
                             <p className="text-[13px] font-bold text-white flex items-center gap-1.5">
-                              <Gift size={14} className="text-[#a8ff35]" />
+                              <Gift size={14} className="text-[#ffc94d]" />
                               {next ? t('profile.nextReward', { reward: next.reward }) : t('profile.allRewardsUnlocked')}
                             </p>
                             <p className="text-[12px] text-white/40">{totalSpent.toFixed(2)} €</p>
                           </div>
                           <div className="w-full h-2 rounded-full bg-white/[0.06] overflow-hidden">
                             <div
-                              className="h-full bg-gradient-to-r from-[#a8ff35] to-[#6fe600] rounded-full transition-all"
+                              className="h-full bg-gradient-to-r from-[#ffc94d] to-[#ff5470] rounded-full transition-all"
                               style={{ width: `${progress}%` }}
                             />
                           </div>
@@ -1224,8 +1224,8 @@ export default function ProfilePage() {
                           ) : (
                             <span className="text-white/70 text-xs font-bold">{n.actor.username[0]?.toUpperCase()}</span>
                           )}
-                          <span className="absolute -bottom-1 -right-1 w-4.5 h-4.5 rounded-full bg-[#0d0d0f] border border-white/10 flex items-center justify-center">
-                            <Icon size={9} className="text-[#a8ff35]" />
+                          <span className="absolute -bottom-1 -right-1 w-4.5 h-4.5 rounded-full bg-[#341839] border border-white/10 flex items-center justify-center">
+                            <Icon size={9} className="text-[#ffc94d]" />
                           </span>
                         </div>
                         <p className="flex-1 text-[13px] text-white/85 leading-snug">
@@ -1235,7 +1235,7 @@ export default function ProfilePage() {
                         {(n.post?.thumbnailUrl || n.post?.mediaUrl) && (
                           <img src={n.post.thumbnailUrl || n.post.mediaUrl} alt="" className="w-9 h-9 rounded-lg object-cover shrink-0" />
                         )}
-                        {!n.read && <span className="w-2 h-2 rounded-full bg-[#a8ff35] shrink-0" />}
+                        {!n.read && <span className="w-2 h-2 rounded-full bg-[#ffc94d] shrink-0" />}
                       </Link>
                     );
                   })}
@@ -1270,7 +1270,7 @@ export default function ProfilePage() {
                 <button
                   type="button"
                   onClick={() => setAvatarMenuOpen((o) => !o)}
-                  className="relative w-20 h-20 rounded-full overflow-hidden bg-gradient-to-br from-[#a8ff35] to-[#6fe600] flex items-center justify-center text-2xl font-extrabold text-black"
+                  className="relative w-20 h-20 rounded-full overflow-hidden bg-gradient-to-br from-[#ffc94d] to-[#ff5470] flex items-center justify-center text-2xl font-extrabold text-black"
                 >
                   {editAvatarPreview ? (
                     <img src={editAvatarPreview} alt="" className="w-full h-full object-cover" />
@@ -1280,14 +1280,14 @@ export default function ProfilePage() {
                   <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
                     <Camera size={20} className="text-white" />
                   </div>
-                  <div className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-[#a8ff35] border-2 border-[#0d0d0f] flex items-center justify-center">
+                  <div className="absolute bottom-0 right-0 w-6 h-6 rounded-full bg-[#ffc94d] border-2 border-[#341839] flex items-center justify-center">
                     <Camera size={11} className="text-black" />
                   </div>
                 </button>
                 <button
                   type="button"
                   onClick={() => setAvatarMenuOpen((o) => !o)}
-                  className="text-xs text-[#a8ff35] font-semibold hover:underline"
+                  className="text-xs text-[#ffc94d] font-semibold hover:underline"
                 >
                   {t('profile.changePhoto')}
                 </button>
@@ -1331,7 +1331,7 @@ export default function ProfilePage() {
                   value={editDisplayName}
                   onChange={(e) => setEditDisplayName(e.target.value)}
                   placeholder={user.username}
-                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30 transition-all"
                 />
               </div>
 
@@ -1344,7 +1344,7 @@ export default function ProfilePage() {
                   onChange={(e) => setEditBio(e.target.value)}
                   placeholder={t('profile.bioPlaceholder')}
                   rows={3}
-                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all resize-none"
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30 transition-all resize-none"
                 />
               </div>
 
@@ -1403,11 +1403,11 @@ export default function ProfilePage() {
                   <select
                     value={newCapsulePostId}
                     onChange={(e) => setNewCapsulePostId(e.target.value)}
-                    className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                    className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30 transition-all"
                   >
-                    <option value="" className="bg-[#0d0d0f]">{t('studio.noPost')}</option>
+                    <option value="" className="bg-[#341839]">{t('studio.noPost')}</option>
                     {analytics.posts.map((p) => (
-                      <option key={p.id} value={p.id} className="bg-[#0d0d0f]">
+                      <option key={p.id} value={p.id} className="bg-[#341839]">
                         {p.caption || `Post ${p.id.slice(0, 8)}`}
                       </option>
                     ))}
@@ -1489,7 +1489,7 @@ export default function ProfilePage() {
                   min="1"
                   value={topupAmount}
                   onChange={(e) => setTopupAmount(e.target.value)}
-                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30 transition-all"
                 />
               </div>
 
@@ -1506,7 +1506,7 @@ export default function ProfilePage() {
                       value={cardNumber}
                       onChange={(e) => setCardNumber(e.target.value)}
                       maxLength={19}
-                      className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                      className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30 transition-all"
                     />
                   </div>
                   <div className="flex gap-3">
@@ -1520,7 +1520,7 @@ export default function ProfilePage() {
                         value={cardExpiry}
                         onChange={(e) => setCardExpiry(e.target.value)}
                         maxLength={5}
-                        className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                        className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30 transition-all"
                       />
                     </div>
                     <div className="flex-1">
@@ -1534,7 +1534,7 @@ export default function ProfilePage() {
                         value={cardCvc}
                         onChange={(e) => setCardCvc(e.target.value)}
                         maxLength={3}
-                        className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                        className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30 transition-all"
                       />
                     </div>
                   </div>
@@ -1586,7 +1586,7 @@ export default function ProfilePage() {
                   min="1"
                   value={withdrawAmount}
                   onChange={(e) => setWithdrawAmount(e.target.value)}
-                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30 transition-all"
                 />
               </div>
               {withdrawError && (
@@ -1665,7 +1665,7 @@ export default function ProfilePage() {
                   <input ref={editFileInputRef} type="file" accept="image/*,video/*" onChange={onEditFileChange} className="hidden" />
                 </div>
                 {editPreview && (
-                  <p className="text-[11px] text-[#a8ff35] mt-1.5">{t('profile.newMediaReady')}</p>
+                  <p className="text-[11px] text-[#ffc94d] mt-1.5">{t('profile.newMediaReady')}</p>
                 )}
                 <CameraCaptureModal open={editCameraOpen} onClose={() => setEditCameraOpen(false)} onCapture={applyEditFile} />
               </div>
@@ -1677,7 +1677,7 @@ export default function ProfilePage() {
                   value={editCaption}
                   onChange={(e) => setEditCaption(e.target.value)}
                   rows={3}
-                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm resize-none focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                  className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white text-sm resize-none focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30 transition-all"
                 />
               </div>
               <div>
@@ -1703,7 +1703,7 @@ export default function ProfilePage() {
                     onChange={(e) => setEditTagInput(e.target.value)}
                     onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addEditTag(); } }}
                     placeholder={t('studio.addTagPlaceholder')}
-                    className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all"
+                    className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30 transition-all"
                   />
                   <button
                     type="button"
@@ -1852,7 +1852,7 @@ export default function ProfilePage() {
                     onClick={() => (l.code === 'fr' || l.code === 'en' ? setLanguage(l.code) : showComingSoon(l.label))}
                     className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all ${
                       l.code === language
-                        ? 'bg-[#a8ff35]/10 text-[#a8ff35]'
+                        ? 'bg-[#ffc94d]/10 text-[#ffc94d]'
                         : 'text-white/50 hover:bg-white/[0.05] hover:text-white/80'
                     }`}
                   >

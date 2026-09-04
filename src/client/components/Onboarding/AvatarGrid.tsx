@@ -19,7 +19,7 @@ export function AvatarGrid({ options, value, onChange }: AvatarGridProps) {
             type="button"
             onClick={() => onChange(url)}
             className={`relative aspect-square rounded-full overflow-hidden border-2 transition-all active:scale-95 ${
-              active ? 'border-[#a8ff35] shadow-glow-lime-sm' : 'border-white/10 hover:border-white/30'
+              active ? 'border-[#ffc94d] shadow-glow-lime-sm' : 'border-white/10 hover:border-white/30'
             }`}
           >
             <img src={url} alt="" className="w-full h-full object-cover" />

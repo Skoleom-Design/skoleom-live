@@ -94,7 +94,7 @@ export function AvatarCategoryPicker({ cosmicOptions, value, onChange }: AvatarC
                 onClick={() => setCategory(tabItem.key)}
                 className={`shrink-0 px-3.5 py-2 rounded-full text-[12.5px] font-semibold border transition-all ${
                   category === tabItem.key
-                    ? 'bg-[#a8ff35] text-black border-[#a8ff35]'
+                    ? 'bg-[#ffc94d] text-black border-[#ffc94d]'
                     : 'bg-white/[0.04] text-white/60 border-white/10 hover:border-white/25'
                 }`}
               >

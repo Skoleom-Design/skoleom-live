@@ -105,11 +105,11 @@ function DesktopSidebar({
   return (
     <aside className="cosmic-bg relative hidden md:flex flex-col w-[272px] h-full px-3 py-5 shrink-0 overflow-hidden">
       {/* Bordure droite en filet degrade, au lieu d'un trait plat */}
-      <div className="absolute top-0 right-0 bottom-0 w-px bg-gradient-to-b from-transparent via-[#a8ff35]/25 to-transparent" />
+      <div className="absolute top-0 right-0 bottom-0 w-px bg-gradient-to-b from-transparent via-[#ffc94d]/25 to-transparent" />
 
       {/* Orbes d'ambiance — tres discrets, juste pour donner de la profondeur au fond */}
-      <div className="cosmic-orb w-24 h-24 bg-[#00ffff]/10 -top-6 -right-10 animate-float" style={{ animationDelay: '0s' }} />
-      <div className="cosmic-orb w-20 h-20 bg-[#faee21]/[0.06] bottom-16 -left-8 animate-float" style={{ animationDelay: '-3s' }} />
+      <div className="cosmic-orb w-24 h-24 bg-[#ff5470]/10 -top-6 -right-10 animate-float" style={{ animationDelay: '0s' }} />
+      <div className="cosmic-orb w-20 h-20 bg-[#ffc94d]/[0.06] bottom-16 -left-8 animate-float" style={{ animationDelay: '-3s' }} />
 
       <div className="relative px-3 pb-7 pt-2 flex items-center gap-2.5">
         <div className="relative shrink-0">
@@ -208,7 +208,7 @@ function MobileNavBar({
         const iconEl = (
           <span className="relative w-7 h-7 rounded-full flex items-center justify-center">
             {item.avatarUrl ? (
-              <span className={`w-full h-full rounded-full overflow-hidden ${isActive ? 'ring-2 ring-[#a8ff35]' : 'ring-1 ring-white/20'}`}>
+              <span className={`w-full h-full rounded-full overflow-hidden ${isActive ? 'ring-2 ring-[#ffc94d]' : 'ring-1 ring-white/20'}`}>
                 <img src={item.avatarUrl} alt="" className="w-full h-full object-cover" />
               </span>
             ) : (
@@ -217,7 +217,7 @@ function MobileNavBar({
                 strokeWidth={isActive ? 2.5 : 1.75}
                 fill={isActive ? 'currentColor' : 'none'}
                 fillOpacity={isActive ? 0.15 : undefined}
-                className={disabled ? 'text-white/25' : isActive ? 'text-[#a8ff35]' : 'text-white/70'}
+                className={disabled ? 'text-white/25' : isActive ? 'text-[#ffc94d]' : 'text-white/70'}
               />
             )}
             {(item.badge ?? 0) > 0 && (

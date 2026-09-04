@@ -63,10 +63,10 @@ export interface CapsuleProductFormHandle {
   getProducts: () => CapsuleProductInput[] | null;
 }
 
-const fieldClass = 'w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30 transition-all';
+const fieldClass = 'w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30 transition-all';
 const chipClass = (active: boolean) =>
   `px-3.5 py-2 rounded-[10px] text-xs font-medium transition-all duration-150 border ${
-    active ? 'bg-[#a8ff35] text-black border-[#a8ff35]' : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08] hover:border-white/20'
+    active ? 'bg-[#ffc94d] text-black border-[#ffc94d]' : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08] hover:border-white/20'
   }`;
 
 export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle>(function CapsuleProductForm(_props, ref) {
@@ -193,7 +193,7 @@ export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle>(function 
     <div className="space-y-4">
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2">
-          {t('capsuleForm.capsuleName')} <span className="text-[#a8ff35]">*</span>
+          {t('capsuleForm.capsuleName')} <span className="text-[#ffc94d]">*</span>
         </p>
         <input
           type="text"
@@ -246,7 +246,7 @@ export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle>(function 
       {/* Demarcation claire : chaque produit est numerote, comme une fiche d'article separee
           (inspire du flow d'ajout d'articles de Whatnot avant un live). */}
       <div className="flex items-center gap-3 pt-2">
-        <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#a8ff35] whitespace-nowrap">
+        <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#ffc94d] whitespace-nowrap">
           {t('capsuleForm.productNumber', { n: products.length + 1 })}
         </span>
         <div className="flex-1 h-px bg-white/10" />
@@ -419,7 +419,7 @@ export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle>(function 
                 onClick={() => toggleColor(c.name)}
                 title={colorLabel(t, c.name)}
                 className={`relative w-9 h-9 rounded-full transition-all duration-150 ${
-                  isSelected ? 'ring-2 ring-[#a8ff35] ring-offset-2 ring-offset-[#050505]' : 'ring-1 ring-white/15 hover:ring-white/35'
+                  isSelected ? 'ring-2 ring-[#ffc94d] ring-offset-2 ring-offset-[#1c0c21]' : 'ring-1 ring-white/15 hover:ring-white/35'
                 }`}
                 style={{ background: c.swatch }}
               >

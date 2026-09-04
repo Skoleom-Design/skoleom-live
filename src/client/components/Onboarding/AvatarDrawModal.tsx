@@ -11,8 +11,8 @@ interface Props {
 }
 
 const SIZE = 320;
-const BACKGROUNDS = ['#ffffff', '#0d0d0f', '#a8ff35', '#6fe600', '#00ffff', '#faee21'];
-const COLORS = ['#000000', '#ffffff', '#a8ff35', '#00ffff', '#faee21', '#ff4d6d', '#4d7dff', '#ff9f4d'];
+const BACKGROUNDS = ['#ffffff', '#341839', '#ffc94d', '#ff5470', '#ff5470', '#ffc94d'];
+const COLORS = ['#000000', '#ffffff', '#ffc94d', '#ff5470', '#ffc94d', '#ff4d6d', '#4d7dff', '#ff9f4d'];
 const BRUSH_SIZES = [3, 8, 16];
 
 // Atelier de dessin — canvas libre pour se creer un avatar entierement personnalise, en plus
@@ -174,7 +174,7 @@ export function AvatarDrawModal({ open, onClose, onSave }: Props) {
               key={bg}
               type="button"
               onClick={() => fillBackground(bg)}
-              className={`w-7 h-7 rounded-full border-2 transition-all ${background === bg ? 'border-[#a8ff35] scale-110' : 'border-white/15'}`}
+              className={`w-7 h-7 rounded-full border-2 transition-all ${background === bg ? 'border-[#ffc94d] scale-110' : 'border-white/15'}`}
               style={{ backgroundColor: bg }}
             />
           ))}
@@ -187,7 +187,7 @@ export function AvatarDrawModal({ open, onClose, onSave }: Props) {
               key={c}
               type="button"
               onClick={() => { setColor(c); setErasing(false); }}
-              className={`w-7 h-7 rounded-full border-2 transition-all ${!erasing && color === c ? 'border-[#a8ff35] scale-110' : 'border-white/15'}`}
+              className={`w-7 h-7 rounded-full border-2 transition-all ${!erasing && color === c ? 'border-[#ffc94d] scale-110' : 'border-white/15'}`}
               style={{ backgroundColor: c }}
             />
           ))}
@@ -201,7 +201,7 @@ export function AvatarDrawModal({ open, onClose, onSave }: Props) {
                 type="button"
                 onClick={() => setBrushSize(s)}
                 className={`w-9 h-9 rounded-full border flex items-center justify-center transition-all ${
-                  brushSize === s ? 'border-[#a8ff35] bg-white/[0.06]' : 'border-white/15'
+                  brushSize === s ? 'border-[#ffc94d] bg-white/[0.06]' : 'border-white/15'
                 }`}
               >
                 <span className="rounded-full bg-white" style={{ width: s, height: s }} />
@@ -212,7 +212,7 @@ export function AvatarDrawModal({ open, onClose, onSave }: Props) {
               onClick={() => setErasing((v) => !v)}
               title={t('onboarding.drawEraser')}
               className={`w-9 h-9 rounded-full border flex items-center justify-center transition-all ${
-                erasing ? 'border-[#a8ff35] bg-white/[0.06] text-[#a8ff35]' : 'border-white/15 text-white/60'
+                erasing ? 'border-[#ffc94d] bg-white/[0.06] text-[#ffc94d]' : 'border-white/15 text-white/60'
               }`}
             >
               <Eraser size={15} />

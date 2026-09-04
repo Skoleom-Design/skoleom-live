@@ -70,7 +70,7 @@ export default function GoogleCallbackPage() {
       <Head><title>skoleomLive</title></Head>
       <div className="cosmic-bg min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
-          <div className="w-8 h-8 border-2 border-white/20 border-t-[#a8ff35] rounded-full animate-spin" />
+          <div className="w-8 h-8 border-2 border-white/20 border-t-[#ffc94d] rounded-full animate-spin" />
           <p className="text-white/40 text-sm">{t('common.loading')}</p>
         </div>
       </div>
