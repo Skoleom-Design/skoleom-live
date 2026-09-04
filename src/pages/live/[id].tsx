@@ -192,6 +192,11 @@ export default function LiveViewerPage() {
   const [gameInvite, setGameInvite] = useState<{ fromUsername: string } | null>(null);
   const [guests, setGuests] = useState<LiveGuest[]>([]);
   const amGuest = guests.some((g) => g.id === myId);
+  // Erreur camera/micro specifique a un invite — avant, un echec ici etait avale par le catch
+  // general de l'effet LiveKit (pense pour un simple spectateur, ou l'absence de video n'est pas
+  // grave) : un invite dont la camera refusait de s'activer ne le savait jamais, et personne
+  // (lui y compris) ne comprenait pourquoi "sa camera ne s'affiche pas".
+  const [duoMediaError, setDuoMediaError] = useState('');
   // Demande de duo initiee par le spectateur lui-meme (sens inverse de duoInvite ci-dessus) —
   // voir requestDuo/cancelDuoRequest et LivesGateway (requestDuo/respondDuoRequest).
   const [duoRequestStatus, setDuoRequestStatus] = useState<'idle' | 'pending' | 'declined' | 'error'>('idle');
@@ -500,11 +505,27 @@ export default function LiveViewerPage() {
     (async () => {
       try {
         if (amGuest) {
-          const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-          if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
-          duoStreamRef.current = stream;
-          const myVideoEl = guestVideoRefs.current.get(myId!);
-          if (myVideoEl) myVideoEl.srcObject = stream;
+          setDuoMediaError('');
+          // Isole cet echec du catch general plus bas (pense pour un simple spectateur, ou
+          // l'absence de video n'a rien de grave) — un invite dont la camera echoue doit le
+          // savoir, sinon il croit que "ça ne marche pas" sans comprendre pourquoi, et continue
+          // quand meme a rejoindre la room (chat + reception video du createur restent utiles).
+          try {
+            const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return; }
+            duoStreamRef.current = stream;
+            const myVideoEl = guestVideoRefs.current.get(myId!);
+            if (myVideoEl) myVideoEl.srcObject = stream;
+          } catch (err) {
+            const name = err instanceof DOMException ? err.name : '';
+            setDuoMediaError(
+              name === 'NotAllowedError' || name === 'PermissionDeniedError'
+                ? "Caméra/micro refusés — autorise-les dans les réglages de ton navigateur pour être vu en duo."
+                : name === 'NotReadableError' || name === 'TrackStartError'
+                ? 'Ta caméra ou ton micro est déjà utilisé par une autre application.'
+                : "Impossible d'accéder à ta caméra/micro — tu restes en duo mais sans image.",
+            );
+          }
         }
 
         const { token, url } = await api.get<{ token: string; url: string }>(`/lives/${id}/livekit-token`);
@@ -835,6 +856,15 @@ export default function LiveViewerPage() {
                           <XIcon size={14} />
                         </button>
                       </div>
+                    </div>
+                  )}
+
+                  {amGuest && duoMediaError && (
+                    <div className="absolute top-14 left-3 right-3 z-30 flex items-center justify-between gap-2 bg-red-500/15 backdrop-blur-sm border border-red-400/40 rounded-2xl px-3.5 py-2.5">
+                      <p className="text-red-200 text-[12px] font-medium min-w-0">{duoMediaError}</p>
+                      <button onClick={() => setDuoMediaError('')} className="w-7 h-7 rounded-full bg-white/10 text-white flex items-center justify-center shrink-0">
+                        <XIcon size={13} />
+                      </button>
                     </div>
                   )}
 
