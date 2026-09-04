@@ -17,6 +17,17 @@ function roomFor(liveId: string): string {
   return `live:${liveId}`;
 }
 
+interface MusicState {
+  youtubeId: string;
+  playing: boolean;
+  // Position (secondes) au moment de `updatedAt` — le client recalcule la position "live" comme
+  // position + (Date.now()/1000 - updatedAt) si `playing`, evitant tout flux continu de sync.
+  position: number;
+  updatedAt: number; // epoch secondes
+}
+
+const YOUTUBE_ID_RE = /^[a-zA-Z0-9_-]{11}$/;
+
 @WebSocketGateway({ cors: { origin: '*' } })
 export class LivesGateway implements OnGatewayDisconnect {
   @WebSocketServer()
@@ -41,6 +52,12 @@ export class LivesGateway implements OnGatewayDisconnect {
   // Spectateurs expulses par le createur — empeche de rejoindre le meme live une seconde fois
   // (voir handleJoin), en plus d'etre deconnectes immediatement (voir handleKickUser).
   private kicked = new Map<string, Set<string>>();
+  // Musique d'ambiance (YouTube) — purement du "sync de lecture" : chaque client (createur ET
+  // spectateurs) charge et joue la meme video YouTube dans son propre navigateur, positionnee au
+  // meme endroit (voir `position`/`updatedAt`/`playing`). Pas de mixage audio reel dans le flux
+  // LiveKit (ça demanderait de re-router l'audio du createur via Web Audio API) — volontairement
+  // simple : le son n'est donc pas "dans" la video du createur mais joue en parallele, cote client.
+  private musicState = new Map<string, MusicState>();
 
   constructor(
     private jwtService: JwtService,
@@ -115,6 +132,11 @@ export class LivesGateway implements OnGatewayDisconnect {
       avatarUrl: c.user.avatarUrl,
       createdAt: c.createdAt,
     })));
+
+    // Un spectateur qui rejoint alors qu'une musique tourne deja doit demarrer synchronise, pas
+    // silencieux jusqu'au prochain changement (play/pause/stop) de quelqu'un d'autre.
+    const music = this.musicState.get(liveId);
+    if (music) client.emit('musicChanged', music);
   }
 
   @SubscribeMessage('leave')
@@ -608,5 +630,73 @@ export class LivesGateway implements OnGatewayDisconnect {
   // et tous les spectateurs le voient apparaitre en temps reel dans le fil de commentaires.
   broadcastGift(liveId: string, data: { giftType: string; username: string; displayName?: string }) {
     this.server.to(roomFor(liveId)).emit('giftSent', data);
+  }
+
+  // Pousse une invitation ponctuelle a un spectateur precis pour rejoindre la partie en cours
+  // (voir GameGateway pour le jeu lui-meme) — le rejoindre reste toujours possible en libre-
+  // service via le bouton Jeu des que gameActive est diffuse a tout le monde ; ceci sert juste a
+  // le rendre plus visible/decouvrable pour une personne en particulier. Pas de persistance, pas
+  // d'accord requis (contrairement a un duo, rejoindre un lobby de jeu est sans consequence).
+  @SubscribeMessage('inviteToGame')
+  async handleInviteToGame(
+    @MessageBody() data: { liveId: string; targetUserId: string; token: string },
+  ) {
+    const user = await this.authenticate(data.token);
+    if (!user || !(await this.livesService.isOwner(data.liveId, user.id))) return;
+
+    const targetSockets = [...this.viewerIdentities.entries()].filter(
+      ([, v]) => v.liveId === data.liveId && v.userId === data.targetUserId,
+    );
+    for (const [socketId] of targetSockets) {
+      this.server.to(socketId).emit('gameInvite', { fromUsername: user.displayName || user.username });
+    }
+  }
+
+  // Musique d'ambiance (YouTube) — reserve au createur, voir le commentaire sur `musicState` plus
+  // haut pour le principe (sync de lecture cote client, pas de mixage audio reel).
+  private broadcastMusic(liveId: string) {
+    this.server.to(roomFor(liveId)).emit('musicChanged', this.musicState.get(liveId) ?? null);
+  }
+
+  @SubscribeMessage('setMusic')
+  async handleSetMusic(@MessageBody() data: { liveId: string; youtubeId: string; token: string }) {
+    const user = await this.authenticate(data.token);
+    if (!user || !(await this.livesService.isOwner(data.liveId, user.id))) return;
+    const youtubeId = (data.youtubeId || '').trim();
+    if (!YOUTUBE_ID_RE.test(youtubeId)) return;
+
+    this.musicState.set(data.liveId, { youtubeId, playing: true, position: 0, updatedAt: Date.now() / 1000 });
+    this.broadcastMusic(data.liveId);
+  }
+
+  @SubscribeMessage('pauseMusic')
+  async handlePauseMusic(@MessageBody() data: { liveId: string; token: string }) {
+    const user = await this.authenticate(data.token);
+    if (!user || !(await this.livesService.isOwner(data.liveId, user.id))) return;
+    const state = this.musicState.get(data.liveId);
+    if (!state || !state.playing) return;
+
+    const now = Date.now() / 1000;
+    this.musicState.set(data.liveId, { ...state, playing: false, position: state.position + (now - state.updatedAt), updatedAt: now });
+    this.broadcastMusic(data.liveId);
+  }
+
+  @SubscribeMessage('resumeMusic')
+  async handleResumeMusic(@MessageBody() data: { liveId: string; token: string }) {
+    const user = await this.authenticate(data.token);
+    if (!user || !(await this.livesService.isOwner(data.liveId, user.id))) return;
+    const state = this.musicState.get(data.liveId);
+    if (!state || state.playing) return;
+
+    this.musicState.set(data.liveId, { ...state, playing: true, updatedAt: Date.now() / 1000 });
+    this.broadcastMusic(data.liveId);
+  }
+
+  @SubscribeMessage('stopMusic')
+  async handleStopMusic(@MessageBody() data: { liveId: string; token: string }) {
+    const user = await this.authenticate(data.token);
+    if (!user || !(await this.livesService.isOwner(data.liveId, user.id))) return;
+    this.musicState.delete(data.liveId);
+    this.broadcastMusic(data.liveId);
   }
 }

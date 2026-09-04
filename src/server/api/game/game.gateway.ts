@@ -9,7 +9,7 @@ import { Repository } from 'typeorm';
 import { User } from '../users/user.entity';
 import { LivesService } from '../lives/lives.service';
 import { LivesGateway } from '../lives/lives.gateway';
-import { GameError, GameRoom, GameService, GameSettings } from './game.service';
+import { GameError, GameRoom, GameService, GameSettings, GameType } from './game.service';
 
 function roomFor(code: string): string {
   return `game:${code}`;
@@ -73,7 +73,7 @@ export class GameGateway implements OnGatewayDisconnect {
   @SubscribeMessage('joinLiveGame')
   async handleJoinLiveGame(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { token?: string; liveId: string },
+    @MessageBody() data: { token?: string; liveId: string; gameType?: GameType },
   ) {
     const user = await this.authenticate(data.token);
     if (!user) return this.fail(client, 'Connecte-toi pour jouer.');
@@ -87,6 +87,7 @@ export class GameGateway implements OnGatewayDisconnect {
         live.creatorId === user.id,
         { userId: user.id, username: user.displayName || user.username, avatarUrl: user.avatarUrl },
         client.id,
+        data.gameType ?? 'undercover',
       );
       client.join(roomFor(room.code));
       this.socketRoom.set(client.id, { code: room.code, userId: user.id });
@@ -123,7 +124,7 @@ export class GameGateway implements OnGatewayDisconnect {
   @SubscribeMessage('updateSettings')
   async handleUpdateSettings(
     @ConnectedSocket() client: Socket,
-    @MessageBody() data: { token?: string; code: string; settings: GameSettings },
+    @MessageBody() data: { token?: string; code: string; settings: Partial<GameSettings> },
   ) {
     const user = await this.authenticate(data.token);
     if (!user) return;
@@ -181,6 +182,27 @@ export class GameGateway implements OnGatewayDisconnect {
       this.broadcastState(updated);
     } catch (err) {
       this.fail(client, err instanceof GameError ? err.message : 'Vote refusé.');
+    }
+  }
+
+  @SubscribeMessage('submitNightKill')
+  async handleSubmitNightKill(
+    @ConnectedSocket() client: Socket,
+    @MessageBody() data: { token?: string; code: string; targetUserId: string },
+  ) {
+    const user = await this.authenticate(data.token);
+    if (!user) return;
+    try {
+      const room = this.gameService.getRoom(data.code);
+      const beforeLen = room?.history.length ?? 0;
+      const updated = this.gameService.submitNightKill(data.code, user.id, data.targetUserId);
+      if (updated.history.length > beforeLen) {
+        this.server.to(roomFor(updated.code)).emit('roundResult', updated.history[updated.history.length - 1]);
+      }
+      if (updated.phase !== 'lobby') this.sendPrivateInfoToAll(updated);
+      this.broadcastState(updated);
+    } catch (err) {
+      this.fail(client, err instanceof GameError ? err.message : 'Choix refusé.');
     }
   }
 

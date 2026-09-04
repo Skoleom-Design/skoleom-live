@@ -6,12 +6,14 @@ import { getToken } from '../../../shared/api/http';
 // src/shared/api/realtime.ts pour le pendant "canal global" de ce meme pattern.
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
-export type GamePhase = 'lobby' | 'clue' | 'voting' | 'reveal' | 'mrWhiteGuess' | 'ended';
-export type GameRole = 'civilian' | 'undercover' | 'mrwhite';
+export type GamePhase = 'lobby' | 'clue' | 'night' | 'voting' | 'reveal' | 'mrWhiteGuess' | 'ended';
+export type GameRole = 'civilian' | 'undercover' | 'mrwhite' | 'villager' | 'werewolf';
+export type GameType = 'undercover' | 'werewolf';
 
 export interface GameSettings {
   undercoverCount: number;
   mrWhiteCount: number;
+  werewolfCount: number;
 }
 
 export interface PublicPlayer {
@@ -40,6 +42,7 @@ export interface EliminationRecord {
 
 export interface RoomState {
   code: string;
+  gameType: GameType;
   phase: GamePhase;
   round: number;
   settings: GameSettings;
@@ -48,9 +51,11 @@ export interface RoomState {
   currentTurnUserId?: string;
   clues: RoundClue[];
   votesReceived?: number;
+  nightVotesReceived?: number;
+  nightWolvesCount?: number;
   history: EliminationRecord[];
   mrWhiteGuessUserId?: string;
-  winner?: 'civilians' | 'undercover' | 'mrwhite';
+  winner?: 'civilians' | 'undercover' | 'mrwhite' | 'villagers' | 'werewolves';
   civilianWordReveal?: string;
   undercoverWordReveal?: string;
   finalRoles?: { userId: string; username: string; role?: GameRole; word?: string }[];
@@ -106,12 +111,13 @@ export function useGameSocket() {
     mrWhiteResult,
     kicked,
     clearError: () => setError(''),
-    joinLiveGame: (liveId: string) => emit('joinLiveGame', { liveId }),
+    joinLiveGame: (liveId: string, gameType?: GameType) => emit('joinLiveGame', { liveId, gameType }),
     leaveRoom: (code: string) => emit('leaveRoom', { code }),
-    updateSettings: (code: string, settings: GameSettings) => emit('updateSettings', { code, settings }),
+    updateSettings: (code: string, settings: Partial<GameSettings>) => emit('updateSettings', { code, settings }),
     startGame: (code: string) => emit('startGame', { code }),
     submitClue: (code: string, clue: string) => emit('submitClue', { code, clue }),
     submitVote: (code: string, targetUserId: string) => emit('submitVote', { code, targetUserId }),
+    submitNightKill: (code: string, targetUserId: string) => emit('submitNightKill', { code, targetUserId }),
     mrWhiteGuess: (code: string, guess: string) => emit('mrWhiteGuess', { code, guess }),
     kickPlayer: (code: string, targetUserId: string) => emit('kickPlayer', { code, targetUserId }),
     newRound: (code: string) => emit('newRound', { code }),

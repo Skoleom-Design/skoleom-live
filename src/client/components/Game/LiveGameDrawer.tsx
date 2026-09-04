@@ -1,20 +1,35 @@
 import { useEffect, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Check, Copy, Crown, Gamepad2, LogOut, UserX, WifiOff, X } from 'lucide-react';
+import { Check, Copy, Crown, Gamepad2, LogOut, Moon, UserX, WifiOff, X } from 'lucide-react';
 import { useLanguage } from '../../i18n/LanguageContext';
 import { getStoredUser } from '../../../shared/api/http';
-import { useGameSocket, GameRole, PublicPlayer } from './useGameSocket';
+import { useGameSocket, GameRole, GameType, PublicPlayer } from './useGameSocket';
 
 const ROLE_STYLES: Record<GameRole, { ring: string; text: string; bg: string }> = {
   civilian: { ring: 'ring-white/20', text: 'text-white', bg: 'bg-white/[0.06]' },
   undercover: { ring: 'ring-[#00ffff]/40', text: 'text-[#00ffff]', bg: 'bg-[#00ffff]/[0.08]' },
   mrwhite: { ring: 'ring-red-400/40', text: 'text-red-400', bg: 'bg-red-400/[0.08]' },
+  villager: { ring: 'ring-white/20', text: 'text-white', bg: 'bg-white/[0.06]' },
+  werewolf: { ring: 'ring-purple-400/40', text: 'text-purple-300', bg: 'bg-purple-400/[0.08]' },
 };
 
-// Le jeu ne se lance que depuis l'interieur d'un live (voir le bouton "Jeu" sur src/pages/live/[id].tsx)
-// — pas d'ecran /jeu autonome, pas de code a saisir : la room est retrouvee/creee a partir du
-// liveId cote serveur (voir GameService.joinOrCreateLiveGame).
-export function LiveGameDrawer({ liveId, isLiveOwner, onClose }: { liveId: string; isLiveOwner: boolean; onClose: () => void }) {
+// Le jeu ne se lance que depuis l'interieur d'un live (voir le bouton "Jeu" sur src/pages/live/[id].tsx
+// et src/pages/studio/live.tsx) — pas d'ecran /jeu autonome, pas de code a saisir : la room est
+// retrouvee/creee a partir du liveId cote serveur (voir GameService.joinOrCreateLiveGame).
+// `gameActive` indique qu'une partie tourne deja pour ce live (peu importe le type choisi a
+// l'origine) — dans ce cas on rejoint direct, sans repasser par le choix du jeu (reserve au
+// createur au tout premier lancement).
+export function LiveGameDrawer({
+  liveId,
+  isLiveOwner,
+  gameActive,
+  onClose,
+}: {
+  liveId: string;
+  isLiveOwner: boolean;
+  gameActive: boolean;
+  onClose: () => void;
+}) {
   const { t, dict } = useLanguage();
   const game = useGameSocket();
   const me = useMemo(() => getStoredUser(), []);
@@ -22,11 +37,22 @@ export function LiveGameDrawer({ liveId, isLiveOwner, onClose }: { liveId: strin
   const [clueText, setClueText] = useState('');
   const [guessText, setGuessText] = useState('');
   const [revealBanner, setRevealBanner] = useState<string | null>(null);
+  const [chosenGameType, setChosenGameType] = useState<GameType | null>(null);
+
+  // Seul le createur, au tout premier lancement (pas encore de partie active), doit choisir le
+  // jeu — sinon (rejoindre une partie deja en cours, ou etre simple spectateur) on rejoint direct,
+  // le type de jeu ayant deja ete fixe a la creation de la room.
+  const needsGameTypeChoice = isLiveOwner && !gameActive;
 
   useEffect(() => {
-    if (game.connected) game.joinLiveGame(liveId);
+    if (!game.connected) return;
+    if (needsGameTypeChoice) {
+      if (chosenGameType) game.joinLiveGame(liveId, chosenGameType);
+    } else {
+      game.joinLiveGame(liveId);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [game.connected, liveId]);
+  }, [game.connected, liveId, needsGameTypeChoice, chosenGameType]);
 
   useEffect(() => {
     if (!game.lastResult) return;
@@ -76,6 +102,8 @@ export function LiveGameDrawer({ liveId, isLiveOwner, onClose }: { liveId: strin
               {t('common.close')}
             </button>
           </CenteredMessage>
+        ) : needsGameTypeChoice && !chosenGameType ? (
+          <GameTypePicker t={t} onChoose={setChosenGameType} />
         ) : !game.connected || !game.room ? (
           <CenteredMessage>
             {game.error ? (
@@ -117,13 +145,48 @@ function CenteredMessage({ children }: { children: React.ReactNode }) {
   return <div className="flex items-center justify-center min-h-[40vh] flex-col text-center px-6 gap-1">{children}</div>;
 }
 
-function RoomBody({ room, game, me, isHost, onClose, copyCode, copied, clueText, setClueText, guessText, setGuessText, t, dict }: any) {
-  const alivePlayers = room.players.filter((p: PublicPlayer) => p.alive);
+// Choix du jeu — uniquement propose au createur au tout premier lancement (voir needsGameTypeChoice).
+function GameTypePicker({ t, onChoose }: { t: (key: string) => string; onChoose: (type: GameType) => void }) {
   return (
     <div className="pt-2">
       <div className="flex items-center gap-2 mb-6">
         <Gamepad2 size={18} className="text-[#a8ff35]" />
-        <h1 className="text-lg font-bold text-white display-text">{t('game.title')}</h1>
+        <h1 className="text-lg font-bold text-white display-text">{t('game.gameType.choose')}</h1>
+      </div>
+      <div className="grid grid-cols-1 gap-3">
+        <button
+          onClick={() => onChoose('undercover')}
+          className="text-left glass-card p-5 hover:bg-white/[0.06] transition-colors border border-white/[0.08] hover:border-[#00ffff]/30 rounded-2xl"
+        >
+          <div className="flex items-center gap-2 mb-1.5">
+            <Gamepad2 size={16} className="text-[#00ffff]" />
+            <span className="text-white font-bold text-sm">{t('game.gameType.undercover')}</span>
+          </div>
+          <p className="text-white/40 text-xs leading-relaxed">{t('game.gameType.undercoverDesc')}</p>
+        </button>
+        <button
+          onClick={() => onChoose('werewolf')}
+          className="text-left glass-card p-5 hover:bg-white/[0.06] transition-colors border border-white/[0.08] hover:border-purple-400/30 rounded-2xl"
+        >
+          <div className="flex items-center gap-2 mb-1.5">
+            <Moon size={16} className="text-purple-300" />
+            <span className="text-white font-bold text-sm">{t('game.gameType.werewolf')}</span>
+          </div>
+          <p className="text-white/40 text-xs leading-relaxed">{t('game.gameType.werewolfDesc')}</p>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function RoomBody({ room, game, me, isHost, onClose, copyCode, copied, clueText, setClueText, guessText, setGuessText, t, dict }: any) {
+  const alivePlayers = room.players.filter((p: PublicPlayer) => p.alive);
+  const isWerewolf = room.gameType === 'werewolf';
+  return (
+    <div className="pt-2">
+      <div className="flex items-center gap-2 mb-6">
+        {isWerewolf ? <Moon size={18} className="text-purple-300" /> : <Gamepad2 size={18} className="text-[#a8ff35]" />}
+        <h1 className="text-lg font-bold text-white display-text">{isWerewolf ? t('game.gameType.werewolf') : t('game.title')}</h1>
       </div>
 
       {game.error && (
@@ -134,6 +197,7 @@ function RoomBody({ room, game, me, isHost, onClose, copyCode, copied, clueText,
         <LobbyView room={room} isHost={isHost} game={game} copyCode={copyCode} copied={copied} t={t} dict={dict} />
       )}
       {room.phase === 'clue' && <ClueView room={room} me={me} game={game} clueText={clueText} setClueText={setClueText} t={t} />}
+      {room.phase === 'night' && <NightView room={room} me={me} game={game} t={t} />}
       {room.phase === 'voting' && <VotingView room={room} me={me} game={game} t={t} />}
       {room.phase === 'reveal' && (
         <CenteredMessage>
@@ -198,6 +262,8 @@ function PlayerStrip({ players, currentTurnUserId }: { players: PublicPlayer[]; 
 // ── Lobby ────────────────────────────────────────────────────────────
 function LobbyView({ room, isHost, game, copyCode, copied, t, dict }: any) {
   const canStart = room.players.length >= 3;
+  const isWerewolf = room.gameType === 'werewolf';
+  const rules = isWerewolf ? dict.game.rulesWerewolf : dict.game.rules;
   const [rulesOpen, setRulesOpen] = useState(false);
   return (
     <div>
@@ -206,7 +272,7 @@ function LobbyView({ room, isHost, game, copyCode, copied, t, dict }: any) {
       </button>
       {rulesOpen && (
         <ol className="space-y-2 mb-6 bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4">
-          {dict.game.rules.map((rule: string, i: number) => (
+          {rules.map((rule: string, i: number) => (
             <li key={i} className="flex gap-2.5 text-xs text-white/50 leading-relaxed">
               <span className="shrink-0 w-4 h-4 rounded-full bg-white/[0.06] text-white/50 text-[10px] font-semibold flex items-center justify-center mt-0.5">
                 {i + 1}
@@ -252,38 +318,63 @@ function LobbyView({ room, isHost, game, copyCode, copied, t, dict }: any) {
       </div>
 
       <div className="glass-card p-5 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <span className="text-white text-sm">{t('game.lobby.undercoverCount')}</span>
-          <div className="flex items-center gap-3">
-            <button
-              disabled={!isHost || room.settings.undercoverCount <= 1}
-              onClick={() => game.updateSettings(room.code, { ...room.settings, undercoverCount: room.settings.undercoverCount - 1 })}
-              className="w-7 h-7 rounded-full bg-white/[0.06] text-white disabled:opacity-30 flex items-center justify-center"
-            >
-              −
-            </button>
-            <span className="text-white font-semibold w-4 text-center">{room.settings.undercoverCount}</span>
-            <button
-              disabled={!isHost || room.settings.undercoverCount >= 4}
-              onClick={() => game.updateSettings(room.code, { ...room.settings, undercoverCount: room.settings.undercoverCount + 1 })}
-              className="w-7 h-7 rounded-full bg-white/[0.06] text-white disabled:opacity-30 flex items-center justify-center"
-            >
-              +
-            </button>
+        {isWerewolf ? (
+          <div className="flex items-center justify-between">
+            <span className="text-white text-sm">{t('game.gameType.werewolf')}</span>
+            <div className="flex items-center gap-3">
+              <button
+                disabled={!isHost || room.settings.werewolfCount <= 1}
+                onClick={() => game.updateSettings(room.code, { werewolfCount: room.settings.werewolfCount - 1 })}
+                className="w-7 h-7 rounded-full bg-white/[0.06] text-white disabled:opacity-30 flex items-center justify-center"
+              >
+                −
+              </button>
+              <span className="text-white font-semibold w-4 text-center">{room.settings.werewolfCount}</span>
+              <button
+                disabled={!isHost || room.settings.werewolfCount >= 4}
+                onClick={() => game.updateSettings(room.code, { werewolfCount: room.settings.werewolfCount + 1 })}
+                className="w-7 h-7 rounded-full bg-white/[0.06] text-white disabled:opacity-30 flex items-center justify-center"
+              >
+                +
+              </button>
+            </div>
           </div>
-        </div>
-        <div className="flex items-center justify-between">
-          <span className="text-white text-sm">{t('game.lobby.mrWhiteCount')}</span>
-          <button
-            disabled={!isHost}
-            onClick={() => game.updateSettings(room.code, { ...room.settings, mrWhiteCount: room.settings.mrWhiteCount > 0 ? 0 : 1 })}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors disabled:opacity-50 ${
-              room.settings.mrWhiteCount > 0 ? 'bg-[#a8ff35] text-black' : 'bg-white/[0.06] text-white/50'
-            }`}
-          >
-            {room.settings.mrWhiteCount > 0 ? t('game.lobby.mrWhiteEnabled') : t('game.lobby.mrWhiteDisabled')}
-          </button>
-        </div>
+        ) : (
+          <>
+            <div className="flex items-center justify-between mb-4">
+              <span className="text-white text-sm">{t('game.lobby.undercoverCount')}</span>
+              <div className="flex items-center gap-3">
+                <button
+                  disabled={!isHost || room.settings.undercoverCount <= 1}
+                  onClick={() => game.updateSettings(room.code, { undercoverCount: room.settings.undercoverCount - 1 })}
+                  className="w-7 h-7 rounded-full bg-white/[0.06] text-white disabled:opacity-30 flex items-center justify-center"
+                >
+                  −
+                </button>
+                <span className="text-white font-semibold w-4 text-center">{room.settings.undercoverCount}</span>
+                <button
+                  disabled={!isHost || room.settings.undercoverCount >= 4}
+                  onClick={() => game.updateSettings(room.code, { undercoverCount: room.settings.undercoverCount + 1 })}
+                  className="w-7 h-7 rounded-full bg-white/[0.06] text-white disabled:opacity-30 flex items-center justify-center"
+                >
+                  +
+                </button>
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-white text-sm">{t('game.lobby.mrWhiteCount')}</span>
+              <button
+                disabled={!isHost}
+                onClick={() => game.updateSettings(room.code, { mrWhiteCount: room.settings.mrWhiteCount > 0 ? 0 : 1 })}
+                className={`px-3 py-1.5 rounded-full text-xs font-medium transition-colors disabled:opacity-50 ${
+                  room.settings.mrWhiteCount > 0 ? 'bg-[#a8ff35] text-black' : 'bg-white/[0.06] text-white/50'
+                }`}
+              >
+                {room.settings.mrWhiteCount > 0 ? t('game.lobby.mrWhiteEnabled') : t('game.lobby.mrWhiteDisabled')}
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {isHost ? (
@@ -368,6 +459,53 @@ function ClueView({ room, me, game, clueText, setClueText, t }: any) {
   );
 }
 
+// ── Night phase (Loup-Garou) ─────────────────────────────────────────
+// Seuls les loups voient la grille de cible + votent ; les villageois attendent, sans savoir qui
+// est loup (meme principe que le vote de jour, mais restreint et anonyme pour les non-loups).
+function NightView({ room, me, game, t }: any) {
+  const [votedFor, setVotedFor] = useState<string | null>(null);
+  const yourInfo = game.yourInfo;
+  const isWolf = yourInfo?.role === 'werewolf';
+  const alivePlayers = room.players.filter((p: PublicPlayer) => p.alive);
+  const targetablePlayers = alivePlayers.filter((p: PublicPlayer) => p.userId !== me);
+
+  function choose(targetUserId: string) {
+    setVotedFor(targetUserId);
+    game.submitNightKill(room.code, targetUserId);
+  }
+
+  return (
+    <CenteredMessage>
+      <Moon size={28} className="text-purple-300 mb-2" />
+      <h2 className="text-base font-bold text-white mb-1">{t('game.night.title', { round: room.round })}</h2>
+      {isWolf ? (
+        <>
+          <p className="text-white/50 text-sm mb-2">{t('game.night.chooseVictim')}</p>
+          <p className="text-white/30 text-xs mb-5">{t('game.night.received', { count: room.nightVotesReceived ?? 0, total: room.nightWolvesCount ?? 0 })}</p>
+          <div className="grid grid-cols-2 gap-3 w-full max-w-sm">
+            {targetablePlayers
+              .filter((p: PublicPlayer) => !room.players.find((pl: any) => pl.userId === p.userId && pl.role === 'werewolf'))
+              .map((p: PublicPlayer) => (
+                <button
+                  key={p.userId}
+                  onClick={() => choose(p.userId)}
+                  className={`flex flex-col items-center gap-2 py-5 rounded-2xl border transition-all ${
+                    votedFor === p.userId ? 'border-purple-400 bg-purple-400/10' : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06]'
+                  }`}
+                >
+                  <Avatar player={p} size={48} />
+                  <span className="text-white text-sm font-medium">{p.username}</span>
+                </button>
+              ))}
+          </div>
+        </>
+      ) : (
+        <p className="text-white/40 text-sm">{t('game.night.wolvesChoosing')}</p>
+      )}
+    </CenteredMessage>
+  );
+}
+
 // ── Voting phase ─────────────────────────────────────────────────────
 function VotingView({ room, me, game, t }: any) {
   const [votedFor, setVotedFor] = useState<string | null>(null);
@@ -443,12 +581,20 @@ function MrWhiteView({ room, me, game, guessText, setGuessText, t }: any) {
 
 // ── Game over ────────────────────────────────────────────────────────
 function EndedView({ room, isHost, game, onClose, t }: any) {
-  const winnerKey = room.winner === 'civilians' ? 'civiliansWin' : room.winner === 'mrwhite' ? 'mrwhiteWin' : 'undercoverWin';
+  const isWerewolf = room.gameType === 'werewolf';
+  const winnerKey = isWerewolf
+    ? room.winner === 'villagers' ? 'villagersWin' : 'werewolvesWin'
+    : room.winner === 'civilians' ? 'civiliansWin' : room.winner === 'mrwhite' ? 'mrwhiteWin' : 'undercoverWin';
   return (
     <div className="text-center">
       <h2 className="text-xl font-bold text-white mb-2 display-text">{t(`game.over.${winnerKey}`)}</h2>
-      <p className="text-white/50 text-sm mb-1">{t('game.over.wordWas', { word: room.civilianWordReveal })}</p>
-      <p className="text-white/50 text-sm mb-8">{t('game.over.undercoverWordWas', { word: room.undercoverWordReveal })}</p>
+      {!isWerewolf && (
+        <>
+          <p className="text-white/50 text-sm mb-1">{t('game.over.wordWas', { word: room.civilianWordReveal })}</p>
+          <p className="text-white/50 text-sm mb-8">{t('game.over.undercoverWordWas', { word: room.undercoverWordReveal })}</p>
+        </>
+      )}
+      {isWerewolf && <div className="mb-8" />}
 
       <div className="glass-card p-5 mb-6 text-left">
         <div className="space-y-3">

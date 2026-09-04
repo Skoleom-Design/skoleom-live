@@ -3,7 +3,13 @@
 // timestamp-column.type.ts) pour choisir leur type de colonne — sans ce chargement explicite et
 // synchrone du .env ici, ConfigModule.forRoot() ne le fait que plus tard, une fois les entites
 // deja evaluees avec des valeurs par defaut incorrectes.
-import 'dotenv/config';
+//
+// .env.local est charge en premier : dotenv ne remplace jamais une variable deja presente dans
+// process.env, donc ses valeurs (ex. GOOGLE_REDIRECT_URI en localhost) gagnent sur celles du
+// .env partage (qui, lui, sert aussi au deploiement Render et garde les valeurs de prod).
+import { config as loadEnv } from 'dotenv';
+loadEnv({ path: '.env.local' });
+loadEnv();
 import 'reflect-metadata';
 import { join } from 'path';
 import * as express from 'express';

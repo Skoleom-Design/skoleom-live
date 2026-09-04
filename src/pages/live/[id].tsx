@@ -4,11 +4,12 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { io, Socket } from 'socket.io-client';
 import { Room, RoomEvent, Track, type RemoteTrack } from 'livekit-client';
-import { ArrowLeft, Users, Users2, Send, Gavel, Timer, Package, Crown, Gift, Wallet, Plus, Trophy, VolumeX, Check, X as XIcon, MoreVertical, UserX, AlertTriangle, Loader2, Lock, Gamepad2 } from 'lucide-react';
+import { ArrowLeft, Users, Send, Gavel, Timer, Package, Crown, Gift, Wallet, Plus, Trophy, VolumeX, Volume2, Check, X as XIcon, MoreVertical, UserX, AlertTriangle, Loader2, Lock, Gamepad2, Music, Hand } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
 import { LiveGameDrawer } from '../../client/components/Game/LiveGameDrawer';
 import { GiftBurstOverlay, type ActiveGiftBurst } from '../../client/components/Live/GiftBurstOverlay';
+import { YoutubeMusicPlayer, type MusicState } from '../../client/components/Live/YoutubeMusicPlayer';
 import { GIFTS, COIN_PACKS, giftById, type GiftDef } from '../../client/constants/gifts';
 import { api, ApiError, getToken, getStoredUser } from '../../shared/api/http';
 import type { Capsule } from '../../shared/types/api';
@@ -184,6 +185,7 @@ export default function LiveViewerPage() {
 
   // Invites (ex-duo, desormais N) — voir LivesGateway (inviteDuo/respondDuo/endDuo).
   const [duoInvite, setDuoInvite] = useState<{ fromUsername: string } | null>(null);
+  const [gameInvite, setGameInvite] = useState<{ fromUsername: string } | null>(null);
   const [guests, setGuests] = useState<LiveGuest[]>([]);
   const amGuest = guests.some((g) => g.id === myId);
   // Demande de duo initiee par le spectateur lui-meme (sens inverse de duoInvite ci-dessus) —
@@ -200,6 +202,12 @@ export default function LiveViewerPage() {
   // qui n'a pas encore ouvert le tiroir.
   const [gameDrawerOpen, setGameDrawerOpen] = useState(false);
   const [gameActive, setGameActive] = useState(false);
+
+  // Musique d'ambiance (YouTube) — voir YoutubeMusicPlayer.tsx : ce spectateur charge et joue la
+  // meme video que le createur, en parallele (pas mixee dans l'audio LiveKit). Muet par defaut
+  // (autoplay non-muet bloque sans geste utilisateur "frais" sur ce client) — bouton pour activer.
+  const [musicState, setMusicState] = useState<MusicState | null>(null);
+  const [musicMuted, setMusicMuted] = useState(true);
 
   // Liste des spectateurs — visible par tout le monde ; le createur voit en plus un menu de
   // moderation par spectateur (exclure/muter), voir isOwner ci-dessous.
@@ -369,6 +377,7 @@ export default function LiveViewerPage() {
       setRoundActive(false);
       setAuctionResult(d);
     });
+    socket.on('musicChanged', (m: MusicState | null) => setMusicState(m));
     socket.on('featuredCapsuleChanged', (d: { capsuleId: string | null; capsule: Capsule | null }) => {
       setLive((prev) => (prev ? { ...prev, featuredCapsuleId: d.capsuleId, featuredCapsule: d.capsule } : prev));
     });
@@ -396,6 +405,7 @@ export default function LiveViewerPage() {
       if (typeof id === 'string') fetchTopDonors(id);
     });
     socket.on('duoInvite', (d: { fromUsername: string }) => setDuoInvite(d));
+    socket.on('gameInvite', (d: { fromUsername: string }) => setGameInvite(d));
     socket.on('duoStarted', (d: { partnerId: string; partnerUsername: string; partnerAvatarUrl?: string }) => {
       setGuests((prev) => (prev.some((g) => g.id === d.partnerId) ? prev : [...prev, { id: d.partnerId, username: d.partnerUsername, avatarUrl: d.partnerAvatarUrl }]));
       setDuoInvite(null);
@@ -597,7 +607,7 @@ export default function LiveViewerPage() {
 
   if (loading) {
     return (
-      <div className="flex h-screen cosmic-bg overflow-hidden">
+      <div className="flex h-dvh cosmic-bg overflow-hidden">
         <AppSidebar />
         <main className="flex-1 flex items-center justify-center text-white/40 text-sm">Chargement…</main>
       </div>
@@ -606,7 +616,7 @@ export default function LiveViewerPage() {
 
   if (notFound || !live) {
     return (
-      <div className="flex h-screen cosmic-bg overflow-hidden">
+      <div className="flex h-dvh cosmic-bg overflow-hidden">
         <AppSidebar />
         <main className="flex-1 flex flex-col items-center justify-center gap-3 text-white/50 text-sm">
           <p>Ce live est introuvable ou déjà terminé.</p>
@@ -622,7 +632,7 @@ export default function LiveViewerPage() {
     return (
       <>
         <Head><title>{live.title || 'Live privé'} — skoleomLive</title></Head>
-        <div className="flex h-screen cosmic-bg overflow-hidden">
+        <div className="flex h-dvh cosmic-bg overflow-hidden">
           <AppSidebar />
           <main className="flex-1 flex flex-col items-center justify-center gap-4 px-6 text-center">
             <div className="w-14 h-14 rounded-full bg-white/[0.06] border border-white/10 flex items-center justify-center">
@@ -671,7 +681,7 @@ export default function LiveViewerPage() {
   return (
     <>
       <Head><title>{live.title || 'Live'} — skoleomLive</title></Head>
-      <div className="flex h-screen cosmic-bg overflow-hidden">
+      <div className="flex h-dvh cosmic-bg overflow-hidden">
         <AppSidebar />
 
         <main className="flex-1 flex flex-col overflow-hidden">
@@ -706,7 +716,7 @@ export default function LiveViewerPage() {
                 ) : duoRequestStatus === 'error' ? (
                   <>{duoRequestErrorMsg || 'Refusée'}</>
                 ) : (
-                  <><Users2 size={13} /> Demander à monter</>
+                  <><Hand size={13} /> Demander à monter</>
                 )}
               </button>
             )}
@@ -722,15 +732,54 @@ export default function LiveViewerPage() {
             <div className="flex-1 flex flex-col items-center overflow-hidden md:overflow-y-auto scrollbar-hide">
               <div className="w-full h-full md:h-auto max-w-none md:max-w-md flex flex-col">
                 <div className="relative w-full flex-1 md:flex-none md:aspect-[9/16] md:max-h-[65vh] mx-auto rounded-none md:rounded-2xl overflow-hidden bg-black border-0 md:border md:border-white/[0.08] flex items-center justify-center">
-                  {/* Toujours monte (meme avant connexion) — sinon l'attach() de la track video
-                      arrive avant le montage de l'element et se perd silencieusement. */}
-                  <video
-                    ref={videoElRef}
-                    autoPlay
-                    playsInline
-                    className={`absolute inset-0 w-full h-full object-cover ${videoConnected ? '' : 'hidden'}`}
-                  />
-                  <audio ref={audioElRef} autoPlay className="hidden" />
+                  {/* Grille "cote a cote" façon visio (Discord) — une cellule par participant
+                      (createur + chaque invite duo), toujours la meme structure (meme en solo, ou
+                      elle degenere en 1 seule colonne) pour ne jamais demonter/re-attacher les
+                      <video> refs quand un duo commence ou se termine. */}
+                  <div
+                    className="absolute inset-0 grid gap-0.5 bg-black"
+                    style={{ gridTemplateColumns: `repeat(${guests.length > 0 ? 2 : 1}, 1fr)`, gridAutoRows: '1fr' }}
+                  >
+                    <div className="relative bg-black overflow-hidden">
+                      {/* Toujours monte (meme avant connexion) — sinon l'attach() de la track video
+                          arrive avant le montage de l'element et se perd silencieusement. */}
+                      <video
+                        ref={videoElRef}
+                        autoPlay
+                        playsInline
+                        className={`absolute inset-0 w-full h-full object-cover ${videoConnected ? '' : 'hidden'}`}
+                      />
+                      <audio ref={audioElRef} autoPlay className="hidden" />
+                      {guests.length > 0 && (
+                        <span className="absolute bottom-1 left-1.5 z-10 text-[10px] text-white font-semibold truncate px-1 drop-shadow">
+                          @{live.creator.username}
+                        </span>
+                      )}
+                    </div>
+                    {guests.map((g) => {
+                      const isMe = g.id === myId;
+                      return (
+                        <div key={g.id} className="relative bg-black overflow-hidden">
+                          <video ref={makeGuestVideoRef(g.id)} autoPlay muted={isMe} playsInline className="absolute inset-0 w-full h-full object-cover" />
+                          <audio ref={makeGuestAudioRef(g.id)} autoPlay className="hidden" />
+                          <span className="absolute bottom-1 left-1.5 z-10 text-[10px] text-white font-semibold truncate px-1 drop-shadow">
+                            {isMe ? 'Toi' : `@${g.username}`}
+                          </span>
+                          {(isMe || isOwner) && (
+                            <button
+                              onClick={() => {
+                                if (typeof id !== 'string') return;
+                                socketRef.current?.emit('endDuo', { liveId: id, token: getToken(), ...(isMe ? {} : { targetUserId: g.id }) });
+                              }}
+                              className="absolute top-1 right-1 z-10 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center"
+                            >
+                              <XIcon size={11} className="text-white" />
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
 
                   {soundBlocked && (
                     <button
@@ -758,34 +807,25 @@ export default function LiveViewerPage() {
                     </div>
                   )}
 
-                  {/* Invites — une bulle video par invite (dont la mienne si j'en fais partie) */}
-                  {guests.length > 0 && (
-                    <div className="absolute bottom-20 md:bottom-3 left-3 flex items-end gap-1.5 z-20">
-                      {guests.map((g) => {
-                        const isMe = g.id === myId;
-                        return (
-                          <div key={g.id} className="relative w-20 h-28 rounded-xl overflow-hidden border-2 border-[#a8ff35]/60 bg-black shadow-lg shrink-0">
-                            <video ref={makeGuestVideoRef(g.id)} autoPlay muted={isMe} playsInline className="w-full h-full object-cover" />
-                            <audio ref={makeGuestAudioRef(g.id)} autoPlay className="hidden" />
-                            <span className="absolute bottom-0.5 inset-x-0 text-center text-[9px] text-white/90 font-semibold truncate px-1 drop-shadow">
-                              {isMe ? 'Toi' : `@${g.username}`}
-                            </span>
-                            {(isMe || isOwner) && (
-                              <button
-                                onClick={() => {
-                                  if (typeof id !== 'string') return;
-                                  socketRef.current?.emit('endDuo', { liveId: id, token: getToken(), ...(isMe ? {} : { targetUserId: g.id }) });
-                                }}
-                                className="absolute top-0.5 right-0.5 w-4 h-4 rounded-full bg-black/60 flex items-center justify-center"
-                              >
-                                <XIcon size={9} className="text-white" />
-                              </button>
-                            )}
-                          </div>
-                        );
-                      })}
+                  {gameInvite && (
+                    <div className={`absolute left-3 right-3 z-30 flex items-center justify-between gap-2 bg-black/80 backdrop-blur-sm border border-[#a8ff35]/40 rounded-2xl px-3.5 py-2.5 ${duoInvite ? 'top-[6.5rem]' : 'top-14'}`}>
+                      <p className="text-white text-[12px] font-medium min-w-0">
+                        <span className="font-bold text-[#a8ff35]">@{gameInvite.fromUsername}</span> t'invite à jouer
+                      </p>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <button
+                          onClick={() => { setGameDrawerOpen(true); setGameInvite(null); }}
+                          className="px-3 py-1.5 rounded-full bg-[#a8ff35] text-black text-[12px] font-semibold flex items-center gap-1"
+                        >
+                          <Gamepad2 size={13} /> Rejoindre
+                        </button>
+                        <button onClick={() => setGameInvite(null)} className="w-8 h-8 rounded-full bg-white/10 text-white flex items-center justify-center">
+                          <XIcon size={14} />
+                        </button>
+                      </div>
                     </div>
                   )}
+
 
                   {!videoConnected && (
                     isAuction && roundActive && activeCapsule?.imageUrl ? (
@@ -870,6 +910,22 @@ export default function LiveViewerPage() {
                     </div>
                   )}
 
+                  {musicState && (
+                    <div className="absolute bottom-32 right-3 z-20 w-24 h-16 rounded-xl overflow-hidden border border-white/15 bg-black shadow-lg flex items-center justify-center">
+                      <YoutubeMusicPlayer state={musicState} elementId="viewer-music-player" muted={musicMuted} />
+                      <button
+                        onClick={() => setMusicMuted((m) => !m)}
+                        className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-black/70 flex items-center justify-center"
+                        title={musicMuted ? 'Activer la musique' : 'Couper la musique'}
+                      >
+                        {musicMuted ? <VolumeX size={12} className="text-white" /> : <Volume2 size={12} className="text-[#a8ff35]" />}
+                      </button>
+                      <span className="absolute top-1 left-1 bg-black/60 rounded-full p-0.5">
+                        <Music size={10} className="text-white/80" />
+                      </span>
+                    </div>
+                  )}
+
                   <GiftBurstOverlay items={screenGifts} />
 
                   {/* Mobile uniquement — fil de commentaires transparent façon TikTok (pas de
@@ -936,20 +992,30 @@ export default function LiveViewerPage() {
                     {!isOwner && !amGuest && (
                       <button
                         onClick={() => (duoRequestStatus === 'pending' ? cancelDuoRequest() : requestDuo())}
-                        className={`w-11 h-11 rounded-full border backdrop-blur-sm flex items-center justify-center transition-all ${
-                          duoRequestStatus === 'pending'
-                            ? 'bg-[#a8ff35] border-[#a8ff35] animate-pulse'
-                            : duoRequestStatus === 'declined' || duoRequestStatus === 'error'
-                            ? 'bg-red-500/70 border-red-400/60'
-                            : 'bg-black/40 border-white/15'
-                        }`}
-                        title="Demander un duo"
+                        className="flex flex-col items-center gap-0.5"
+                        title="Demander à monter en duo"
                       >
-                        {duoRequestStatus === 'pending' ? (
-                          <Loader2 size={18} className="text-black animate-spin" />
-                        ) : (
-                          <Users2 size={19} className="text-white" />
-                        )}
+                        <span
+                          className={`w-11 h-11 rounded-full border backdrop-blur-sm flex items-center justify-center transition-all ${
+                            duoRequestStatus === 'pending'
+                              ? 'bg-[#a8ff35] border-[#a8ff35] animate-pulse'
+                              : duoRequestStatus === 'declined' || duoRequestStatus === 'error'
+                              ? 'bg-red-500/70 border-red-400/60'
+                              : 'bg-black/40 border-white/15'
+                          }`}
+                        >
+                          {duoRequestStatus === 'pending' ? (
+                            <Loader2 size={18} className="text-black animate-spin" />
+                          ) : (
+                            <Hand size={19} className="text-white" />
+                          )}
+                        </span>
+                        {/* Libelle explicite — un pictogramme seul (title ne s'affiche jamais au
+                            toucher sur mobile) se perdait au milieu des autres icones du rail,
+                            personne ne devinait que ça servait a demander a monter en duo. */}
+                        <span className="text-white text-[9px] font-semibold [text-shadow:0_1px_3px_rgba(0,0,0,0.9)]">
+                          {duoRequestStatus === 'pending' ? '...' : 'Monter'}
+                        </span>
                       </button>
                     )}
                   </div>
@@ -1316,7 +1382,7 @@ export default function LiveViewerPage() {
       )}
 
       {gameDrawerOpen && (
-        <LiveGameDrawer liveId={id as string} isLiveOwner={isOwner} onClose={() => setGameDrawerOpen(false)} />
+        <LiveGameDrawer liveId={id as string} isLiveOwner={isOwner} gameActive={gameActive} onClose={() => setGameDrawerOpen(false)} />
       )}
 
       {/* Feuilles mobiles — top donateurs et cadeaux vivent dans le panneau desktop (voir plus

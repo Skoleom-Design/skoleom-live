@@ -6,11 +6,18 @@ import { io, Socket } from 'socket.io-client';
 import { Room, RoomEvent, Track, type RemoteTrack } from 'livekit-client';
 import {
   ArrowLeft, Mic, MicOff, Video, VideoOff, Radio, Loader2, Send, Users, Package, X, ShoppingBag,
-  Crown, Trash2, UserX, Gavel, Timer, ChevronRight, Plus, Trophy, Users2, AlertTriangle, Check, Lock, Eye,
+  Crown, Trash2, UserX, Gavel, Timer, ChevronRight, Plus, Trophy, Users2, AlertTriangle, Check, Lock, Eye, Gamepad2,
+  Music, Pause, Play, Square, Wand2,
 } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
 import { GiftBurstOverlay, type ActiveGiftBurst } from '../../client/components/Live/GiftBurstOverlay';
+import { LiveGameDrawer } from '../../client/components/Game/LiveGameDrawer';
+import { YoutubeMusicPlayer, extractYoutubeId, type MusicState } from '../../client/components/Live/YoutubeMusicPlayer';
+import {
+  FilterEngine, NO_FILTERS, filtersActive, COLOR_FILTER_PRESETS, BACKGROUND_FILTER_PRESETS, FACE_FILTER_PRESETS,
+  type FilterConfig,
+} from '../../client/components/Studio/videoFilters';
 import { api, ApiError, getToken, getStoredUser } from '../../shared/api/http';
 import { giftById } from '../../client/constants/gifts';
 import type { Capsule } from '../../shared/types/api';
@@ -88,6 +95,11 @@ export default function StudioLivePage() {
   const router = useRouter();
   const videoRef = useRef<HTMLVideoElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
+  // Flux publie (LiveKit) ET affiche en local — c'est la SORTIE du pipeline de filtres (voir
+  // videoFilters.ts), pas le flux camera brut (streamRef) : les spectateurs voient donc le filtre
+  // aussi, pas seulement un aperçu local gadget.
+  const publishStreamRef = useRef<MediaStream | null>(null);
+  const filterEngineRef = useRef<FilterEngine | null>(null);
   const socketRef = useRef<Socket | null>(null);
   const commentsEndRef = useRef<HTMLDivElement>(null);
   // Incremente a chaque requestMedia() — permet a une requete getUserMedia en cours de se
@@ -126,6 +138,25 @@ export default function StudioLivePage() {
   const [myCapsules, setMyCapsules] = useState<Capsule[]>([]);
   const [capsulePickerOpen, setCapsulePickerOpen] = useState(false);
   const [capsuleDrawerOpen, setCapsuleDrawerOpen] = useState(false);
+
+  // Le createur peut lancer/gerer un jeu (Undercover, Loup-Garou) directement depuis son propre
+  // studio — jusqu'ici seul le spectateur (live/[id].tsx, en tant que "isOwner") le pouvait,
+  // obligeant a ouvrir un second onglet pour y acceder pendant la diffusion.
+  const [gameDrawerOpen, setGameDrawerOpen] = useState(false);
+  const [gameActive, setGameActive] = useState(false);
+
+  // Musique d'ambiance (YouTube) — voir le commentaire de YoutubeMusicPlayer.tsx pour le principe
+  // (sync de lecture cote client, pas de mixage dans le flux LiveKit).
+  const [musicState, setMusicState] = useState<MusicState | null>(null);
+  const [musicPanelOpen, setMusicPanelOpen] = useState(false);
+  const [musicInput, setMusicInput] = useState('');
+  const [musicInputError, setMusicInputError] = useState('');
+
+  // Filtres video (couleur / arriere-plan / visage) — voir videoFilters.ts. `filterMlError` reste
+  // null tant qu'aucun filtre arriere-plan/visage n'a ete tente, ou si son chargement a reussi.
+  const [filterConfig, setFilterConfig] = useState<FilterConfig>(NO_FILTERS);
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  const [filterMlError, setFilterMlError] = useState<string | null>(null);
 
   // Delai minimum apres la fin d'un live avant de pouvoir en relancer un — verifie a l'arrivee
   // sur la page pour afficher un decompte plutot que de le decouvrir a l'echec du clic "Démarrer".
@@ -288,6 +319,9 @@ export default function StudioLivePage() {
       mediaRequestIdRef.current += 1;
       streamRef.current?.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
+      filterEngineRef.current?.stop();
+      filterEngineRef.current = null;
+      publishStreamRef.current = null;
       roomRef.current?.disconnect();
       roomRef.current = null;
     };
@@ -303,6 +337,9 @@ export default function StudioLivePage() {
       streamRef.current.getTracks().forEach((t) => t.stop());
       streamRef.current = null;
     }
+    filterEngineRef.current?.stop();
+    filterEngineRef.current = null;
+    publishStreamRef.current = null;
 
     if (!navigator.mediaDevices?.getUserMedia) {
       setMediaError(
@@ -315,7 +352,7 @@ export default function StudioLivePage() {
 
     navigator.mediaDevices
       .getUserMedia({ video: true, audio: true })
-      .then((stream) => {
+      .then(async (stream) => {
         if (mediaRequestIdRef.current !== requestId) {
           // Cette requete a ete supplantee (nouvel effet StrictMode, ou nouveau Reessayer) —
           // on libere immediatement ce flux au lieu de le laisser fuiter et verrouiller la camera.
@@ -323,7 +360,28 @@ export default function StudioLivePage() {
           return;
         }
         streamRef.current = stream;
-        if (videoRef.current) videoRef.current.srcObject = stream;
+
+        // Le flux camera brut passe toujours par le pipeline de filtres (voir videoFilters.ts) —
+        // meme sans filtre actif ça reste un simple recopiage de frame, et ça evite d'avoir deux
+        // chemins differents (brut vs filtre) a synchroniser pour l'aperçu local ET la
+        // publication LiveKit. Si le pipeline echoue pour une raison quelconque (canvas non
+        // supporte...), on retombe sur le flux brut plutot que de bloquer le live.
+        try {
+          const engine = new FilterEngine(stream);
+          filterEngineRef.current = engine;
+          engine.setConfig(filterConfig);
+          const output = await engine.start();
+          if (mediaRequestIdRef.current !== requestId) {
+            engine.stop();
+            return;
+          }
+          publishStreamRef.current = output;
+          if (videoRef.current) videoRef.current.srcObject = output;
+        } catch {
+          filterEngineRef.current = null;
+          publishStreamRef.current = stream;
+          if (videoRef.current) videoRef.current.srcObject = stream;
+        }
         setMediaReady(true);
       })
       .catch((err) => {
@@ -425,6 +483,8 @@ export default function StudioLivePage() {
     socket.on('featuredCapsuleChanged', (d: { capsuleId: string | null; capsule: Capsule | null }) => {
       setLive((prev) => (prev ? { ...prev, featuredCapsuleId: d.capsuleId, featuredCapsule: d.capsule } : prev));
     });
+    socket.on('gameActive', () => setGameActive(true));
+    socket.on('musicChanged', (m: MusicState | null) => setMusicState(m));
     socket.on('giftSent', (d: { giftType: string; username: string; displayName?: string }) => {
       const gift = giftById(d.giftType);
       if (!gift) return;
@@ -516,6 +576,39 @@ export default function StudioLivePage() {
   function endDuo(targetUserId: string) {
     if (!live) return;
     socketRef.current?.emit('endDuo', { liveId: live.id, token: getToken(), targetUserId });
+  }
+
+  // Pousse une invitation a un spectateur precis pour rejoindre la partie en cours — le jeu se
+  // rejoint sinon seulement en libre-service (bouton Gamepad2, visible des que gameActive passe a
+  // true pour tout le monde), ce qui n'etait pas assez visible/decouvrable en pratique.
+  const [gameInviteSentTo, setGameInviteSentTo] = useState<string | null>(null);
+  function inviteToGame(targetUserId: string) {
+    if (!live) return;
+    socketRef.current?.emit('inviteToGame', { liveId: live.id, targetUserId, token: getToken() });
+    setGameInviteSentTo(targetUserId);
+    setTimeout(() => setGameInviteSentTo((cur) => (cur === targetUserId ? null : cur)), 2500);
+  }
+
+  function setMusicTrack() {
+    if (!live) return;
+    const youtubeId = extractYoutubeId(musicInput);
+    if (!youtubeId) {
+      setMusicInputError("Lien YouTube non reconnu — colle l'URL complète de la vidéo.");
+      return;
+    }
+    setMusicInputError('');
+    socketRef.current?.emit('setMusic', { liveId: live.id, token: getToken(), youtubeId });
+    setMusicInput('');
+  }
+
+  function toggleMusicPlay() {
+    if (!live || !musicState) return;
+    socketRef.current?.emit(musicState.playing ? 'pauseMusic' : 'resumeMusic', { liveId: live.id, token: getToken() });
+  }
+
+  function stopMusic() {
+    if (!live) return;
+    socketRef.current?.emit('stopMusic', { liveId: live.id, token: getToken() });
   }
 
   // Recherche par pseudo debattue cote serveur — meme pattern que pages/index.tsx.
@@ -629,7 +722,7 @@ export default function StudioLivePage() {
   // serveur (pas de compte/cles), l'appel echoue silencieusement : le live continue quand meme
   // (chat/encheres fonctionnent), seule la video ne part pas vers les spectateurs.
   useEffect(() => {
-    if (!live || !mediaReady || !streamRef.current) return;
+    if (!live || !mediaReady || !publishStreamRef.current) return;
     if (publishedLiveIdRef.current === live.id) return;
     publishedLiveIdRef.current = live.id;
 
@@ -651,8 +744,10 @@ export default function StudioLivePage() {
           return;
         }
         roomRef.current = room;
-        const videoTrack = streamRef.current?.getVideoTracks()[0];
-        const audioTrack = streamRef.current?.getAudioTracks()[0];
+        // Flux FILTRE (pas le flux camera brut) — voir publishStreamRef, les spectateurs voient
+        // donc le meme filtre que l'aperçu local.
+        const videoTrack = publishStreamRef.current?.getVideoTracks()[0];
+        const audioTrack = publishStreamRef.current?.getAudioTracks()[0];
         if (videoTrack) await room.localParticipant.publishTrack(videoTrack, { source: Track.Source.Camera });
         if (audioTrack) await room.localParticipant.publishTrack(audioTrack, { source: Track.Source.Microphone });
       } catch {
@@ -664,6 +759,20 @@ export default function StudioLivePage() {
       cancelled = true;
     };
   }, [live?.id, mediaReady]);
+
+  // Repercute tout changement de filtre sur le pipeline en cours — voir videoFilters.ts. Charge
+  // le ML a la demande (une seule fois) si un filtre arriere-plan/visage est choisi, et remonte
+  // l'erreur de chargement s'il y en a une (les filtres de couleur restent utilisables dans tous les cas).
+  useEffect(() => {
+    const engine = filterEngineRef.current;
+    if (!engine) return;
+    engine.setConfig(filterConfig);
+    if (filterConfig.background !== 'none' || filterConfig.face !== 'none') {
+      engine.ensureMlLoaded().then((err) => setFilterMlError(err));
+    } else {
+      setFilterMlError(null);
+    }
+  }, [filterConfig, mediaReady]);
 
   // Compte a rebours de l'enchere — recalcule chaque seconde a partir de auctionEndsAt (mis a
   // jour par les evenements bidUpdate en cas de prolongation anti-sniping).
@@ -868,7 +977,7 @@ export default function StudioLivePage() {
         <title>Live — skoleomLive</title>
       </Head>
 
-      <div className="flex h-screen cosmic-bg overflow-hidden">
+      <div className="flex h-dvh cosmic-bg overflow-hidden">
         <AppSidebar />
 
         <main className="flex-1 flex flex-col overflow-hidden">
@@ -892,9 +1001,19 @@ export default function StudioLivePage() {
                 >
                   <Users size={13} /> {viewerCount}
                 </button>
-                <span className="flex items-center gap-1.5 text-[#a8ff35]">
+                <span className="hidden sm:flex items-center gap-1.5 text-[#a8ff35]">
                   <ShoppingBag size={13} /> {sales.count} vente{sales.count > 1 ? 's' : ''} · {sales.revenue.toFixed(2)} €
                 </span>
+                {/* Seul acces a "Terminer le live" sur mobile — le panneau de bureau (hidden
+                    md:flex, plus bas) en a aussi un, mais il est invisible sur petit ecran. */}
+                <button
+                  onClick={handleEnd}
+                  disabled={ending}
+                  className="flex items-center gap-1 text-red-400 hover:text-red-300 font-semibold disabled:opacity-60 shrink-0"
+                >
+                  {ending ? <Loader2 size={12} className="animate-spin" /> : null}
+                  Terminer
+                </button>
               </div>
             )}
           </div>
@@ -915,28 +1034,54 @@ export default function StudioLivePage() {
                       </button>
                     </div>
                   ) : (
-                    // Le <video> reste toujours monté (meme avant que le flux soit pret) pour que
-                    // videoRef.current existe deja quand requestMedia() resout — sinon l'assignation
-                    // srcObject = stream arrive avant le montage de l'element et se perd silencieusement,
-                    // laissant l'aperçu noir malgre un flux obtenu avec succes.
-                    <video
-                      ref={videoRef}
-                      autoPlay
-                      muted
-                      playsInline
-                      className={`w-full h-full object-cover ${mediaReady && camOn ? '' : 'hidden'}`}
-                    />
-                  )}
-
-                  {!mediaError && !mediaReady && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <Loader2 size={24} className="text-white/30 animate-spin" />
-                    </div>
-                  )}
-
-                  {mediaReady && !camOn && (
-                    <div className="absolute inset-0 flex items-center justify-center">
-                      <VideoOff size={28} className="text-white/25" />
+                    // Grille "cote a cote" façon visio (Discord) — une cellule par participant
+                    // (moi + chaque invite duo), toujours la meme structure (meme en solo, ou elle
+                    // degenere en 1 seule colonne) pour ne jamais demonter/re-attacher les <video>
+                    // refs quand un duo commence ou se termine.
+                    <div
+                      className="absolute inset-0 grid gap-0.5 bg-black"
+                      style={{ gridTemplateColumns: `repeat(${guests.length > 0 ? 2 : 1}, 1fr)`, gridAutoRows: '1fr' }}
+                    >
+                      <div className="relative bg-black overflow-hidden">
+                        {/* Le <video> reste toujours monté (meme avant que le flux soit pret) pour
+                            que videoRef.current existe deja quand requestMedia() resout — sinon
+                            l'assignation srcObject = stream arrive avant le montage de l'element
+                            et se perd silencieusement, laissant l'aperçu noir malgre un flux
+                            obtenu avec succes. */}
+                        <video
+                          ref={videoRef}
+                          autoPlay
+                          muted
+                          playsInline
+                          className={`absolute inset-0 w-full h-full object-cover ${mediaReady && camOn ? '' : 'hidden'}`}
+                        />
+                        {!mediaReady && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <Loader2 size={24} className="text-white/30 animate-spin" />
+                          </div>
+                        )}
+                        {mediaReady && !camOn && (
+                          <div className="absolute inset-0 flex items-center justify-center">
+                            <VideoOff size={28} className="text-white/25" />
+                          </div>
+                        )}
+                        {guests.length > 0 && (
+                          <span className="absolute bottom-1 left-1.5 z-10 text-[10px] text-white font-semibold truncate px-1 drop-shadow">Toi</span>
+                        )}
+                      </div>
+                      {guests.map((g) => (
+                        <div key={g.id} className="relative bg-black overflow-hidden">
+                          <video ref={makeGuestVideoRef(g.id)} autoPlay playsInline className="absolute inset-0 w-full h-full object-cover" />
+                          <audio ref={makeGuestAudioRef(g.id)} autoPlay className="hidden" />
+                          <span className="absolute bottom-1 left-1.5 z-10 text-[10px] text-white font-semibold truncate px-1 drop-shadow">@{g.username}</span>
+                          <button
+                            onClick={() => endDuo(g.id)}
+                            className="absolute top-1 right-1 z-10 w-5 h-5 rounded-full bg-black/60 flex items-center justify-center"
+                          >
+                            <X size={11} className="text-white" />
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   )}
 
@@ -1012,6 +1157,36 @@ export default function StudioLivePage() {
                           )}
                         </button>
                       )}
+                      {live && (
+                        <button
+                          onClick={() => setGameDrawerOpen(true)}
+                          className="relative w-11 h-11 rounded-full flex items-center justify-center transition-all bg-white/10 hover:bg-white/20 text-white"
+                          title="Jeu"
+                        >
+                          <Gamepad2 size={18} className="text-[#a8ff35]" />
+                          {gameActive && <span className="absolute -top-0.5 -right-0.5 w-3.5 h-3.5 rounded-full bg-[#a8ff35] border-2 border-black" />}
+                        </button>
+                      )}
+                      {live && (
+                        <button
+                          onClick={() => setMusicPanelOpen(true)}
+                          className={`relative w-11 h-11 rounded-full flex items-center justify-center transition-all ${
+                            musicState ? 'bg-[#a8ff35] text-black' : 'bg-white/10 hover:bg-white/20 text-white'
+                          }`}
+                          title="Musique"
+                        >
+                          <Music size={18} />
+                        </button>
+                      )}
+                      <button
+                        onClick={() => setFilterPanelOpen(true)}
+                        className={`relative w-11 h-11 rounded-full flex items-center justify-center transition-all ${
+                          filtersActive(filterConfig) ? 'bg-[#a8ff35] text-black' : 'bg-white/10 hover:bg-white/20 text-white'
+                        }`}
+                        title="Filtres"
+                      >
+                        <Wand2 size={18} />
+                      </button>
                     </div>
                   )}
 
@@ -1098,18 +1273,33 @@ export default function StudioLivePage() {
                     <Trophy size={17} className="text-[#f59e0b]" />
                   </button>
 
-                  {/* Invites — une bulle video par invite, en incrustation */}
-                  {guests.length > 0 && (
-                    <div className="absolute bottom-16 left-3 flex items-end gap-1.5 z-10">
-                      {guests.map((g) => (
-                        <div key={g.id} className="relative w-20 h-28 rounded-xl overflow-hidden border-2 border-[#a8ff35]/60 bg-black shadow-lg shrink-0">
-                          <video ref={makeGuestVideoRef(g.id)} autoPlay playsInline className="w-full h-full object-cover" />
-                          <audio ref={makeGuestAudioRef(g.id)} autoPlay />
-                          <span className="absolute bottom-0.5 inset-x-0 text-center text-[9px] text-white/90 font-semibold truncate px-1 drop-shadow">
-                            @{g.username}
-                          </span>
-                        </div>
-                      ))}
+                  {/* Ecrire un message sur mobile — le formulaire "vrai" (plus bas, avec l'historique
+                      complet) est dans le panneau desktop (hidden md:flex), invisible sur mobile :
+                      sans ceci il n'y avait tout simplement aucun moyen de commenter sur mobile. */}
+                  <form onSubmit={sendComment} className="md:hidden absolute left-3 right-14 bottom-16 z-30 flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={commentInput}
+                      onChange={(e) => setCommentInput(e.target.value)}
+                      placeholder="Commenter…"
+                      className="flex-1 bg-black/45 border border-white/20 rounded-full px-3.5 py-2 text-white placeholder:text-white/50 text-[13px] backdrop-blur-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 transition-all"
+                    />
+                    <button type="submit" className="w-9 h-9 rounded-full bg-black/45 border border-white/20 backdrop-blur-sm flex items-center justify-center shrink-0">
+                      <Send size={14} className="text-[#a8ff35]" />
+                    </button>
+                  </form>
+
+                  {musicState && (
+                    <div className="absolute top-3 right-3 z-20 w-24 h-16 rounded-xl overflow-hidden border border-white/15 bg-black shadow-lg">
+                      <YoutubeMusicPlayer state={musicState} elementId="studio-music-player" />
+                      <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-black/70 py-1">
+                        <button onClick={toggleMusicPlay} className="text-white/90 hover:text-white">
+                          {musicState.playing ? <Pause size={11} /> : <Play size={11} />}
+                        </button>
+                        <button onClick={stopMusic} className="text-white/90 hover:text-white">
+                          <Square size={10} />
+                        </button>
+                      </div>
                     </div>
                   )}
 
@@ -1624,6 +1814,118 @@ export default function StudioLivePage() {
         />
       )}
 
+      {gameDrawerOpen && live && (
+        <LiveGameDrawer liveId={live.id} isLiveOwner gameActive={gameActive} onClose={() => setGameDrawerOpen(false)} />
+      )}
+
+      {musicPanelOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4" onClick={() => setMusicPanelOpen(false)}>
+          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-white font-bold text-base flex items-center gap-2">
+                <Music size={16} /> Musique
+              </h2>
+              <button onClick={() => setMusicPanelOpen(false)} className="text-white/40 hover:text-white">
+                <X size={18} />
+              </button>
+            </div>
+            <p className="text-white/40 text-xs mb-4">
+              Colle un lien YouTube — chaque spectateur l&apos;entendra en même temps que toi, en parallèle de la vidéo (pas mixé dans ton micro).
+            </p>
+            {musicState && (
+              <div className="flex items-center justify-between bg-[#a8ff35]/10 border border-[#a8ff35]/25 rounded-xl px-3.5 py-2.5 mb-4">
+                <p className="text-[12px] text-[#a8ff35] font-semibold">{musicState.playing ? 'En cours de lecture' : 'En pause'}</p>
+                <div className="flex items-center gap-2">
+                  <button onClick={toggleMusicPlay} className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white">
+                    {musicState.playing ? <Pause size={14} /> : <Play size={14} />}
+                  </button>
+                  <button onClick={stopMusic} className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white">
+                    <Square size={13} />
+                  </button>
+                </div>
+              </div>
+            )}
+            <div className="flex gap-2">
+              <input
+                value={musicInput}
+                onChange={(e) => { setMusicInput(e.target.value); setMusicInputError(''); }}
+                onKeyDown={(e) => e.key === 'Enter' && setMusicTrack()}
+                placeholder="https://youtube.com/watch?v=…"
+                className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 focus:border-[#a8ff35]/30"
+              />
+              <button onClick={setMusicTrack} className="btn-skoleom px-4 rounded-xl text-sm shrink-0">
+                {musicState ? 'Changer' : 'Lancer'}
+              </button>
+            </div>
+            {musicInputError && <p className="text-red-400 text-xs mt-2">{musicInputError}</p>}
+          </div>
+        </div>
+      )}
+
+      {filterPanelOpen && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4" onClick={() => setFilterPanelOpen(false)}>
+          <div className="w-full max-w-sm bg-[#0d0d0f] border border-white/[0.08] rounded-[20px] p-5 max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-white font-bold text-base flex items-center gap-2">
+                <Wand2 size={16} /> Filtres
+              </h2>
+              <button onClick={() => setFilterPanelOpen(false)} className="text-white/40 hover:text-white">
+                <X size={18} />
+              </button>
+            </div>
+
+            {filterMlError && (
+              <p className="text-amber-400 text-xs bg-amber-400/10 border border-amber-400/20 rounded-xl px-3.5 py-2.5 mb-4">{filterMlError}</p>
+            )}
+
+            <p className="text-white/50 text-[11px] font-semibold uppercase tracking-wider mb-2">Couleur</p>
+            <div className="flex flex-wrap gap-2 mb-5">
+              {COLOR_FILTER_PRESETS.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setFilterConfig((c) => ({ ...c, color: f.id }))}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                    filterConfig.color === f.id ? 'bg-[#a8ff35] text-black border-[#a8ff35]' : 'bg-white/[0.05] text-white/70 border-white/10 hover:bg-white/[0.08]'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            <p className="text-white/50 text-[11px] font-semibold uppercase tracking-wider mb-2">Arrière-plan</p>
+            <div className="flex flex-wrap gap-2 mb-5">
+              {BACKGROUND_FILTER_PRESETS.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setFilterConfig((c) => ({ ...c, background: f.id }))}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                    filterConfig.background === f.id ? 'bg-[#a8ff35] text-black border-[#a8ff35]' : 'bg-white/[0.05] text-white/70 border-white/10 hover:bg-white/[0.08]'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            <p className="text-white/50 text-[11px] font-semibold uppercase tracking-wider mb-2">Visage</p>
+            <div className="flex flex-wrap gap-2">
+              {FACE_FILTER_PRESETS.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setFilterConfig((c) => ({ ...c, face: f.id }))}
+                  className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all ${
+                    filterConfig.face === f.id ? 'bg-[#a8ff35] text-black border-[#a8ff35]' : 'bg-white/[0.05] text-white/70 border-white/10 hover:bg-white/[0.08]'
+                  }`}
+                >
+                  {f.emoji} {f.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {duoPanelOpen && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4"
           onClick={() => setDuoPanelOpen(false)}>
@@ -1774,6 +2076,20 @@ export default function StudioLivePage() {
                             }`}
                           >
                             {grantedViewerIds.has(v.userId) ? <Check size={13} /> : <Eye size={13} />}
+                          </button>
+                        )}
+                        {gameActive && (
+                          <button
+                            onClick={() => inviteToGame(v.userId)}
+                            disabled={gameInviteSentTo === v.userId}
+                            title="Inviter à jouer"
+                            className={`w-7 h-7 rounded-full flex items-center justify-center border transition-colors ${
+                              gameInviteSentTo === v.userId
+                                ? 'border-[#a8ff35]/40 text-[#a8ff35]'
+                                : 'border-white/15 text-white/60 hover:text-white hover:bg-white/10'
+                            }`}
+                          >
+                            {gameInviteSentTo === v.userId ? <Check size={13} /> : <Gamepad2 size={13} />}
                           </button>
                         )}
                         <button

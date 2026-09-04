@@ -1,8 +1,9 @@
 import { Injectable } from '@nestjs/common';
 import { WordPair, pickRandomPair } from './word-bank';
 
-export type GamePhase = 'lobby' | 'clue' | 'voting' | 'reveal' | 'mrWhiteGuess' | 'ended';
-export type GameRole = 'civilian' | 'undercover' | 'mrwhite';
+export type GamePhase = 'lobby' | 'clue' | 'night' | 'voting' | 'reveal' | 'mrWhiteGuess' | 'ended';
+export type GameRole = 'civilian' | 'undercover' | 'mrwhite' | 'villager' | 'werewolf';
+export type GameType = 'undercover' | 'werewolf';
 
 export const MIN_PLAYERS = 3;
 export const MAX_PLAYERS = 12;
@@ -23,6 +24,7 @@ export interface GamePlayer {
 export interface GameSettings {
   undercoverCount: number;
   mrWhiteCount: number;
+  werewolfCount: number;
 }
 
 export interface RoundClue {
@@ -42,6 +44,7 @@ export interface EliminationRecord {
 
 export interface GameRoom {
   code: string;
+  gameType: GameType;
   players: Map<string, GamePlayer>;
   phase: GamePhase;
   settings: GameSettings;
@@ -50,12 +53,13 @@ export interface GameRoom {
   turnIndex: number;
   clues: RoundClue[];
   votes: Map<string, string>;
+  nightVotes: Map<string, string>; // loups-garous uniquement, phase 'night'
   civilianWord?: string;
   undercoverWord?: string;
   lastPair?: WordPair;
   history: EliminationRecord[];
   mrWhiteGuessUserId?: string;
-  winner?: 'civilians' | 'undercover' | 'mrwhite';
+  winner?: 'civilians' | 'undercover' | 'mrwhite' | 'villagers' | 'werewolves';
   createdAt: number;
 }
 
@@ -92,10 +96,11 @@ export class GameService {
     return this.rooms.get(code.toUpperCase());
   }
 
-  createRoom(host: { userId: string; username: string; avatarUrl?: string }, socketId: string): GameRoom {
+  createRoom(host: { userId: string; username: string; avatarUrl?: string }, socketId: string, gameType: GameType): GameRoom {
     const code = this.generateCode();
     const room: GameRoom = {
       code,
+      gameType,
       players: new Map([[host.userId, {
         userId: host.userId,
         username: host.username,
@@ -106,12 +111,13 @@ export class GameService {
         connected: true,
       }]]),
       phase: 'lobby',
-      settings: { undercoverCount: 1, mrWhiteCount: 0 },
+      settings: { undercoverCount: 1, mrWhiteCount: 0, werewolfCount: 1 },
       round: 0,
       turnOrder: [],
       turnIndex: 0,
       clues: [],
       votes: new Map(),
+      nightVotes: new Map(),
       history: [],
       createdAt: Date.now(),
     };
@@ -155,6 +161,7 @@ export class GameService {
     isLiveCreator: boolean,
     player: { userId: string; username: string; avatarUrl?: string },
     socketId: string,
+    gameType: GameType,
   ): { room: GameRoom; created: boolean } {
     const existingCode = this.liveRooms.get(liveId);
     if (existingCode && this.rooms.has(existingCode)) {
@@ -163,7 +170,7 @@ export class GameService {
     if (!isLiveCreator) {
       throw new GameError("Le créateur n'a pas encore lancé de partie.");
     }
-    const room = this.createRoom(player, socketId);
+    const room = this.createRoom(player, socketId, gameType);
     this.liveRooms.set(liveId, room.code);
     return { room, created: true };
   }
@@ -207,13 +214,18 @@ export class GameService {
     return [...room.players.values()].find((p) => p.isHost)?.userId ?? '';
   }
 
-  updateSettings(code: string, userId: string, settings: GameSettings): GameRoom {
+  updateSettings(code: string, userId: string, settings: Partial<GameSettings>): GameRoom {
     const room = this.mustGetRoom(code);
     this.assertHost(room, userId);
     if (room.phase !== 'lobby') throw new GameError('Impossible de changer les réglages, la partie a commencé.');
-    const undercoverCount = Math.max(1, Math.min(4, Math.floor(settings.undercoverCount)));
-    const mrWhiteCount = Math.max(0, Math.min(1, Math.floor(settings.mrWhiteCount)));
-    room.settings = { undercoverCount, mrWhiteCount };
+    if (room.gameType === 'werewolf') {
+      const werewolfCount = Math.max(1, Math.min(4, Math.floor(settings.werewolfCount ?? room.settings.werewolfCount)));
+      room.settings = { ...room.settings, werewolfCount };
+    } else {
+      const undercoverCount = Math.max(1, Math.min(4, Math.floor(settings.undercoverCount ?? room.settings.undercoverCount)));
+      const mrWhiteCount = Math.max(0, Math.min(1, Math.floor(settings.mrWhiteCount ?? room.settings.mrWhiteCount)));
+      room.settings = { ...room.settings, undercoverCount, mrWhiteCount };
+    }
     return room;
   }
 
@@ -226,6 +238,35 @@ export class GameService {
     if (players.length < MIN_PLAYERS) {
       throw new GameError(`Il faut au moins ${MIN_PLAYERS} joueurs pour commencer.`);
     }
+
+    if (room.gameType === 'werewolf') {
+      const werewolfCount = Math.min(room.settings.werewolfCount, Math.floor((players.length - 1) / 2) || 1);
+      if (werewolfCount >= players.length) throw new GameError('Trop de loups-garous pour ce nombre de joueurs.');
+
+      const shuffled = shuffle(players);
+      const roles: GameRole[] = [
+        ...Array(werewolfCount).fill('werewolf'),
+        ...Array(shuffled.length - werewolfCount).fill('villager'),
+      ];
+      shuffled.forEach((p, i) => {
+        p.role = roles[i];
+        p.word = undefined;
+        p.alive = true;
+      });
+
+      room.round = 1;
+      room.turnOrder = [];
+      room.turnIndex = 0;
+      room.clues = [];
+      room.votes = new Map();
+      room.nightVotes = new Map();
+      room.history = [];
+      room.winner = undefined;
+      room.mrWhiteGuessUserId = undefined;
+      room.phase = 'night';
+      return room;
+    }
+
     const special = room.settings.undercoverCount + room.settings.mrWhiteCount;
     if (special >= players.length - 1) {
       throw new GameError('Trop d\'undercover/Mr. White pour ce nombre de joueurs.');
@@ -258,6 +299,55 @@ export class GameService {
     room.mrWhiteGuessUserId = undefined;
     room.phase = 'clue';
     return room;
+  }
+
+  // Phase de nuit (Loup-Garou uniquement) — les loups choisissent collectivement une victime,
+  // meme mecanisme de majorite que le vote de jour (submitVote/resolveVoting) mais restreint aux
+  // joueurs vivants avec le role 'werewolf', et sans possibilite de s'auto-designer.
+  submitNightKill(code: string, userId: string, targetUserId: string): GameRoom {
+    const room = this.mustGetRoom(code);
+    if (room.gameType !== 'werewolf' || room.phase !== 'night') {
+      throw new GameError("Ce n'est pas la phase de nuit.");
+    }
+    const wolf = this.mustGetPlayer(room, userId);
+    if (!wolf.alive || wolf.role !== 'werewolf') {
+      throw new GameError('Seuls les loups-garous choisissent une victime.');
+    }
+    const target = room.players.get(targetUserId);
+    if (!target || !target.alive || target.role === 'werewolf') {
+      throw new GameError('Cible invalide.');
+    }
+
+    room.nightVotes.set(userId, targetUserId);
+    const aliveWolves = [...room.players.values()].filter((p) => p.alive && p.role === 'werewolf').map((p) => p.userId);
+    if (aliveWolves.every((id) => room.nightVotes.has(id))) {
+      this.resolveNightKill(room);
+    }
+    return room;
+  }
+
+  private resolveNightKill(room: GameRoom) {
+    const tally = new Map<string, number>();
+    for (const targetId of room.nightVotes.values()) {
+      tally.set(targetId, (tally.get(targetId) ?? 0) + 1);
+    }
+    let max = 0;
+    for (const count of tally.values()) max = Math.max(max, count);
+    const topTargets = [...tally.entries()].filter(([, count]) => count === max).map(([id]) => id);
+    const victimId = topTargets[Math.floor(Math.random() * topTargets.length)];
+    const victim = room.players.get(victimId)!;
+    victim.alive = false;
+    room.history.push({ userId: victim.userId, username: victim.username, role: victim.role!, votes: max, tie: false });
+    room.nightVotes = new Map();
+
+    const winner = this.computeWinner(room);
+    if (winner) {
+      room.winner = winner;
+      room.phase = 'ended';
+      return;
+    }
+    room.phase = 'voting';
+    room.votes = new Map();
   }
 
   submitClue(code: string, userId: string, clue: string): GameRoom {
@@ -394,6 +484,13 @@ export class GameService {
         this.resolveVoting(room);
         return room;
       }
+    } else if (room.phase === 'night') {
+      room.nightVotes.delete(targetUserId);
+      const aliveWolves = [...room.players.values()].filter((p) => p.alive && p.role === 'werewolf').map((p) => p.userId);
+      if (aliveWolves.length > 0 && aliveWolves.every((id) => room.nightVotes.has(id))) {
+        this.resolveNightKill(room);
+        return room;
+      }
     }
     this.checkWinConditionInPlace(room);
     return room;
@@ -416,6 +513,13 @@ export class GameService {
 
   private computeWinner(room: GameRoom): GameRoom['winner'] | undefined {
     const alive = [...room.players.values()].filter((p) => p.alive);
+    if (room.gameType === 'werewolf') {
+      const wolves = alive.filter((p) => p.role === 'werewolf').length;
+      const villagers = alive.filter((p) => p.role === 'villager').length;
+      if (wolves === 0) return 'villagers';
+      if (wolves >= villagers) return 'werewolves';
+      return undefined;
+    }
     const infiltrators = alive.filter((p) => p.role === 'undercover' || p.role === 'mrwhite').length;
     const civilians = alive.filter((p) => p.role === 'civilian').length;
     if (infiltrators === 0) return 'civilians';
@@ -431,6 +535,11 @@ export class GameService {
       return;
     }
     room.round += 1;
+    if (room.gameType === 'werewolf') {
+      room.nightVotes = new Map();
+      room.phase = 'night';
+      return;
+    }
     room.turnOrder = shuffle([...room.players.values()].filter((p) => p.alive).map((p) => p.userId));
     room.turnIndex = 0;
     room.clues = [];
@@ -450,6 +559,7 @@ export class GameService {
     room.turnIndex = 0;
     room.clues = [];
     room.votes = new Map();
+    room.nightVotes = new Map();
     room.history = [];
     room.winner = undefined;
     room.mrWhiteGuessUserId = undefined;
@@ -466,6 +576,7 @@ export class GameService {
   getPublicState(room: GameRoom) {
     return {
       code: room.code,
+      gameType: room.gameType,
       phase: room.phase,
       round: room.round,
       settings: room.settings,
@@ -481,6 +592,8 @@ export class GameService {
       currentTurnUserId: room.phase === 'clue' ? room.turnOrder[room.turnIndex] : undefined,
       clues: room.clues,
       votesReceived: room.phase === 'voting' ? room.votes.size : undefined,
+      nightVotesReceived: room.phase === 'night' ? room.nightVotes.size : undefined,
+      nightWolvesCount: room.phase === 'night' ? [...room.players.values()].filter((p) => p.alive && p.role === 'werewolf').length : undefined,
       history: room.history,
       mrWhiteGuessUserId: room.mrWhiteGuessUserId,
       winner: room.winner,
