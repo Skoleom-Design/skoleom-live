@@ -4,7 +4,7 @@ import Head from 'next/head';
 import Link from 'next/link';
 import { io, Socket } from 'socket.io-client';
 import { Room, RoomEvent, Track, type RemoteTrack } from 'livekit-client';
-import { ArrowLeft, Users, Send, Gavel, Timer, Package, Crown, Gift, Wallet, Plus, Trophy, VolumeX, Volume2, Check, X as XIcon, MoreVertical, UserX, AlertTriangle, Loader2, Lock, Gamepad2, Music, Hand } from 'lucide-react';
+import { ArrowLeft, Users, Send, Gavel, Timer, Package, Crown, Gift, Wallet, Plus, Trophy, VolumeX, Volume2, Check, X as XIcon, MoreVertical, UserX, AlertTriangle, Loader2, Lock, Gamepad2, Music, Hand, MessageCircle } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
 import { LiveGameDrawer } from '../../client/components/Game/LiveGameDrawer';
@@ -80,6 +80,10 @@ export default function LiveViewerPage() {
   // Ancre de scroll dediee au fil transparent mobile (voir plus bas) — separee de commentsEndRef
   // pour ne pas faire deux appels scrollIntoView concurrents sur le meme conteneur.
   const mobileCommentsEndRef = useRef<HTMLDivElement>(null);
+  // Ancre dediee a la feuille de chat mobile (mobileChatOpen) — distincte de commentsEndRef
+  // (panneau bureau) pour ne pas se disputer la meme ref alors que les deux existent dans le DOM
+  // en meme temps (le panneau bureau est seulement cache via CSS sur mobile, pas demonte).
+  const mobileChatEndRef = useRef<HTMLDivElement>(null);
   const roomRef = useRef<Room | null>(null);
   const videoElRef = useRef<HTMLVideoElement>(null);
   const audioElRef = useRef<HTMLAudioElement>(null);
@@ -196,6 +200,13 @@ export default function LiveViewerPage() {
   // lateral (voir plus bas), sur mobile ils s'ouvrent en feuille par-dessus la video en plein
   // ecran (voir le bloc md:hidden dans le JSX).
   const [mobileGiftsOpen, setMobileGiftsOpen] = useState(false);
+  // La bande de saisie incrustee au bas de la video (position absolute bottom-0) se retrouvait
+  // hors-champ ou ecrasee sur certains iPhone en Safari quand la colonne d'icones a droite
+  // (trophee/cadeau/musique/jeu/monter) s'est allongee — la hauteur "visible" reelle (barres
+  // Safari comprises) laisse alors moins de place qu'estime. Une feuille plein ecran (meme
+  // mecanisme fiable que mobileGiftsOpen, fixed inset-0, jamais tributaire de la hauteur de la
+  // boite video) est beaucoup plus robuste qu'une bande incrustee de plus en plus a l'etroit.
+  const [mobileChatOpen, setMobileChatOpen] = useState(false);
 
   // Mini-jeu (Undercover) lance depuis l'interieur du live — voir GameGateway.joinLiveGame.
   // `gameActive` allume le badge sur le bouton des qu'une partie demarre, meme pour un spectateur
@@ -549,6 +560,7 @@ export default function LiveViewerPage() {
   useEffect(() => {
     commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     mobileCommentsEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    mobileChatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [comments]);
 
   useEffect(() => {
@@ -968,6 +980,12 @@ export default function LiveViewerPage() {
 
                   <div className="md:hidden absolute right-2 bottom-16 z-30 flex flex-col items-center gap-4">
                     <button
+                      onClick={() => setMobileChatOpen(true)}
+                      className="w-11 h-11 rounded-full bg-black/40 border border-white/15 backdrop-blur-sm flex items-center justify-center"
+                    >
+                      <MessageCircle size={19} className="text-white" />
+                    </button>
+                    <button
                       onClick={() => setTopDonorsOpen(true)}
                       className="w-11 h-11 rounded-full bg-black/40 border border-white/15 backdrop-blur-sm flex items-center justify-center"
                     >
@@ -1031,26 +1049,6 @@ export default function LiveViewerPage() {
                     </div>
                   )}
 
-                  <div className="md:hidden absolute bottom-0 inset-x-0 z-30 pt-8 pb-3 px-3 bg-gradient-to-t from-black/75 via-black/25 to-transparent">
-                    {iAmMuted ? (
-                      <p className="text-center text-[11px] text-red-300 [text-shadow:0_1px_4px_rgba(0,0,0,0.9)]">
-                        Tu as été mis en sourdine par le créateur.
-                      </p>
-                    ) : (
-                      <form onSubmit={sendComment} className="flex items-center gap-2">
-                        <input
-                          type="text"
-                          value={commentInput}
-                          onChange={(e) => setCommentInput(e.target.value)}
-                          placeholder="Commenter…"
-                          className="flex-1 bg-black/35 border border-white/20 rounded-full px-3.5 py-2 text-white placeholder:text-white/50 text-[13px] backdrop-blur-sm focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 transition-all"
-                        />
-                        <button type="submit" className="w-9 h-9 rounded-full bg-black/40 border border-white/15 backdrop-blur-sm flex items-center justify-center shrink-0">
-                          <Send size={14} className="text-[#a8ff35]" />
-                        </button>
-                      </form>
-                    )}
-                  </div>
                 </div>
 
                 {isAuction && roundActive && (
@@ -1426,6 +1424,81 @@ export default function LiveViewerPage() {
                 ))}
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {mobileChatOpen && (
+        <div
+          className="md:hidden fixed inset-0 z-[9999] flex items-end bg-black/70 backdrop-blur-sm"
+          onClick={() => setMobileChatOpen(false)}
+        >
+          <div className="w-full bg-[#0d0d0f] border-t border-white/[0.08] rounded-t-[24px] h-[75vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex justify-center pt-3 pb-1 shrink-0">
+              <div className="w-10 h-1 rounded-full bg-white/20" />
+            </div>
+            <div className="px-4 py-3 border-b border-white/[0.06] shrink-0 text-white font-bold text-sm">
+              Commentaires
+            </div>
+            <div className="flex-1 overflow-y-auto scrollbar-hide px-4 py-3 space-y-2.5">
+              {comments.length === 0 && (
+                <p className="text-white/25 text-xs text-center mt-4">Aucun commentaire pour l&apos;instant.</p>
+              )}
+              {comments.map((c) => {
+                const isHost = c.userId === live.creator.id;
+                if (c.isGift) {
+                  return (
+                    <div key={c.id} className="flex items-center gap-2 text-[13px] leading-snug bg-white/[0.03] rounded-xl px-2 py-1.5">
+                      {c.giftImage && <img src={c.giftImage} alt="" className="w-6 h-6 object-contain shrink-0" />}
+                      <p className="min-w-0">
+                        <span className="font-semibold mr-1 text-[#f59e0b]">{c.username}</span>
+                        <span className="text-[#f59e0b]/80 break-words font-medium">{c.text}</span>
+                      </p>
+                    </div>
+                  );
+                }
+                if (c.isBid) {
+                  return (
+                    <div key={c.id} className="flex items-center gap-2 text-[13px] leading-snug bg-white/[0.03] rounded-xl px-2 py-1.5">
+                      <span className="w-5 h-5 rounded-full bg-[#a8ff35]/15 flex items-center justify-center shrink-0">
+                        <Gavel size={11} className="text-[#a8ff35]" />
+                      </span>
+                      <p className="min-w-0">
+                        <span className="font-semibold mr-1 text-[#a8ff35]">{c.username}</span>
+                        <span className="text-[#a8ff35]/80 break-words font-medium">{c.text}</span>
+                      </p>
+                    </div>
+                  );
+                }
+                return (
+                  <p key={c.id} className="text-[13px] leading-snug">
+                    <span className={`font-semibold mr-1 ${isHost ? 'text-[#f59e0b]' : 'text-[#a8ff35]'}`}>{c.username}</span>
+                    {isHost && <Crown size={11} className="inline text-[#f59e0b] mr-1 -translate-y-px" />}
+                    <span className="text-white/80 break-words">{c.text}</span>
+                  </p>
+                );
+              })}
+              <div ref={mobileChatEndRef} />
+            </div>
+            <div className="p-3 border-t border-white/[0.06] shrink-0" style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}>
+              {iAmMuted ? (
+                <p className="text-center text-[12px] text-red-300">Tu as été mis en sourdine par le créateur.</p>
+              ) : (
+                <form onSubmit={sendComment} className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    autoFocus
+                    value={commentInput}
+                    onChange={(e) => setCommentInput(e.target.value)}
+                    placeholder="Commenter…"
+                    className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-full px-3.5 py-2.5 text-white placeholder:text-white/25 text-[13px] focus:outline-none focus:ring-1 focus:ring-[#a8ff35]/50 transition-all"
+                  />
+                  <button type="submit" className="w-10 h-10 rounded-full bg-white/[0.06] hover:bg-white/10 flex items-center justify-center shrink-0 transition-all">
+                    <Send size={16} className="text-[#a8ff35]" />
+                  </button>
+                </form>
+              )}
+            </div>
           </div>
         </div>
       )}
