@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api } from '../../../shared/api/http';
 import { useLanguage } from '../../i18n/LanguageContext';
-import { PRESET_AVATARS } from '../../constants/avatars';
+import { PRESET_AVATARS_PERSONAS } from '../../constants/avatars';
 import { AvatarCategoryPicker } from './AvatarCategoryPicker';
 import { LogoLockup } from '../Brand/LogoLockup';
 
@@ -13,7 +13,7 @@ interface AvatarPickerGateProps {
 // la main dans le formulaire, il ne reste que la photo de profil facon "gamerpic" a proposer.
 export function AvatarPickerGate({ onDone }: AvatarPickerGateProps) {
   const { t } = useLanguage();
-  const [avatarUrl, setAvatarUrl] = useState(PRESET_AVATARS[0]);
+  const [avatarUrl, setAvatarUrl] = useState(PRESET_AVATARS_PERSONAS[0]);
   const [saving, setSaving] = useState(false);
 
   async function submit() {
@@ -39,7 +39,7 @@ export function AvatarPickerGate({ onDone }: AvatarPickerGateProps) {
         </div>
 
         <div className="mb-6 max-h-72 overflow-y-auto scrollbar-hide pr-1">
-          <AvatarCategoryPicker cosmicOptions={PRESET_AVATARS} value={avatarUrl} onChange={setAvatarUrl} />
+          <AvatarCategoryPicker value={avatarUrl} onChange={setAvatarUrl} />
         </div>
 
         <button

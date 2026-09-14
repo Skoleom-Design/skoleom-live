@@ -156,7 +156,6 @@ export const fr = {
     profileSubtitle: 'Choisis ton pseudo et ta photo de profil — tu pourras les changer plus tard.',
     chooseAvatar: 'Photo de profil',
     avatarSubtitle: 'Choisis ta photo de profil — tu pourras la changer plus tard.',
-    categoryCosmic: 'Cosmique',
     categoryRobots: 'Robots',
     categoryPortraits: 'Portraits',
     categoryOrbits: 'Orbites',

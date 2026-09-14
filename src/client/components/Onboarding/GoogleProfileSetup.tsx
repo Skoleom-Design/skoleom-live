@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { api, ApiError } from '../../../shared/api/http';
 import { useLanguage } from '../../i18n/LanguageContext';
-import { PRESET_AVATARS } from '../../constants/avatars';
+import { PRESET_AVATARS_PERSONAS } from '../../constants/avatars';
 import { AvatarCategoryPicker } from './AvatarCategoryPicker';
 import { LogoLockup } from '../Brand/LogoLockup';
 
@@ -16,10 +16,10 @@ interface GoogleProfileSetupProps {
 // donc on laisse l'occasion de le changer ici, plus un choix de photo de profil facon "gamerpic".
 export function GoogleProfileSetup({ initialUsername, googleAvatarUrl, onDone }: GoogleProfileSetupProps) {
   const { t } = useLanguage();
-  const avatarOptions = googleAvatarUrl ? [googleAvatarUrl, ...PRESET_AVATARS] : PRESET_AVATARS;
+  const extraOptions = googleAvatarUrl ? [googleAvatarUrl] : [];
 
   const [username, setUsername] = useState(initialUsername);
-  const [avatarUrl, setAvatarUrl] = useState(avatarOptions[0]);
+  const [avatarUrl, setAvatarUrl] = useState(googleAvatarUrl || PRESET_AVATARS_PERSONAS[0]);
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -68,7 +68,7 @@ export function GoogleProfileSetup({ initialUsername, googleAvatarUrl, onDone }:
           {t('onboarding.chooseAvatar')}
         </p>
         <div className="mb-6 max-h-72 overflow-y-auto scrollbar-hide pr-1">
-          <AvatarCategoryPicker cosmicOptions={avatarOptions} value={avatarUrl} onChange={setAvatarUrl} />
+          <AvatarCategoryPicker extraOptions={extraOptions} value={avatarUrl} onChange={setAvatarUrl} />
         </div>
 
         {error && (

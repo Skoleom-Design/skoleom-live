@@ -8,16 +8,20 @@ import {
 import { useLanguage } from '../../i18n/LanguageContext';
 
 interface AvatarCategoryPickerProps {
-  cosmicOptions: string[];
+  // Avatars a proposer en plus des galeries fixes (ex: la vraie photo Google au premier login) —
+  // fusionnes en tete de l'onglet "Personnages" plutot que d'avoir leur propre onglet.
+  extraOptions?: string[];
   value: string;
   onChange: (url: string) => void;
 }
 
-// Categories de gamerpics — "Cosmique" (illustrations SVG maison), quatre categories illustrees
-// (voir PRESET_AVATARS_*, generees via DiceBear puis sauvegardees en statique) et "Dessiner"
-// (atelier de dessin libre, voir AvatarDrawModal), toutes dans un seul rang d'onglets
-// horizontalement scrollable. Partage entre l'onboarding et l'edition de profil.
-export function AvatarCategoryPicker({ cosmicOptions, value, onChange }: AvatarCategoryPickerProps) {
+// Categories de gamerpics — quatre categories illustrees (voir PRESET_AVATARS_*, generees via
+// DiceBear puis sauvegardees en statique) et "Dessiner" (atelier de dessin libre, voir
+// AvatarDrawModal), toutes dans un seul rang d'onglets horizontalement scrollable. Partage entre
+// l'onboarding et l'edition de profil. L'ancienne categorie "Cosmique" (illustrations maison
+// rocket/planet/etc.) a ete retiree — jugee peu qualitative — et "Personnages" est desormais la
+// categorie par defaut.
+export function AvatarCategoryPicker({ extraOptions = [], value, onChange }: AvatarCategoryPickerProps) {
   const { t } = useLanguage();
   const [drawOpen, setDrawOpen] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -25,14 +29,13 @@ export function AvatarCategoryPicker({ cosmicOptions, value, onChange }: AvatarC
   const [canScrollRight, setCanScrollRight] = useState(false);
 
   const galleries = [
-    { key: 'personas', label: t('onboarding.categoryPersonas'), options: PRESET_AVATARS_PERSONAS },
+    { key: 'personas', label: t('onboarding.categoryPersonas'), options: [...extraOptions, ...PRESET_AVATARS_PERSONAS] },
     { key: 'portraits', label: t('onboarding.categoryPortraits'), options: PRESET_AVATARS_PORTRAITS },
     { key: 'robots', label: t('onboarding.categoryRobots'), options: PRESET_AVATARS_ROBOTS },
     { key: 'orbits', label: t('onboarding.categoryOrbits'), options: PRESET_AVATARS_ORBITS },
-    { key: 'cosmic', label: t('onboarding.categoryCosmic'), options: cosmicOptions },
   ];
   // Ordre d'affichage voulu : Personnages, Portraits, Robots, Dessiner (bouton special, pas une
-  // galerie), Orbites, Cosmique.
+  // galerie), Orbites.
   const tabs: Array<{ isDraw: true } | { isDraw: false; key: string; label: string }> = [
     ...galleries.slice(0, 3).map((g) => ({ isDraw: false as const, key: g.key, label: g.label })),
     { isDraw: true },
