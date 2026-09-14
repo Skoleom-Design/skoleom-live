@@ -214,6 +214,8 @@ export const en = {
     addTagPlaceholder: 'Add a tag',
     music: 'Music (optional)',
     musicSelected: 'Selected',
+    importMusic: 'Import a track (MP3, WAV...)',
+    musicUploadFailed: 'Failed to upload the music.',
     choosePhotoOrVideo: 'Choose a photo or a video.',
     uploadFailed: 'Failed to upload to storage.',
     publish: 'Publish',

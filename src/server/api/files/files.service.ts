@@ -33,7 +33,7 @@ export class FilesService {
   }
 
   async getUploadUrl(
-    folder: 'posts' | 'capsules' | 'avatars',
+    folder: 'posts' | 'capsules' | 'avatars' | 'music',
     mimeType: string,
     extension: string,
   ): Promise<{ uploadUrl: string; fileUrl: string; key: string }> {

@@ -10,7 +10,6 @@ import { CapsuleProductForm, CapsuleProductFormHandle } from '../../client/compo
 import { api, ApiError, getToken, getStoredUser } from '../../shared/api/http';
 import type { Capsule } from '../../shared/types/api';
 import { useLanguage } from '../../client/i18n/LanguageContext';
-import { MUSIC_LIBRARY } from '../../client/constants/music';
 
 type Step = 'form' | 'capsule' | 'done';
 type CapsuleMode = 'existing' | 'new';
@@ -34,9 +33,11 @@ export default function StudioPage() {
   const [caption, setCaption] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
-  const [musicTrackId, setMusicTrackId] = useState<string | null>(null);
-  const [previewingId, setPreviewingId] = useState<string | null>(null);
+  const [musicFile, setMusicFile] = useState<File | null>(null);
+  const [musicPreviewUrl, setMusicPreviewUrl] = useState<string>('');
+  const [musicPlaying, setMusicPlaying] = useState(false);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+  const musicInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState('');
@@ -102,22 +103,37 @@ export default function StudioPage() {
     setTagInput('');
   }
 
-  function togglePreview(trackId: string, url: string) {
-    if (previewingId === trackId) {
+  function onMusicFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const f = e.target.files?.[0];
+    e.target.value = '';
+    if (!f) return;
+    previewAudioRef.current?.pause();
+    setMusicPlaying(false);
+    setMusicFile(f);
+    setMusicPreviewUrl(URL.createObjectURL(f));
+  }
+
+  function removeMusic() {
+    previewAudioRef.current?.pause();
+    setMusicPlaying(false);
+    setMusicFile(null);
+    setMusicPreviewUrl('');
+  }
+
+  function toggleMusicPreview() {
+    if (!musicPreviewUrl) return;
+    if (musicPlaying) {
       previewAudioRef.current?.pause();
-      setPreviewingId(null);
+      setMusicPlaying(false);
       return;
     }
     if (!previewAudioRef.current) previewAudioRef.current = new Audio();
     const audioEl = previewAudioRef.current;
-    audioEl.src = url;
+    audioEl.src = musicPreviewUrl;
     audioEl.currentTime = 0;
+    audioEl.onended = () => setMusicPlaying(false);
     audioEl.play().catch(() => {});
-    setPreviewingId(trackId);
-  }
-
-  function selectMusic(trackId: string) {
-    setMusicTrackId((prev) => (prev === trackId ? null : trackId));
+    setMusicPlaying(true);
   }
 
   function removeTag(t: string) {
@@ -149,15 +165,33 @@ export default function StudioPage() {
       });
       if (!putRes.ok) throw new Error(t('studio.uploadFailed'));
 
-      const selectedTrack = MUSIC_LIBRARY.find((m) => m.id === musicTrackId);
+      let musicName: string | undefined;
+      let musicUrl: string | undefined;
+      if (musicFile) {
+        const musicExtension = musicFile.name.split('.').pop() || 'mp3';
+        const musicUpload = await api.post('/files/upload-url', {
+          folder: 'music',
+          mimeType: musicFile.type,
+          extension: musicExtension,
+        });
+        const musicPutRes = await fetch(musicUpload.uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': musicFile.type },
+          body: musicFile,
+        });
+        if (!musicPutRes.ok) throw new Error(t('studio.musicUploadFailed'));
+        musicName = musicFile.name.replace(/\.[a-zA-Z0-9]+$/, '');
+        musicUrl = musicUpload.fileUrl;
+      }
+
       const type = file.type.startsWith('image/') ? 'photo' : 'video';
       const post = await api.post('/posts', {
         type,
         mediaUrl: fileUrl,
         caption: caption.trim() || undefined,
         tags,
-        musicName: selectedTrack?.name,
-        musicUrl: selectedTrack?.url,
+        musicName,
+        musicUrl,
       });
 
       setPostId(post.id);
@@ -446,43 +480,42 @@ export default function StudioPage() {
                   <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2 flex items-center gap-1.5">
                     <Music size={12} /> {t('studio.music')}
                   </p>
-                  <div className="space-y-1.5">
-                    {MUSIC_LIBRARY.map((track) => {
-                      const selected = musicTrackId === track.id;
-                      const playing = previewingId === track.id;
-                      return (
-                        <div
-                          key={track.id}
-                          className={`flex items-center gap-2.5 px-3 py-2.5 rounded-xl border transition-all ${
-                            selected ? 'border-[#ffc94d]/50 bg-[#ffc94d]/10' : 'border-white/[0.08] bg-white/[0.02]'
-                          }`}
-                        >
-                          <button
-                            type="button"
-                            onClick={() => togglePreview(track.id, track.url)}
-                            className="w-8 h-8 shrink-0 rounded-full bg-white/[0.08] hover:bg-white/[0.14] flex items-center justify-center text-white transition-all"
-                          >
-                            {playing ? <Pause size={13} /> : <Play size={13} />}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => selectMusic(track.id)}
-                            className="flex-1 min-w-0 text-left"
-                          >
-                            <p className={`text-[13px] font-medium truncate ${selected ? 'text-[#ffc94d]' : 'text-white'}`}>
-                              {track.name}
-                            </p>
-                            <p className="text-[11px] text-white/35 truncate">{track.artist}</p>
-                          </button>
-                          {selected && (
-                            <span className="text-[10px] font-bold uppercase tracking-wider text-[#ffc94d] shrink-0">
-                              {t('studio.musicSelected')}
-                            </span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <input
+                    ref={musicInputRef}
+                    type="file"
+                    accept="audio/*"
+                    onChange={onMusicFileChange}
+                    className="hidden"
+                  />
+                  {musicFile ? (
+                    <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-[#ffc94d]/50 bg-[#ffc94d]/10">
+                      <button
+                        type="button"
+                        onClick={toggleMusicPreview}
+                        className="w-8 h-8 shrink-0 rounded-full bg-white/[0.08] hover:bg-white/[0.14] flex items-center justify-center text-white transition-all"
+                      >
+                        {musicPlaying ? <Pause size={13} /> : <Play size={13} />}
+                      </button>
+                      <p className="flex-1 min-w-0 text-[13px] font-medium truncate text-[#ffc94d]">
+                        {musicFile.name}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={removeMusic}
+                        className="w-7 h-7 shrink-0 rounded-full hover:bg-white/[0.08] flex items-center justify-center text-white/50 hover:text-white transition-all"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => musicInputRef.current?.click()}
+                      className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-white/15 hover:border-[#ffc94d]/50 text-white/50 hover:text-[#ffc94d] text-[13px] font-medium transition-all"
+                    >
+                      <Import size={14} /> {t('studio.importMusic')}
+                    </button>
+                  )}
                 </div>
 
                 {error && (

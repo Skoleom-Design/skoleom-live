@@ -3,7 +3,7 @@ import { Request } from 'express';
 import { FilesService } from './files.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 
-const SAFE_FOLDER = /^(posts|capsules|avatars)$/;
+const SAFE_FOLDER = /^(posts|capsules|avatars|music)$/;
 const SAFE_FILENAME = /^[a-f0-9-]+\.[a-zA-Z0-9]+$/;
 
 @Controller('files')
@@ -14,7 +14,7 @@ export class FilesController {
   @Post('upload-url')
   getUploadUrl(
     @Body() body: {
-      folder: 'posts' | 'capsules' | 'avatars';
+      folder: 'posts' | 'capsules' | 'avatars' | 'music';
       mimeType: string;
       extension: string;
     },
