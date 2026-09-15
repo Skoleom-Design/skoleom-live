@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import Head from 'next/head';
 import Link from 'next/link';
-import { ArrowLeft, Camera, Image as ImageIcon, Loader2, Package, Radio, Gavel, Import, Plus, X, Music, Play, Pause, Sparkles } from 'lucide-react';
+import { ArrowLeft, Camera, Image as ImageIcon, Loader2, Package, Radio, Gavel, Import, Plus, X, Music, Play, Pause, Sparkles, Search } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CameraCaptureModal } from '../../client/components/Post/CameraCaptureModal';
 import { InstagramImportModal } from '../../client/components/Post/InstagramImportModal';
@@ -13,6 +13,14 @@ import { useLanguage } from '../../client/i18n/LanguageContext';
 
 type Step = 'form' | 'capsule' | 'done';
 type CapsuleMode = 'existing' | 'new';
+
+interface MusicTrack {
+  id: number;
+  title: string;
+  artist: string;
+  albumCover: string;
+  previewUrl: string;
+}
 
 interface StudioUser {
   username: string;
@@ -33,11 +41,12 @@ export default function StudioPage() {
   const [caption, setCaption] = useState('');
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState('');
-  const [musicFile, setMusicFile] = useState<File | null>(null);
-  const [musicPreviewUrl, setMusicPreviewUrl] = useState<string>('');
-  const [musicPlaying, setMusicPlaying] = useState(false);
+  const [musicQuery, setMusicQuery] = useState('');
+  const [musicResults, setMusicResults] = useState<MusicTrack[]>([]);
+  const [musicSearching, setMusicSearching] = useState(false);
+  const [selectedTrack, setSelectedTrack] = useState<MusicTrack | null>(null);
+  const [previewingId, setPreviewingId] = useState<number | null>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
-  const musicInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState('');
@@ -54,6 +63,27 @@ export default function StudioPage() {
   useEffect(() => {
     return () => previewAudioRef.current?.pause();
   }, []);
+
+  useEffect(() => {
+    const query = musicQuery.trim();
+    if (!query) {
+      setMusicResults([]);
+      setMusicSearching(false);
+      return;
+    }
+    setMusicSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await api.get<MusicTrack[]>(`/music/search?q=${encodeURIComponent(query)}`);
+        setMusicResults(results);
+      } catch {
+        setMusicResults([]);
+      } finally {
+        setMusicSearching(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [musicQuery]);
 
   useEffect(() => {
     if (!getToken()) {
@@ -103,37 +133,31 @@ export default function StudioPage() {
     setTagInput('');
   }
 
-  function onMusicFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    e.target.value = '';
-    if (!f) return;
-    previewAudioRef.current?.pause();
-    setMusicPlaying(false);
-    setMusicFile(f);
-    setMusicPreviewUrl(URL.createObjectURL(f));
-  }
-
-  function removeMusic() {
-    previewAudioRef.current?.pause();
-    setMusicPlaying(false);
-    setMusicFile(null);
-    setMusicPreviewUrl('');
-  }
-
-  function toggleMusicPreview() {
-    if (!musicPreviewUrl) return;
-    if (musicPlaying) {
+  function togglePreview(track: MusicTrack) {
+    if (previewingId === track.id) {
       previewAudioRef.current?.pause();
-      setMusicPlaying(false);
+      setPreviewingId(null);
       return;
     }
     if (!previewAudioRef.current) previewAudioRef.current = new Audio();
     const audioEl = previewAudioRef.current;
-    audioEl.src = musicPreviewUrl;
+    audioEl.src = track.previewUrl;
     audioEl.currentTime = 0;
-    audioEl.onended = () => setMusicPlaying(false);
+    audioEl.onended = () => setPreviewingId(null);
     audioEl.play().catch(() => {});
-    setMusicPlaying(true);
+    setPreviewingId(track.id);
+  }
+
+  function selectTrack(track: MusicTrack) {
+    setSelectedTrack(track);
+    setMusicQuery('');
+    setMusicResults([]);
+  }
+
+  function removeTrack() {
+    previewAudioRef.current?.pause();
+    setPreviewingId(null);
+    setSelectedTrack(null);
   }
 
   function removeTag(t: string) {
@@ -165,33 +189,14 @@ export default function StudioPage() {
       });
       if (!putRes.ok) throw new Error(t('studio.uploadFailed'));
 
-      let musicName: string | undefined;
-      let musicUrl: string | undefined;
-      if (musicFile) {
-        const musicExtension = musicFile.name.split('.').pop() || 'mp3';
-        const musicUpload = await api.post('/files/upload-url', {
-          folder: 'music',
-          mimeType: musicFile.type,
-          extension: musicExtension,
-        });
-        const musicPutRes = await fetch(musicUpload.uploadUrl, {
-          method: 'PUT',
-          headers: { 'Content-Type': musicFile.type },
-          body: musicFile,
-        });
-        if (!musicPutRes.ok) throw new Error(t('studio.musicUploadFailed'));
-        musicName = musicFile.name.replace(/\.[a-zA-Z0-9]+$/, '');
-        musicUrl = musicUpload.fileUrl;
-      }
-
       const type = file.type.startsWith('image/') ? 'photo' : 'video';
       const post = await api.post('/posts', {
         type,
         mediaUrl: fileUrl,
         caption: caption.trim() || undefined,
         tags,
-        musicName,
-        musicUrl,
+        musicName: selectedTrack ? `${selectedTrack.title} - ${selectedTrack.artist}` : undefined,
+        musicUrl: selectedTrack?.previewUrl,
       });
 
       setPostId(post.id);
@@ -480,41 +485,85 @@ export default function StudioPage() {
                   <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2 flex items-center gap-1.5">
                     <Music size={12} /> {t('studio.music')}
                   </p>
-                  <input
-                    ref={musicInputRef}
-                    type="file"
-                    accept="audio/*"
-                    onChange={onMusicFileChange}
-                    className="hidden"
-                  />
-                  {musicFile ? (
+
+                  {selectedTrack ? (
                     <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-[#ffc94d]/50 bg-[#ffc94d]/10">
+                      {selectedTrack.albumCover ? (
+                        <img src={selectedTrack.albumCover} alt="" className="w-8 h-8 rounded-lg shrink-0 object-cover" />
+                      ) : (
+                        <span className="w-8 h-8 shrink-0 rounded-lg bg-white/[0.08] flex items-center justify-center">
+                          <Music size={13} className="text-white/50" />
+                        </span>
+                      )}
                       <button
                         type="button"
-                        onClick={toggleMusicPreview}
+                        onClick={() => togglePreview(selectedTrack)}
                         className="w-8 h-8 shrink-0 rounded-full bg-white/[0.08] hover:bg-white/[0.14] flex items-center justify-center text-white transition-all"
                       >
-                        {musicPlaying ? <Pause size={13} /> : <Play size={13} />}
+                        {previewingId === selectedTrack.id ? <Pause size={13} /> : <Play size={13} />}
                       </button>
-                      <p className="flex-1 min-w-0 text-[13px] font-medium truncate text-[#ffc94d]">
-                        {musicFile.name}
-                      </p>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[13px] font-medium truncate text-[#ffc94d]">{selectedTrack.title}</p>
+                        <p className="text-[11px] text-white/40 truncate">{selectedTrack.artist}</p>
+                      </div>
                       <button
                         type="button"
-                        onClick={removeMusic}
+                        onClick={removeTrack}
                         className="w-7 h-7 shrink-0 rounded-full hover:bg-white/[0.08] flex items-center justify-center text-white/50 hover:text-white transition-all"
                       >
                         <X size={14} />
                       </button>
                     </div>
                   ) : (
-                    <button
-                      type="button"
-                      onClick={() => musicInputRef.current?.click()}
-                      className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border border-dashed border-white/15 hover:border-[#ffc94d]/50 text-white/50 hover:text-[#ffc94d] text-[13px] font-medium transition-all"
-                    >
-                      <Import size={14} /> {t('studio.importMusic')}
-                    </button>
+                    <div className="relative">
+                      <div className="relative">
+                        <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+                        <input
+                          type="text"
+                          value={musicQuery}
+                          onChange={(e) => setMusicQuery(e.target.value)}
+                          placeholder={t('studio.searchMusicPlaceholder')}
+                          className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl pl-9 pr-9 py-2.5 text-white placeholder:text-white/25 text-[13px] focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30"
+                        />
+                        {musicSearching && (
+                          <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 animate-spin" />
+                        )}
+                      </div>
+
+                      {musicResults.length > 0 && (
+                        <div className="mt-1.5 space-y-1 max-h-52 overflow-y-auto scrollbar-hide">
+                          {musicResults.map((track) => (
+                            <div
+                              key={track.id}
+                              className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.05] transition-all"
+                            >
+                              {track.albumCover ? (
+                                <img src={track.albumCover} alt="" className="w-8 h-8 rounded-lg shrink-0 object-cover" />
+                              ) : (
+                                <span className="w-8 h-8 shrink-0 rounded-lg bg-white/[0.08] flex items-center justify-center">
+                                  <Music size={13} className="text-white/50" />
+                                </span>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => togglePreview(track)}
+                                className="w-7 h-7 shrink-0 rounded-full bg-white/[0.08] hover:bg-white/[0.14] flex items-center justify-center text-white transition-all"
+                              >
+                                {previewingId === track.id ? <Pause size={12} /> : <Play size={12} />}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => selectTrack(track)}
+                                className="flex-1 min-w-0 text-left"
+                              >
+                                <p className="text-[13px] font-medium truncate text-white">{track.title}</p>
+                                <p className="text-[11px] text-white/40 truncate">{track.artist}</p>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   )}
                 </div>
 

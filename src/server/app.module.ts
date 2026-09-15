@@ -37,6 +37,7 @@ import { InstagramModule } from './api/instagram/instagram.module';
 import { FollowsModule } from './api/follows/follows.module';
 import { MessagesModule } from './api/messages/messages.module';
 import { GameModule } from './api/game/game.module';
+import { MusicModule } from './api/music/music.module';
 
 @Module({
   imports: [
@@ -78,6 +79,7 @@ import { GameModule } from './api/game/game.module';
     FollowsModule,
     MessagesModule,
     GameModule,
+    MusicModule,
   ],
 })
 export class AppModule {}
