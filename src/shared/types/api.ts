@@ -54,6 +54,7 @@ export interface Post {
   isBoosted: boolean;
   musicName?: string;
   musicUrl?: string;
+  musicTrackId?: string;
   creator: User;
   capsules: Capsule[];
   createdAt: string;

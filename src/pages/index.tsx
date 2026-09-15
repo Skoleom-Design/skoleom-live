@@ -9,6 +9,7 @@ import { AppGateScreen } from '../client/components/AppGate/AppGateScreen';
 import { BoostBadge } from '../client/components/Boost/BoostBadge';
 import type { Post } from '../shared/types/api';
 import { api, getToken } from '../shared/api/http';
+import { resolveMusicUrl } from '../shared/api/music';
 import { useLanguage } from '../client/i18n/LanguageContext';
 
 interface UserResult {
@@ -43,18 +44,26 @@ export default function FeedPage() {
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
   const hoverAudioRef = useRef<HTMLAudioElement | null>(null);
+  const hoverPostIdRef = useRef<string | null>(null);
 
   // Apercu sonore au survol des tuiles de la grille "Explorer" — un seul <audio> reutilise
   // (pas une instance par tuile), coupe des qu'on quitte la tuile ou qu'on en survole une autre.
-  function playPreview(url: string) {
-    if (!hoverAudioRef.current) hoverAudioRef.current = new Audio();
-    const audioEl = hoverAudioRef.current;
-    audioEl.src = url;
-    audioEl.currentTime = 0;
-    audioEl.play().catch(() => {});
+  // hoverPostIdRef evite qu'une resolution d'URL en retard ne demarre la lecture apres que la
+  // souris ait deja quitte la tuile (ou survole une autre entre-temps).
+  function playPreview(post: Post) {
+    hoverPostIdRef.current = post.id;
+    resolveMusicUrl(post).then((url) => {
+      if (!url || hoverPostIdRef.current !== post.id) return;
+      if (!hoverAudioRef.current) hoverAudioRef.current = new Audio();
+      const audioEl = hoverAudioRef.current;
+      audioEl.src = url;
+      audioEl.currentTime = 0;
+      audioEl.play().catch(() => {});
+    });
   }
 
   function stopPreview() {
+    hoverPostIdRef.current = null;
     hoverAudioRef.current?.pause();
   }
 
@@ -246,7 +255,7 @@ export default function FeedPage() {
                         <Link
                           key={post.id}
                           href={`/post/${post.id}`}
-                          onMouseEnter={() => post.musicUrl && playPreview(post.musicUrl)}
+                          onMouseEnter={() => post.musicUrl && playPreview(post)}
                           onMouseLeave={stopPreview}
                           className={`relative aspect-square bg-white/[0.04] overflow-hidden group ${
                             post.isBoosted ? 'ring-2 ring-[#ffc94d]/60' : ''

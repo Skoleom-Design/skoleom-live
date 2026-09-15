@@ -52,8 +52,15 @@ export class Post {
   @Column({ nullable: true })
   musicName: string;
 
+  // URL de preview Deezer au moment de la publication — a titre indicatif seulement, elle expire
+  // au bout de ~15min. La lecture reelle repasse toujours par musicTrackId (voir /music/track/:id
+  // cote API) pour obtenir une URL fraiche ; ce champ n'est qu'un fallback si musicTrackId est vide
+  // (ancien post, ou musique ajoutee autrement).
   @Column({ nullable: true })
   musicUrl: string;
+
+  @Column({ nullable: true })
+  musicTrackId: string;
 
   @ManyToOne(() => User, (user) => user.posts, { eager: true })
   @JoinColumn({ name: 'creatorId' })

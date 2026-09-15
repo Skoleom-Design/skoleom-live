@@ -18,7 +18,9 @@ function roomFor(liveId: string): string {
 }
 
 interface MusicState {
-  youtubeId: string;
+  trackId: string;
+  title: string;
+  artist: string;
   playing: boolean;
   // Position (secondes) au moment de `updatedAt` — le client recalcule la position "live" comme
   // position + (Date.now()/1000 - updatedAt) si `playing`, evitant tout flux continu de sync.
@@ -26,7 +28,7 @@ interface MusicState {
   updatedAt: number; // epoch secondes
 }
 
-const YOUTUBE_ID_RE = /^[a-zA-Z0-9_-]{11}$/;
+const TRACK_ID_RE = /^\d+$/;
 
 @WebSocketGateway({ cors: { origin: '*' } })
 export class LivesGateway implements OnGatewayDisconnect {
@@ -652,20 +654,29 @@ export class LivesGateway implements OnGatewayDisconnect {
     }
   }
 
-  // Musique d'ambiance (YouTube) — reserve au createur, voir le commentaire sur `musicState` plus
-  // haut pour le principe (sync de lecture cote client, pas de mixage audio reel).
+  // Musique d'ambiance (Deezer) — reserve au createur, voir le commentaire sur `musicState` plus
+  // haut pour le principe (sync de lecture cote client, pas de mixage audio reel). On ne stocke
+  // ici que l'id du morceau, jamais une URL de preview — celles-ci expirent au bout de ~15min
+  // (voir music.service.ts), chaque client resout une URL fraiche a la reception de l'etat.
   private broadcastMusic(liveId: string) {
     this.server.to(roomFor(liveId)).emit('musicChanged', this.musicState.get(liveId) ?? null);
   }
 
   @SubscribeMessage('setMusic')
-  async handleSetMusic(@MessageBody() data: { liveId: string; youtubeId: string; token: string }) {
+  async handleSetMusic(@MessageBody() data: { liveId: string; trackId: string; title: string; artist: string; token: string }) {
     const user = await this.authenticate(data.token);
     if (!user || !(await this.livesService.isOwner(data.liveId, user.id))) return;
-    const youtubeId = (data.youtubeId || '').trim();
-    if (!YOUTUBE_ID_RE.test(youtubeId)) return;
+    const trackId = String(data.trackId || '').trim();
+    if (!TRACK_ID_RE.test(trackId)) return;
 
-    this.musicState.set(data.liveId, { youtubeId, playing: true, position: 0, updatedAt: Date.now() / 1000 });
+    this.musicState.set(data.liveId, {
+      trackId,
+      title: (data.title || '').slice(0, 200),
+      artist: (data.artist || '').slice(0, 200),
+      playing: true,
+      position: 0,
+      updatedAt: Date.now() / 1000,
+    });
     this.broadcastMusic(data.liveId);
   }
 

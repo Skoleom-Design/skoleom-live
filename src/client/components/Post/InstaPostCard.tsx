@@ -15,6 +15,7 @@ import { BoostBadge } from '../Boost/BoostBadge';
 import { CommentsDrawer } from './CommentsDrawer';
 import { ShareModal } from './ShareModal';
 import { api, ApiError, getToken } from '../../../shared/api/http';
+import { resolveMusicUrl } from '../../../shared/api/music';
 import { useLanguage } from '../../i18n/LanguageContext';
 
 interface Props {
@@ -82,23 +83,30 @@ export function InstaPostCard({ post, liked: likedProp = false }: Props) {
   // pastille demasque le son — un vrai geste utilisateur, donc jamais bloque par le navigateur.
   useEffect(() => {
     if (!mediaRef.current || post.type !== 'photo' || !post.musicUrl) return;
-    if (!musicAudioRef.current) {
-      musicAudioRef.current = new Audio(post.musicUrl);
-      musicAudioRef.current.loop = true;
-      musicAudioRef.current.muted = true;
-    }
-    const audioEl = musicAudioRef.current;
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) audioEl.play().catch(() => {});
-        else audioEl.pause();
-      },
-      { threshold: 0.1 },
-    );
-    observer.observe(mediaRef.current);
+    const node = mediaRef.current;
+    let cancelled = false;
+    let observer: IntersectionObserver | null = null;
+
+    resolveMusicUrl(post).then((url) => {
+      if (cancelled || !url) return;
+      const audioEl = new Audio(url);
+      audioEl.loop = true;
+      audioEl.muted = true;
+      musicAudioRef.current = audioEl;
+      observer = new IntersectionObserver(
+        ([entry]) => {
+          if (entry.isIntersecting) audioEl.play().catch(() => {});
+          else audioEl.pause();
+        },
+        { threshold: 0.1 },
+      );
+      observer.observe(node);
+    });
+
     return () => {
-      observer.disconnect();
-      audioEl.pause();
+      cancelled = true;
+      observer?.disconnect();
+      musicAudioRef.current?.pause();
     };
   }, [post.type, post.musicUrl]);
 

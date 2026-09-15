@@ -9,7 +9,7 @@ import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
 import { LiveGameDrawer } from '../../client/components/Game/LiveGameDrawer';
 import { GiftBurstOverlay, type ActiveGiftBurst } from '../../client/components/Live/GiftBurstOverlay';
-import { YoutubeMusicPlayer, type MusicState } from '../../client/components/Live/YoutubeMusicPlayer';
+import { DeezerMusicPlayer, type MusicState } from '../../client/components/Live/DeezerMusicPlayer';
 import { GIFTS, COIN_PACKS, giftById, type GiftDef } from '../../client/constants/gifts';
 import { api, ApiError, getToken, getStoredUser } from '../../shared/api/http';
 import type { Capsule } from '../../shared/types/api';
@@ -219,8 +219,8 @@ export default function LiveViewerPage() {
   const [gameDrawerOpen, setGameDrawerOpen] = useState(false);
   const [gameActive, setGameActive] = useState(false);
 
-  // Musique d'ambiance (YouTube) — voir YoutubeMusicPlayer.tsx : ce spectateur charge et joue la
-  // meme video que le createur, en parallele (pas mixee dans l'audio LiveKit). Muet par defaut
+  // Musique d'ambiance (Deezer) — voir DeezerMusicPlayer.tsx : ce spectateur charge et joue le
+  // meme extrait que le createur, en parallele (pas mixe dans l'audio LiveKit). Muet par defaut
   // (autoplay non-muet bloque sans geste utilisateur "frais" sur ce client) — bouton pour activer.
   const [musicState, setMusicState] = useState<MusicState | null>(null);
   const [musicMuted, setMusicMuted] = useState(true);
@@ -953,18 +953,21 @@ export default function LiveViewerPage() {
                   )}
 
                   {musicState && (
-                    <div className="absolute bottom-32 right-3 z-20 w-24 h-16 rounded-xl overflow-hidden border border-white/15 bg-black shadow-lg flex items-center justify-center">
-                      <YoutubeMusicPlayer state={musicState} elementId="viewer-music-player" muted={musicMuted} />
+                    <div className="absolute bottom-32 right-3 z-20 max-w-[150px] rounded-xl border border-white/15 bg-black/80 backdrop-blur-sm shadow-lg px-2.5 py-2">
+                      <DeezerMusicPlayer state={musicState} muted={musicMuted} />
+                      <div className="flex items-center gap-1.5">
+                        <Music size={11} className="text-[#ffc94d] shrink-0" />
+                        <p className="text-white text-[11px] font-medium truncate">{musicState.title}</p>
+                      </div>
+                      <p className="text-white/40 text-[10px] truncate mb-1.5 ml-[17px]">{musicState.artist}</p>
                       <button
                         onClick={() => setMusicMuted((m) => !m)}
-                        className="absolute bottom-1 right-1 w-6 h-6 rounded-full bg-black/70 flex items-center justify-center"
+                        className="flex items-center gap-1 text-white/70 hover:text-white"
                         title={musicMuted ? 'Activer la musique' : 'Couper la musique'}
                       >
-                        {musicMuted ? <VolumeX size={12} className="text-white" /> : <Volume2 size={12} className="text-[#ffc94d]" />}
+                        {musicMuted ? <VolumeX size={12} /> : <Volume2 size={12} className="text-[#ffc94d]" />}
+                        <span className="text-[10px]">{musicMuted ? 'Activer le son' : 'Couper le son'}</span>
                       </button>
-                      <span className="absolute top-1 left-1 bg-black/60 rounded-full p-0.5">
-                        <Music size={10} className="text-white/80" />
-                      </span>
                     </div>
                   )}
 

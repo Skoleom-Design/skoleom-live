@@ -7,13 +7,13 @@ import { Room, RoomEvent, Track, type RemoteTrack } from 'livekit-client';
 import {
   ArrowLeft, Mic, MicOff, Video, VideoOff, Radio, Loader2, Send, Users, Package, X, ShoppingBag,
   Crown, Trash2, UserX, Gavel, Timer, ChevronRight, Plus, Trophy, Users2, AlertTriangle, Check, Lock, Eye, Gamepad2,
-  Music, Pause, Play, Square, Wand2,
+  Music, Pause, Play, Square, Wand2, Search,
 } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { CapsuleDrawer } from '../../client/components/Capsule/CapsuleDrawer';
 import { GiftBurstOverlay, type ActiveGiftBurst } from '../../client/components/Live/GiftBurstOverlay';
 import { LiveGameDrawer } from '../../client/components/Game/LiveGameDrawer';
-import { YoutubeMusicPlayer, extractYoutubeId, type MusicState } from '../../client/components/Live/YoutubeMusicPlayer';
+import { DeezerMusicPlayer, type MusicState } from '../../client/components/Live/DeezerMusicPlayer';
 import {
   FilterEngine, NO_FILTERS, filtersActive, COLOR_FILTER_PRESETS, BACKGROUND_FILTER_PRESETS, FACE_FILTER_PRESETS,
   type FilterConfig,
@@ -26,6 +26,14 @@ import type { Capsule } from '../../shared/types/api';
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
 
 type LiveMode = 'live' | 'auction';
+
+interface MusicTrack {
+  id: number;
+  title: string;
+  artist: string;
+  albumCover: string;
+  previewUrl: string;
+}
 
 interface LiveSession {
   id: string;
@@ -145,12 +153,13 @@ export default function StudioLivePage() {
   const [gameDrawerOpen, setGameDrawerOpen] = useState(false);
   const [gameActive, setGameActive] = useState(false);
 
-  // Musique d'ambiance (YouTube) — voir le commentaire de YoutubeMusicPlayer.tsx pour le principe
+  // Musique d'ambiance (Deezer) — voir le commentaire de DeezerMusicPlayer.tsx pour le principe
   // (sync de lecture cote client, pas de mixage dans le flux LiveKit).
   const [musicState, setMusicState] = useState<MusicState | null>(null);
   const [musicPanelOpen, setMusicPanelOpen] = useState(false);
-  const [musicInput, setMusicInput] = useState('');
-  const [musicInputError, setMusicInputError] = useState('');
+  const [musicQuery, setMusicQuery] = useState('');
+  const [musicResults, setMusicResults] = useState<MusicTrack[]>([]);
+  const [musicSearching, setMusicSearching] = useState(false);
 
   // Filtres video (couleur / arriere-plan / visage) — voir videoFilters.ts. `filterMlError` reste
   // null tant qu'aucun filtre arriere-plan/visage n'a ete tente, ou si son chargement a reussi.
@@ -589,16 +598,38 @@ export default function StudioLivePage() {
     setTimeout(() => setGameInviteSentTo((cur) => (cur === targetUserId ? null : cur)), 2500);
   }
 
-  function setMusicTrack() {
-    if (!live) return;
-    const youtubeId = extractYoutubeId(musicInput);
-    if (!youtubeId) {
-      setMusicInputError("Lien YouTube non reconnu — colle l'URL complète de la vidéo.");
+  useEffect(() => {
+    const query = musicQuery.trim();
+    if (!query) {
+      setMusicResults([]);
+      setMusicSearching(false);
       return;
     }
-    setMusicInputError('');
-    socketRef.current?.emit('setMusic', { liveId: live.id, token: getToken(), youtubeId });
-    setMusicInput('');
+    setMusicSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await api.get<MusicTrack[]>(`/music/search?q=${encodeURIComponent(query)}`);
+        setMusicResults(results);
+      } catch {
+        setMusicResults([]);
+      } finally {
+        setMusicSearching(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [musicQuery]);
+
+  function selectMusicTrack(track: MusicTrack) {
+    if (!live) return;
+    socketRef.current?.emit('setMusic', {
+      liveId: live.id,
+      token: getToken(),
+      trackId: String(track.id),
+      title: track.title,
+      artist: track.artist,
+    });
+    setMusicQuery('');
+    setMusicResults([]);
   }
 
   function toggleMusicPlay() {
@@ -1290,9 +1321,14 @@ export default function StudioLivePage() {
                   </form>
 
                   {musicState && (
-                    <div className="absolute top-3 right-3 z-20 w-24 h-16 rounded-xl overflow-hidden border border-white/15 bg-black shadow-lg">
-                      <YoutubeMusicPlayer state={musicState} elementId="studio-music-player" />
-                      <div className="absolute inset-x-0 bottom-0 flex items-center justify-center gap-2 bg-black/70 py-1">
+                    <div className="absolute top-3 right-3 z-20 max-w-[150px] rounded-xl border border-white/15 bg-black/80 backdrop-blur-sm shadow-lg px-2.5 py-2">
+                      <DeezerMusicPlayer state={musicState} />
+                      <div className="flex items-center gap-1.5">
+                        <Music size={11} className="text-[#ffc94d] shrink-0" />
+                        <p className="text-white text-[11px] font-medium truncate">{musicState.title}</p>
+                      </div>
+                      <p className="text-white/40 text-[10px] truncate mb-1.5 ml-[17px]">{musicState.artist}</p>
+                      <div className="flex items-center justify-center gap-2">
                         <button onClick={toggleMusicPlay} className="text-white/90 hover:text-white">
                           {musicState.playing ? <Pause size={11} /> : <Play size={11} />}
                         </button>
@@ -1830,12 +1866,15 @@ export default function StudioLivePage() {
               </button>
             </div>
             <p className="text-white/40 text-xs mb-4">
-              Colle un lien YouTube — chaque spectateur l&apos;entendra en même temps que toi, en parallèle de la vidéo (pas mixé dans ton micro).
+              Cherche un titre — chaque spectateur l&apos;entendra en même temps que toi, en parallèle de la vidéo (pas mixé dans ton micro).
             </p>
             {musicState && (
               <div className="flex items-center justify-between bg-[#ffc94d]/10 border border-[#ffc94d]/25 rounded-xl px-3.5 py-2.5 mb-4">
-                <p className="text-[12px] text-[#ffc94d] font-semibold">{musicState.playing ? 'En cours de lecture' : 'En pause'}</p>
-                <div className="flex items-center gap-2">
+                <div className="min-w-0">
+                  <p className="text-[12px] text-[#ffc94d] font-semibold truncate">{musicState.title}</p>
+                  <p className="text-[11px] text-white/40 truncate">{musicState.artist}</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
                   <button onClick={toggleMusicPlay} className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center text-white">
                     {musicState.playing ? <Pause size={14} /> : <Play size={14} />}
                   </button>
@@ -1845,19 +1884,43 @@ export default function StudioLivePage() {
                 </div>
               </div>
             )}
-            <div className="flex gap-2">
+            <div className="relative">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
               <input
-                value={musicInput}
-                onChange={(e) => { setMusicInput(e.target.value); setMusicInputError(''); }}
-                onKeyDown={(e) => e.key === 'Enter' && setMusicTrack()}
-                placeholder="https://youtube.com/watch?v=…"
-                className="flex-1 bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-2.5 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30"
+                value={musicQuery}
+                onChange={(e) => setMusicQuery(e.target.value)}
+                placeholder="Chercher un titre, un artiste..."
+                className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl pl-9 pr-9 py-2.5 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30"
               />
-              <button onClick={setMusicTrack} className="btn-skoleom px-4 rounded-xl text-sm shrink-0">
-                {musicState ? 'Changer' : 'Lancer'}
-              </button>
+              {musicSearching && (
+                <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 animate-spin" />
+              )}
             </div>
-            {musicInputError && <p className="text-red-400 text-xs mt-2">{musicInputError}</p>}
+
+            {musicResults.length > 0 && (
+              <div className="mt-2 space-y-1 max-h-52 overflow-y-auto">
+                {musicResults.map((track) => (
+                  <button
+                    key={track.id}
+                    type="button"
+                    onClick={() => selectMusicTrack(track)}
+                    className="w-full flex items-center gap-2.5 px-2.5 py-2 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.05] transition-all text-left"
+                  >
+                    {track.albumCover ? (
+                      <img src={track.albumCover} alt="" className="w-8 h-8 rounded-lg shrink-0 object-cover" />
+                    ) : (
+                      <span className="w-8 h-8 shrink-0 rounded-lg bg-white/[0.08] flex items-center justify-center">
+                        <Music size={13} className="text-white/50" />
+                      </span>
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-[13px] font-medium truncate text-white">{track.title}</p>
+                      <p className="text-[11px] text-white/40 truncate">{track.artist}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         </div>
       )}

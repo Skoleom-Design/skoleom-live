@@ -16,6 +16,7 @@ export interface CreatePostDto {
   tags?: string[];
   musicName?: string;
   musicUrl?: string;
+  musicTrackId?: string;
 }
 
 export interface FeedQuery {

@@ -10,6 +10,7 @@ import { CommentsDrawer } from '../../client/components/Post/CommentsDrawer';
 import { ShareModal } from '../../client/components/Post/ShareModal';
 import type { Post } from '../../shared/types/api';
 import { api, ApiError, getToken } from '../../shared/api/http';
+import { resolveMusicUrl } from '../../shared/api/music';
 
 function formatCount(n: number): string {
   if (n >= 1000000) return `${(n / 1000000).toFixed(1)}M`;
@@ -42,18 +43,27 @@ export default function PostDetailPage() {
   // propre piste audio geree par `muted` ci-dessus, pas de raison de superposer les deux).
   useEffect(() => {
     if (!post || post.type !== 'photo' || !post.musicUrl) return;
-    const audioEl = new Audio(post.musicUrl);
-    audioEl.loop = true;
-    musicAudioRef.current = audioEl;
-    audioEl.play().catch(() => {
-      // Lecture avec son bloquee par le navigateur (pas de geste utilisateur reconnu) —
-      // on retente en muet, l'utilisateur peut reactiver le son via le bouton dedie.
-      audioEl.muted = true;
-      setMusicMuted(true);
-      audioEl.play().catch(() => {});
+    let cancelled = false;
+    let audioEl: HTMLAudioElement | null = null;
+
+    resolveMusicUrl(post).then((url) => {
+      if (cancelled || !url) return;
+      audioEl = new Audio(url);
+      audioEl.loop = true;
+      musicAudioRef.current = audioEl;
+      audioEl.play().catch(() => {
+        // Lecture avec son bloquee par le navigateur (pas de geste utilisateur reconnu) —
+        // on retente en muet, l'utilisateur peut reactiver le son via le bouton dedie.
+        if (!audioEl) return;
+        audioEl.muted = true;
+        setMusicMuted(true);
+        audioEl.play().catch(() => {});
+      });
     });
+
     return () => {
-      audioEl.pause();
+      cancelled = true;
+      audioEl?.pause();
       musicAudioRef.current = null;
     };
   }, [post]);
