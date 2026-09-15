@@ -888,17 +888,17 @@ export default function ProfilePage() {
               </p>
             )}
 
-            {/* Tabs — icone seule sous sm (6 onglets ne tiennent pas avec le texte sur un
-                ecran de telephone, les 2 derniers restaient inatteignables), texte+icone au
-                dela. overflow-x-auto en filet de securite (grande taille de police, tres
-                petit ecran...) plutot que de compter uniquement sur le responsive. */}
+            {/* Tabs — icone seule sous sm, chaque onglet en flex-1 pour occuper toute la
+                largeur (repartis a egalite, comme une vraie barre d'onglets mobile) plutot que
+                collees a gauche avec du vide a droite. Texte+icone et largeur naturelle des
+                sm. overflow-x-auto en filet de securite (grande taille de police...). */}
             <div className="flex gap-1 border-b border-white/[0.06] mb-6 overflow-x-auto scrollbar-hide">
               {TABS.map((tabItem) => {
                 const Icon = tabItem.icon;
                 const active = tab === tabItem.key;
                 return (
                   <button key={tabItem.key} onClick={() => setTab(tabItem.key)}
-                    className={`relative flex items-center gap-2 px-3 sm:px-4 py-2.5 text-[13px] font-semibold border-b-2 transition-all -mb-px shrink-0 whitespace-nowrap ${active ? 'border-white text-white' : 'border-transparent text-white/40 hover:text-white/70'}`}>
+                    className={`relative flex flex-1 sm:flex-none items-center justify-center sm:justify-start gap-2 px-2 sm:px-4 py-2.5 text-[13px] font-semibold border-b-2 transition-all -mb-px shrink-0 whitespace-nowrap ${active ? 'border-white text-white' : 'border-transparent text-white/40 hover:text-white/70'}`}>
                     <span className="relative">
                       <Icon size={15} />
                       {tabItem.key === 'notifications' && unreadNotifCount > 0 && (
