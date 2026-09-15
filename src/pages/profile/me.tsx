@@ -888,21 +888,24 @@ export default function ProfilePage() {
               </p>
             )}
 
-            {/* Tabs */}
-            <div className="flex gap-1 border-b border-white/[0.06] mb-6">
+            {/* Tabs — icone seule sous sm (6 onglets ne tiennent pas avec le texte sur un
+                ecran de telephone, les 2 derniers restaient inatteignables), texte+icone au
+                dela. overflow-x-auto en filet de securite (grande taille de police, tres
+                petit ecran...) plutot que de compter uniquement sur le responsive. */}
+            <div className="flex gap-1 border-b border-white/[0.06] mb-6 overflow-x-auto scrollbar-hide">
               {TABS.map((tabItem) => {
                 const Icon = tabItem.icon;
                 const active = tab === tabItem.key;
                 return (
                   <button key={tabItem.key} onClick={() => setTab(tabItem.key)}
-                    className={`relative flex items-center gap-2 px-4 py-2.5 text-[13px] font-semibold border-b-2 transition-all -mb-px ${active ? 'border-white text-white' : 'border-transparent text-white/40 hover:text-white/70'}`}>
+                    className={`relative flex items-center gap-2 px-3 sm:px-4 py-2.5 text-[13px] font-semibold border-b-2 transition-all -mb-px shrink-0 whitespace-nowrap ${active ? 'border-white text-white' : 'border-transparent text-white/40 hover:text-white/70'}`}>
                     <span className="relative">
                       <Icon size={15} />
                       {tabItem.key === 'notifications' && unreadNotifCount > 0 && (
                         <span className="absolute -top-1 -right-1 w-2.5 h-2.5 rounded-full bg-red-500 border-2 border-black/80" />
                       )}
                     </span>
-                    {tabItem.label}
+                    <span className="hidden sm:inline">{tabItem.label}</span>
                   </button>
                 );
               })}
