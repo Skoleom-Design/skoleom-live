@@ -824,17 +824,19 @@ export default function ProfilePage() {
         <main className="flex-1 overflow-y-auto scrollbar-hide">
           <div className="max-w-[700px] mx-auto px-4 py-8 pb-20 md:pb-8">
 
-            {/* Profile header */}
-            <div className="flex items-center gap-6 mb-8">
-              <div className="w-20 h-20 rounded-full flex items-center justify-center text-3xl font-extrabold text-black shrink-0 bg-gradient-to-br from-[#ffc94d] to-[#ff5470] overflow-hidden">
+            {/* Profile header — flex-wrap plutot qu'une seule ligne rigide : le bloc bouton+icones
+                passe a la ligne (pleine largeur) des que nom/avatar/bouton ne tiennent plus cote
+                a cote, au lieu de se faire ecraser/chevaucher sur mobile. */}
+            <div className="flex flex-wrap items-center gap-4 sm:gap-6 mb-8">
+              <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full flex items-center justify-center text-2xl sm:text-3xl font-extrabold text-black shrink-0 bg-gradient-to-br from-[#ffc94d] to-[#ff5470] overflow-hidden">
                 {user.avatarUrl ? (
                   <img src={user.avatarUrl} alt={user.username} className="w-full h-full object-cover" />
                 ) : (
                   (user.displayName || user.username)[0]?.toUpperCase()
                 )}
               </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-1">
+              <div className="flex-1 min-w-[160px]">
+                <div className="flex items-center gap-2 mb-1 flex-wrap">
                   <h1 className="text-[20px] font-extrabold text-white">{user.displayName || user.username}</h1>
                   <span className="text-[11px] text-white/40">@{user.username}</span>
                   {user.plan && (
@@ -851,12 +853,12 @@ export default function ProfilePage() {
                 </div>
                 {user.bio && <p className="text-[13px] text-white/45 mb-3">{user.bio}</p>}
               </div>
-              <div className="flex flex-col items-end gap-2">
+              <div className="flex items-center sm:flex-col sm:items-end gap-2 w-full sm:w-auto order-3 sm:order-none">
                 <Link href="/studio"
-                  className="btn-skoleom flex items-center gap-2 px-4 py-2 rounded-full text-[13px] hover:shadow-glow-lime-sm transition-all">
+                  className="btn-skoleom flex flex-1 sm:flex-none items-center justify-center gap-2 px-4 py-2 rounded-full text-[13px] hover:shadow-glow-lime-sm transition-all">
                   <Plus size={14} /> {t('profile.newPost')}
                 </Link>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 shrink-0">
                   <button
                     onClick={() => router.push('/studio/live')}
                     title={t('profile.startLive')}
