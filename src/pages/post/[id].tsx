@@ -41,29 +41,39 @@ export default function PostDetailPage() {
 
   // Lecture auto de la musique du post — uniquement pour les photos (une video a deja sa
   // propre piste audio geree par `muted` ci-dessus, pas de raison de superposer les deux).
+  //
+  // On demarre IMMEDIATEMENT avec post.musicUrl (deja en memoire, aucun aller-retour reseau) —
+  // le navigateur autorise le son non-coupe seulement si l'appel play() suit "de pres" le clic
+  // qui a mene sur cette page ; passer par resolveMusicUrl() d'abord (un fetch async) suffit a
+  // faire perdre cette fenetre et a faire echouer la lecture avec son a chaque fois. On resout
+  // ensuite une URL fraiche EN PARALLELE (l'URL stockee expire au bout de ~15min, voir
+  // music.service.ts) et on bascule dessus sans interrompre une lecture deja en cours.
   useEffect(() => {
     if (!post || post.type !== 'photo' || !post.musicUrl) return;
-    let cancelled = false;
-    let audioEl: HTMLAudioElement | null = null;
+    const audioEl = new Audio(post.musicUrl);
+    audioEl.loop = true;
+    musicAudioRef.current = audioEl;
+    audioEl.play().catch(() => {
+      // Lecture avec son bloquee par le navigateur (pas de geste utilisateur reconnu) —
+      // on retente en muet, l'utilisateur peut reactiver le son via le bouton dedie.
+      audioEl.muted = true;
+      setMusicMuted(true);
+      audioEl.play().catch(() => {});
+    });
 
-    resolveMusicUrl(post).then((url) => {
-      if (cancelled || !url) return;
-      audioEl = new Audio(url);
-      audioEl.loop = true;
-      musicAudioRef.current = audioEl;
-      audioEl.play().catch(() => {
-        // Lecture avec son bloquee par le navigateur (pas de geste utilisateur reconnu) —
-        // on retente en muet, l'utilisateur peut reactiver le son via le bouton dedie.
-        if (!audioEl) return;
-        audioEl.muted = true;
-        setMusicMuted(true);
-        audioEl.play().catch(() => {});
-      });
+    let cancelled = false;
+    resolveMusicUrl(post).then((freshUrl) => {
+      if (cancelled || !freshUrl || freshUrl === post.musicUrl || musicAudioRef.current !== audioEl) return;
+      const wasPlaying = !audioEl.paused;
+      const wasMuted = audioEl.muted;
+      audioEl.src = freshUrl;
+      audioEl.muted = wasMuted;
+      if (wasPlaying) audioEl.play().catch(() => {});
     });
 
     return () => {
       cancelled = true;
-      audioEl?.pause();
+      audioEl.pause();
       musicAudioRef.current = null;
     };
   }, [post]);

@@ -50,13 +50,23 @@ export default function FeedPage() {
   // (pas une instance par tuile), coupe des qu'on quitte la tuile ou qu'on en survole une autre.
   // hoverPostIdRef evite qu'une resolution d'URL en retard ne demarre la lecture apres que la
   // souris ait deja quitte la tuile (ou survole une autre entre-temps).
+  //
+  // On joue IMMEDIATEMENT avec post.musicUrl (deja en memoire) plutot que d'attendre le fetch
+  // de resolveMusicUrl() — le navigateur n'autorise le son non-coupe que si play() suit "de pres"
+  // le geste de l'utilisateur, et un aller-retour reseau avant le premier essai suffit a faire
+  // echouer la lecture avec son a chaque fois.
   function playPreview(post: Post) {
+    if (!post.musicUrl) return;
     hoverPostIdRef.current = post.id;
-    resolveMusicUrl(post).then((url) => {
-      if (!url || hoverPostIdRef.current !== post.id) return;
-      if (!hoverAudioRef.current) hoverAudioRef.current = new Audio();
-      const audioEl = hoverAudioRef.current;
-      audioEl.src = url;
+    if (!hoverAudioRef.current) hoverAudioRef.current = new Audio();
+    const audioEl = hoverAudioRef.current;
+    audioEl.src = post.musicUrl;
+    audioEl.currentTime = 0;
+    audioEl.play().catch(() => {});
+
+    resolveMusicUrl(post).then((freshUrl) => {
+      if (!freshUrl || freshUrl === post.musicUrl || hoverPostIdRef.current !== post.id) return;
+      audioEl.src = freshUrl;
       audioEl.currentTime = 0;
       audioEl.play().catch(() => {});
     });
