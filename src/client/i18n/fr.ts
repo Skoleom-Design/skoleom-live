@@ -370,6 +370,7 @@ export const fr = {
     current: 'Actuel',
     planNoPayment: "Changement de palier immédiat — aucun paiement réel n'est requis pour l'instant.",
     createCapsule: 'Créer une capsule',
+    editCapsule: 'Modifier la capsule',
     attachToPost: 'Rattacher au post',
     createCapsuleNeedsPost: "Créez d'abord un post — une capsule doit toujours être rattachée à un post.",
     walletBalance: 'Solde disponible',

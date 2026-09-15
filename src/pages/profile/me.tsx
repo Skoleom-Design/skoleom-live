@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { BoostModal } from '../../client/components/Boost/BoostModal';
-import { CapsuleProductForm, CapsuleProductFormHandle } from '../../client/components/Capsule/CapsuleProductForm';
+import { CapsuleProductForm, CapsuleProductFormHandle, CapsuleProductInput } from '../../client/components/Capsule/CapsuleProductForm';
 import { CameraCaptureModal } from '../../client/components/Post/CameraCaptureModal';
 import { AvatarCategoryPicker } from '../../client/components/Onboarding/AvatarCategoryPicker';
 import { api, ApiError, getToken, getStoredUser, clearSession, uploadFile } from '../../shared/api/http';
@@ -169,6 +169,11 @@ export default function ProfilePage() {
   const [newCapsuleError, setNewCapsuleError] = useState('');
   const [newCapsuleSaving, setNewCapsuleSaving] = useState(false);
   const newCapsuleFormRef = useRef<CapsuleProductFormHandle>(null);
+
+  const [editCapsuleItemTarget, setEditCapsuleItemTarget] = useState<CapsuleData | null>(null);
+  const [editCapsuleItemError, setEditCapsuleItemError] = useState('');
+  const [editCapsuleItemSaving, setEditCapsuleItemSaving] = useState(false);
+  const editCapsuleItemFormRef = useRef<CapsuleProductFormHandle>(null);
 
   // Regroupe les capsules par capsule-groupe (une capsule nommée = plusieurs produits).
   // Les capsules sans groupe (créées avant ce champ) restent affichées seules.
@@ -428,6 +433,30 @@ export default function ProfilePage() {
       setMyCapsules((prev) => prev.filter((c) => c.id !== capsuleId));
     } catch {
       // silent — la liste reflète toujours l'état serveur au prochain rechargement
+    }
+  }
+
+  function openEditCapsuleItem(c: CapsuleData) {
+    setEditCapsuleItemError('');
+    setEditCapsuleItemTarget(c);
+  }
+
+  async function handleUpdateCapsuleItem(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editCapsuleItemTarget) return;
+    const product = editCapsuleItemFormRef.current?.getSingleProduct();
+    if (!product) return;
+
+    setEditCapsuleItemError('');
+    setEditCapsuleItemSaving(true);
+    try {
+      const updated = await api.patch<CapsuleData>(`/capsules/${editCapsuleItemTarget.id}`, product);
+      setMyCapsules((prev) => prev.map((c) => (c.id === updated.id ? { ...c, ...updated } : c)));
+      setEditCapsuleItemTarget(null);
+    } catch (err) {
+      setEditCapsuleItemError(err instanceof ApiError ? err.message : t('common.genericError'));
+    } finally {
+      setEditCapsuleItemSaving(false);
     }
   }
 
@@ -1027,6 +1056,10 @@ export default function ProfilePage() {
                               {c.condition && ` · ${conditionLabel(t, c.condition)}`}
                             </p>
                           </div>
+                          <button onClick={() => openEditCapsuleItem(c)}
+                            className="w-8 h-8 rounded-full hover:bg-white/10 flex items-center justify-center text-white/25 hover:text-white transition-all">
+                            <Pencil size={14} />
+                          </button>
                           <button onClick={() => handleRemoveCapsule(c.id)}
                             className="w-8 h-8 rounded-full hover:bg-red-500/20 flex items-center justify-center text-white/25 hover:text-red-400 transition-all">
                             <Trash2 size={14} />
@@ -1519,6 +1552,55 @@ export default function ProfilePage() {
                 className="btn-skoleom w-full py-3.5 rounded-full text-sm shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.98] disabled:opacity-60 gap-2 mt-4 shrink-0"
               >
                 {newCapsuleSaving ? <Loader2 size={16} className="animate-spin" /> : t('studio.addCapsule')}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {editCapsuleItemTarget && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+          <div className="cosmic-modal w-full max-w-sm max-h-[85vh] flex flex-col overflow-hidden border border-white/[0.08] rounded-[20px] p-5">
+            <div className="flex items-center justify-between mb-5 shrink-0">
+              <h2 className="text-white font-bold text-base">{t('profile.editCapsule')}</h2>
+              <button onClick={() => setEditCapsuleItemTarget(null)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 flex items-center justify-center transition-all">
+                <X size={16} className="text-white" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateCapsuleItem} className="flex-1 flex flex-col min-h-0">
+              <div className="flex-1 overflow-y-auto scrollbar-hide space-y-4 pb-1">
+                <CapsuleProductForm
+                  ref={editCapsuleItemFormRef}
+                  mode="edit"
+                  initialProduct={{
+                    name: editCapsuleItemTarget.name,
+                    brand: editCapsuleItemTarget.brand,
+                    imageUrl: editCapsuleItemTarget.imageUrl,
+                    category: editCapsuleItemTarget.category as CapsuleProductInput['category'],
+                    subcategory: editCapsuleItemTarget.subcategory,
+                    size: editCapsuleItemTarget.size,
+                    condition: editCapsuleItemTarget.condition as CapsuleProductInput['condition'],
+                    colors: editCapsuleItemTarget.colors || [],
+                    price: editCapsuleItemTarget.price,
+                    stock: editCapsuleItemTarget.stock,
+                  }}
+                />
+
+                {editCapsuleItemError && (
+                  <p className="text-red-400 text-sm bg-red-400/10 px-4 py-2.5 rounded-xl border border-red-400/20">
+                    {editCapsuleItemError}
+                  </p>
+                )}
+              </div>
+
+              <button
+                type="submit"
+                disabled={editCapsuleItemSaving}
+                className="btn-skoleom w-full py-3.5 rounded-full text-sm shadow-glow-lime-sm hover:shadow-glow-lime active:scale-[0.98] disabled:opacity-60 gap-2 mt-4 shrink-0"
+              >
+                {editCapsuleItemSaving ? <Loader2 size={16} className="animate-spin" /> : t('profile.saveChanges')}
               </button>
             </form>
           </div>

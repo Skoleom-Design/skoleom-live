@@ -370,6 +370,7 @@ export const en = {
     current: 'Current',
     planNoPayment: 'Plan changes apply immediately — no real payment is required for now.',
     createCapsule: 'Create a capsule',
+    editCapsule: 'Edit capsule',
     attachToPost: 'Attach to post',
     createCapsuleNeedsPost: 'Create a post first — a capsule must always be attached to a post.',
     walletBalance: 'Available balance',

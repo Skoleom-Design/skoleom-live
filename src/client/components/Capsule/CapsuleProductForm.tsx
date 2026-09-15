@@ -61,6 +61,32 @@ export interface CapsuleProductFormHandle {
   /** Retourne la liste complete (produits deja ajoutes + brouillon courant s'il est valide).
    *  Retourne null si rien n'est pret — un message d'erreur est alors deja affiche dans le formulaire. */
   getProducts: () => CapsuleProductInput[] | null;
+  /** Mode edition (un seul produit existant, pas de groupe) : valide et retourne le brouillon
+   *  courant. Retourne null (avec message d'erreur affiche) s'il est invalide. */
+  getSingleProduct: () => CapsuleProductInput | null;
+}
+
+function productToDraft(p: CapsuleProductInput): Draft {
+  return {
+    name: p.name,
+    brand: p.brand || '',
+    description: p.description || '',
+    imageUrl: p.imageUrl || '',
+    category: p.category,
+    subcategory: p.subcategory || '',
+    size: p.size || '',
+    condition: p.condition,
+    colors: p.colors,
+    price: String(p.price),
+    stock: String(p.stock),
+  };
+}
+
+interface CapsuleProductFormProps {
+  /** 'edit' cache la partie "nom de la capsule + liste de produits" (creation de groupe) pour
+   *  n'afficher que les champs d'un produit existant, pre-rempli via `initialProduct`. */
+  mode?: 'create' | 'edit';
+  initialProduct?: CapsuleProductInput;
 }
 
 const fieldClass = 'w-full bg-white/[0.05] border border-white/[0.08] rounded-xl px-4 py-3 text-white placeholder:text-white/20 text-sm focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30 transition-all';
@@ -69,11 +95,14 @@ const chipClass = (active: boolean) =>
     active ? 'bg-[#ffc94d] text-black border-[#ffc94d]' : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08] hover:border-white/20'
   }`;
 
-export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle>(function CapsuleProductForm(_props, ref) {
+export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle, CapsuleProductFormProps>(function CapsuleProductForm(
+  { mode = 'create', initialProduct },
+  ref,
+) {
   const { t } = useLanguage();
   const [groupName, setGroupName] = useState('');
   const [products, setProducts] = useState<CapsuleProductInput[]>([]);
-  const [draft, setDraft] = useState<Draft>(emptyDraft());
+  const [draft, setDraft] = useState<Draft>(() => (initialProduct ? productToDraft(initialProduct) : emptyDraft()));
   const [error, setError] = useState('');
   const [cameraOpen, setCameraOpen] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
@@ -187,10 +216,21 @@ export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle>(function 
       setError('');
       return result;
     },
+    getSingleProduct() {
+      const validated = validateDraft(draft);
+      if (typeof validated === 'string') {
+        setError(validated);
+        return null;
+      }
+      setError('');
+      return validated;
+    },
   }));
 
   return (
     <div className="space-y-4">
+      {mode === 'create' && (
+        <>
       <div>
         <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2">
           {t('capsuleForm.capsuleName')} <span className="text-[#ffc94d]">*</span>
@@ -211,8 +251,10 @@ export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle>(function 
 
       {/* Demarcation entre la capsule (conteneur) et ses produits individuels. */}
       <div className="h-px bg-white/10" />
+        </>
+      )}
 
-      {products.length > 0 && (
+      {mode === 'create' && products.length > 0 && (
         <div className="space-y-2">
           <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40">
             {t('studio.productsInCapsule', { count: products.length, plural: products.length > 1 ? 's' : '' })}
@@ -244,13 +286,16 @@ export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle>(function 
       )}
 
       {/* Demarcation claire : chaque produit est numerote, comme une fiche d'article separee
-          (inspire du flow d'ajout d'articles de Whatnot avant un live). */}
-      <div className="flex items-center gap-3 pt-2">
-        <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#ffc94d] whitespace-nowrap">
-          {t('capsuleForm.productNumber', { n: products.length + 1 })}
-        </span>
-        <div className="flex-1 h-px bg-white/10" />
-      </div>
+          (inspire du flow d'ajout d'articles de Whatnot avant un live). Pas de sens en edition
+          d'un produit unique existant. */}
+      {mode === 'create' && (
+        <div className="flex items-center gap-3 pt-2">
+          <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#ffc94d] whitespace-nowrap">
+            {t('capsuleForm.productNumber', { n: products.length + 1 })}
+          </span>
+          <div className="flex-1 h-px bg-white/10" />
+        </div>
+      )}
 
       <input
         type="text"
@@ -462,18 +507,20 @@ export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle>(function 
         </p>
       )}
 
-      <button
-        type="button"
-        onClick={addProduct}
-        disabled={limitReached}
-        className={`w-full py-2.5 rounded-xl border border-dashed text-sm font-medium transition-all ${
-          limitReached
-            ? 'border-white/10 text-white/25 cursor-not-allowed'
-            : 'border-white/15 text-white/60 hover:bg-white/[0.04] hover:text-white hover:border-white/25'
-        }`}
-      >
-        {limitReached ? t('studio.capsuleLimitReached', { limit: limit as number }) : t('studio.addAnotherProduct')}
-      </button>
+      {mode === 'create' && (
+        <button
+          type="button"
+          onClick={addProduct}
+          disabled={limitReached}
+          className={`w-full py-2.5 rounded-xl border border-dashed text-sm font-medium transition-all ${
+            limitReached
+              ? 'border-white/10 text-white/25 cursor-not-allowed'
+              : 'border-white/15 text-white/60 hover:bg-white/[0.04] hover:text-white hover:border-white/25'
+          }`}
+        >
+          {limitReached ? t('studio.capsuleLimitReached', { limit: limit as number }) : t('studio.addAnotherProduct')}
+        </button>
+      )}
     </div>
   );
 });
