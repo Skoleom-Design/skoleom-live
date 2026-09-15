@@ -8,6 +8,7 @@ import {
   MoreHorizontal,
   VolumeX,
   Volume2,
+  Music,
 } from 'lucide-react';
 import type { Post } from '../../../shared/types/api';
 import { CapsuleDrawer } from '../Capsule/CapsuleDrawer';
@@ -304,20 +305,33 @@ export function InstaPostCard({ post, liked: likedProp = false }: Props) {
       )}
 
       {/* ── Music — lecture uniquement pour les photos (une video a deja sa propre piste
-          audio, geree par isMuted ci-dessus, pas de raison de superposer les deux). ── */}
+          audio, geree par isMuted ci-dessus, pas de raison de superposer les deux). Meme
+          gabarit que la ligne son des posts Instagram : pochette + titre, icone son a droite. ── */}
       {post.musicName && (
         <div className="px-3 py-0.5 pb-3">
           {post.type === 'photo' && post.musicUrl ? (
             <button
               type="button"
               onClick={toggleMusicMute}
-              className="flex items-center gap-1.5 text-[11px] text-white/35 hover:text-white/60 transition-colors"
+              className="flex items-center gap-1.5 max-w-full text-white/60 hover:text-white/90 transition-colors"
             >
-              {musicMuted ? <VolumeX size={11} /> : <Volume2 size={11} />}
-              🎵 {post.musicName}
+              {post.musicAlbumCover ? (
+                <img src={post.musicAlbumCover} alt="" className="w-4 h-4 rounded-[3px] object-cover shrink-0" />
+              ) : (
+                <Music size={11} className="shrink-0" />
+              )}
+              <p className="text-[11px] truncate">{post.musicName}</p>
+              {musicMuted ? <VolumeX size={11} className="shrink-0" /> : <Volume2 size={11} className="text-[#ffc94d] shrink-0" />}
             </button>
           ) : (
-            <p className="text-[11px] text-white/35">🎵 {post.musicName}</p>
+            <div className="flex items-center gap-1.5 max-w-full text-white/35">
+              {post.musicAlbumCover ? (
+                <img src={post.musicAlbumCover} alt="" className="w-4 h-4 rounded-[3px] object-cover shrink-0" />
+              ) : (
+                <Music size={11} className="shrink-0" />
+              )}
+              <p className="text-[11px] truncate">{post.musicName}</p>
+            </div>
           )}
         </div>
       )}

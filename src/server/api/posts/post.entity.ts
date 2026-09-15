@@ -62,6 +62,9 @@ export class Post {
   @Column({ nullable: true })
   musicTrackId: string;
 
+  @Column({ nullable: true })
+  musicAlbumCover: string;
+
   @ManyToOne(() => User, (user) => user.posts, { eager: true })
   @JoinColumn({ name: 'creatorId' })
   creator: User;

@@ -317,13 +317,25 @@ export default function PostDetailPage() {
                     <button
                       type="button"
                       onClick={toggleMusicMute}
-                      className="flex items-center gap-1 text-[11px] text-white/35 hover:text-white/60 transition-colors"
+                      className="flex items-center gap-1.5 min-w-0 text-white/60 hover:text-white/90 transition-colors"
                     >
-                      {musicMuted ? <VolumeX size={11} /> : <Volume2 size={11} />}
-                      🎵 {post.musicName}
+                      {post.musicAlbumCover ? (
+                        <img src={post.musicAlbumCover} alt="" className="w-4 h-4 rounded-[3px] object-cover shrink-0" />
+                      ) : (
+                        <Music size={11} className="shrink-0" />
+                      )}
+                      <span className="text-[11px] truncate">{post.musicName}</span>
+                      {musicMuted ? <VolumeX size={11} className="shrink-0" /> : <Volume2 size={11} className="text-[#ffc94d] shrink-0" />}
                     </button>
                   ) : (
-                    <p className="text-[11px] text-white/35">🎵 {post.musicName}</p>
+                    <div className="flex items-center gap-1.5 min-w-0 text-white/35">
+                      {post.musicAlbumCover ? (
+                        <img src={post.musicAlbumCover} alt="" className="w-4 h-4 rounded-[3px] object-cover shrink-0" />
+                      ) : (
+                        <Music size={11} className="shrink-0" />
+                      )}
+                      <span className="text-[11px] truncate">{post.musicName}</span>
+                    </div>
                   )
                 ) : <span />}
                 <p className="text-[11px] text-white/30">

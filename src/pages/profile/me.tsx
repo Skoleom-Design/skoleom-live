@@ -7,6 +7,7 @@ import {
   Heart, Zap, Wallet, ArrowDownToLine, ArrowUpFromLine, Radio, Settings, Check,
   ShoppingBag, Gift, Clock, Truck, MoreVertical, Landmark, CreditCard,
   Image as ImageIcon, Bell, MessageCircle, UserPlus, Video, Sparkles, Upload,
+  Music, Play, Pause, Search,
 } from 'lucide-react';
 import { AppSidebar } from '../../client/components/Layout/Sidebar';
 import { BoostModal } from '../../client/components/Boost/BoostModal';
@@ -80,6 +81,18 @@ interface PostData {
   viewCount: number;
   likeCount: number;
   capsules: CapsuleData[];
+  musicName?: string;
+  musicUrl?: string;
+  musicTrackId?: string;
+  musicAlbumCover?: string;
+}
+
+interface MusicTrack {
+  id: number;
+  title: string;
+  artist: string;
+  albumCover: string;
+  previewUrl: string;
 }
 
 interface LikedPost {
@@ -209,6 +222,14 @@ export default function ProfilePage() {
   const [editTagInput, setEditTagInput] = useState('');
   const [editPostError, setEditPostError] = useState('');
   const [editPostSaving, setEditPostSaving] = useState(false);
+
+  const [editMusicQuery, setEditMusicQuery] = useState('');
+  const [editMusicResults, setEditMusicResults] = useState<MusicTrack[]>([]);
+  const [editMusicSearching, setEditMusicSearching] = useState(false);
+  const [editSelectedTrack, setEditSelectedTrack] = useState<MusicTrack | null>(null);
+  const [editPreviewingId, setEditPreviewingId] = useState<number | null>(null);
+  const editPreviewAudioRef = useRef<HTMLAudioElement | null>(null);
+  useEffect(() => () => editPreviewAudioRef.current?.pause(), []);
 
   // Remplacement du media (photo/video) — reste vide (media d'origine conserve) tant que
   // l'utilisateur n'a pas choisi un nouveau fichier.
@@ -431,6 +452,19 @@ export default function ProfilePage() {
     setEditCapsulePickerOpen(false);
     setEditCapsuleError('');
     setEditPostError('');
+    setEditMusicQuery('');
+    setEditMusicResults([]);
+    setEditSelectedTrack(
+      post.musicTrackId
+        ? {
+            id: Number(post.musicTrackId),
+            title: post.musicName?.split(' - ')[0] || post.musicName || '',
+            artist: post.musicName?.split(' - ').slice(1).join(' - ') || '',
+            albumCover: post.musicAlbumCover || '',
+            previewUrl: post.musicUrl || '',
+          }
+        : null,
+    );
     setEditPostOpen(true);
     setOpenMenuPostId(null);
   }
@@ -514,6 +548,54 @@ export default function ProfilePage() {
     setEditTags((prev) => prev.filter((x) => x !== tag));
   }
 
+  useEffect(() => {
+    const query = editMusicQuery.trim();
+    if (!query) {
+      setEditMusicResults([]);
+      setEditMusicSearching(false);
+      return;
+    }
+    setEditMusicSearching(true);
+    const timer = setTimeout(async () => {
+      try {
+        const results = await api.get<MusicTrack[]>(`/music/search?q=${encodeURIComponent(query)}`);
+        setEditMusicResults(results);
+      } catch {
+        setEditMusicResults([]);
+      } finally {
+        setEditMusicSearching(false);
+      }
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [editMusicQuery]);
+
+  function toggleEditPreview(track: MusicTrack) {
+    if (editPreviewingId === track.id) {
+      editPreviewAudioRef.current?.pause();
+      setEditPreviewingId(null);
+      return;
+    }
+    if (!editPreviewAudioRef.current) editPreviewAudioRef.current = new Audio();
+    const audioEl = editPreviewAudioRef.current;
+    audioEl.src = track.previewUrl;
+    audioEl.currentTime = 0;
+    audioEl.onended = () => setEditPreviewingId(null);
+    audioEl.play().catch(() => {});
+    setEditPreviewingId(track.id);
+  }
+
+  function selectEditTrack(track: MusicTrack) {
+    setEditSelectedTrack(track);
+    setEditMusicQuery('');
+    setEditMusicResults([]);
+  }
+
+  function removeEditTrack() {
+    editPreviewAudioRef.current?.pause();
+    setEditPreviewingId(null);
+    setEditSelectedTrack(null);
+  }
+
   async function handleUpdatePost(e: React.FormEvent) {
     e.preventDefault();
     if (!editPostTarget) return;
@@ -525,10 +607,19 @@ export default function ProfilePage() {
         const mediaUrl = await uploadFile(editFile, 'posts');
         media = { mediaUrl, type: editFile.type.startsWith('video/') ? 'video' : 'photo' };
       }
+      const musicChanged = editSelectedTrack?.id !== (editPostTarget.musicTrackId ? Number(editPostTarget.musicTrackId) : undefined);
       const updated = await api.patch<PostData>(`/posts/${editPostTarget.id}`, {
         caption: editCaption.trim() || undefined,
         tags: editTags,
         ...media,
+        ...(musicChanged
+          ? {
+              musicName: editSelectedTrack ? `${editSelectedTrack.title} - ${editSelectedTrack.artist}` : null,
+              musicUrl: editSelectedTrack?.previewUrl ?? null,
+              musicTrackId: editSelectedTrack ? String(editSelectedTrack.id) : null,
+              musicAlbumCover: editSelectedTrack?.albumCover ?? null,
+            }
+          : {}),
       });
       setAnalytics((prev) =>
         prev
@@ -1713,6 +1804,94 @@ export default function ProfilePage() {
                     <Plus size={16} />
                   </button>
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-[11px] text-white/40 mb-1.5 font-medium uppercase tracking-wider flex items-center gap-1.5">
+                  <Music size={12} /> {t('studio.music')}
+                </label>
+
+                {editSelectedTrack ? (
+                  <div className="flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-[#ffc94d]/50 bg-[#ffc94d]/10">
+                    {editSelectedTrack.albumCover ? (
+                      <img src={editSelectedTrack.albumCover} alt="" className="w-8 h-8 rounded-lg shrink-0 object-cover" />
+                    ) : (
+                      <span className="w-8 h-8 shrink-0 rounded-lg bg-white/[0.08] flex items-center justify-center">
+                        <Music size={13} className="text-white/50" />
+                      </span>
+                    )}
+                    {editSelectedTrack.previewUrl && (
+                      <button
+                        type="button"
+                        onClick={() => toggleEditPreview(editSelectedTrack)}
+                        className="w-8 h-8 shrink-0 rounded-full bg-white/[0.08] hover:bg-white/[0.14] flex items-center justify-center text-white transition-all"
+                      >
+                        {editPreviewingId === editSelectedTrack.id ? <Pause size={13} /> : <Play size={13} />}
+                      </button>
+                    )}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[13px] font-medium truncate text-[#ffc94d]">{editSelectedTrack.title}</p>
+                      <p className="text-[11px] text-white/40 truncate">{editSelectedTrack.artist}</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={removeEditTrack}
+                      className="w-7 h-7 shrink-0 rounded-full hover:bg-white/[0.08] flex items-center justify-center text-white/50 hover:text-white transition-all"
+                    >
+                      <X size={14} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="relative">
+                    <div className="relative">
+                      <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30" />
+                      <input
+                        type="text"
+                        value={editMusicQuery}
+                        onChange={(e) => setEditMusicQuery(e.target.value)}
+                        placeholder={t('studio.searchMusicPlaceholder')}
+                        className="w-full bg-white/[0.05] border border-white/[0.08] rounded-xl pl-9 pr-9 py-2.5 text-white placeholder:text-white/25 text-[13px] focus:outline-none focus:ring-1 focus:ring-[#ffc94d]/50 focus:border-[#ffc94d]/30"
+                      />
+                      {editMusicSearching && (
+                        <Loader2 size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/30 animate-spin" />
+                      )}
+                    </div>
+
+                    {editMusicResults.length > 0 && (
+                      <div className="mt-1.5 space-y-1 max-h-52 overflow-y-auto scrollbar-hide">
+                        {editMusicResults.map((track) => (
+                          <div
+                            key={track.id}
+                            className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl border border-white/[0.08] bg-white/[0.02] hover:bg-white/[0.05] transition-all"
+                          >
+                            {track.albumCover ? (
+                              <img src={track.albumCover} alt="" className="w-8 h-8 rounded-lg shrink-0 object-cover" />
+                            ) : (
+                              <span className="w-8 h-8 shrink-0 rounded-lg bg-white/[0.08] flex items-center justify-center">
+                                <Music size={13} className="text-white/50" />
+                              </span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => toggleEditPreview(track)}
+                              className="w-7 h-7 shrink-0 rounded-full bg-white/[0.08] hover:bg-white/[0.14] flex items-center justify-center text-white transition-all"
+                            >
+                              {editPreviewingId === track.id ? <Pause size={12} /> : <Play size={12} />}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => selectEditTrack(track)}
+                              className="flex-1 min-w-0 text-left"
+                            >
+                              <p className="text-[13px] font-medium truncate text-white">{track.title}</p>
+                              <p className="text-[11px] text-white/40 truncate">{track.artist}</p>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div>

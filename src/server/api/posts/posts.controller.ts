@@ -56,7 +56,10 @@ export class PostsController {
   update(
     @Param('id') id: string,
     @Request() req,
-    @Body() body: { caption?: string; tags?: string[]; mediaUrl?: string; thumbnailUrl?: string; type?: PostType },
+    @Body() body: {
+      caption?: string; tags?: string[]; mediaUrl?: string; thumbnailUrl?: string; type?: PostType;
+      musicName?: string | null; musicUrl?: string | null; musicTrackId?: string | null; musicAlbumCover?: string | null;
+    },
   ) {
     return this.postsService.update(id, req.user.id, body);
   }

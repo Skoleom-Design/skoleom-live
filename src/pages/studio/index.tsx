@@ -198,6 +198,7 @@ export default function StudioPage() {
         musicName: selectedTrack ? `${selectedTrack.title} - ${selectedTrack.artist}` : undefined,
         musicUrl: selectedTrack?.previewUrl,
         musicTrackId: selectedTrack ? String(selectedTrack.id) : undefined,
+        musicAlbumCover: selectedTrack?.albumCover,
       });
 
       setPostId(post.id);

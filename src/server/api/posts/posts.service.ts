@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
+import { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { Post } from './post.entity';
 import { Comment } from './comment.entity';
 import { User } from '../users/user.entity';
@@ -17,6 +18,7 @@ export interface CreatePostDto {
   musicName?: string;
   musicUrl?: string;
   musicTrackId?: string;
+  musicAlbumCover?: string;
 }
 
 export interface FeedQuery {
@@ -123,11 +125,16 @@ export class PostsService {
   async update(
     id: string,
     creatorId: string,
-    updates: { caption?: string; tags?: string[]; mediaUrl?: string; thumbnailUrl?: string; type?: PostType },
+    updates: {
+      caption?: string; tags?: string[]; mediaUrl?: string; thumbnailUrl?: string; type?: PostType;
+      musicName?: string | null; musicUrl?: string | null; musicTrackId?: string | null; musicAlbumCover?: string | null;
+    },
   ): Promise<Post> {
     const post = await this.postsRepo.findOne({ where: { id, creatorId } });
     if (!post) throw new NotFoundException('Post not found');
-    await this.postsRepo.update(id, updates);
+    // `null` (pour effacer une musique retiree) n'entre pas dans le type stricte de update() —
+    // TypeORM l'accepte tres bien en pratique (SET colonne = NULL), seul le typage est trop rigide.
+    await this.postsRepo.update(id, updates as QueryDeepPartialEntity<Post>);
     return this.postsRepo.findOne({ where: { id } }) as Promise<Post>;
   }
 

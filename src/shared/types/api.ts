@@ -55,6 +55,7 @@ export interface Post {
   musicName?: string;
   musicUrl?: string;
   musicTrackId?: string;
+  musicAlbumCover?: string;
   creator: User;
   capsules: Capsule[];
   createdAt: string;
