@@ -255,8 +255,26 @@ export default function FeedPage() {
                         <Link
                           key={post.id}
                           href={`/post/${post.id}`}
-                          onMouseEnter={() => post.musicUrl && playPreview(post)}
-                          onMouseLeave={stopPreview}
+                          onMouseEnter={(e) => {
+                            // Photo+musique : on joue l'extrait Deezer. Video : elle a deja sa
+                            // propre piste audio, on la demasque plutot que de superposer les deux
+                            // (meme regle que sur le feed/la page post, voir InstaPostCard).
+                            if (post.type === 'photo' && post.musicUrl) playPreview(post);
+                            const video = e.currentTarget.querySelector('video');
+                            if (video) {
+                              video.muted = false;
+                              video.currentTime = 0;
+                              video.play().catch(() => {});
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            stopPreview();
+                            const video = e.currentTarget.querySelector('video');
+                            if (video) {
+                              video.pause();
+                              video.muted = true;
+                            }
+                          }}
                           className={`relative aspect-square bg-white/[0.04] overflow-hidden group ${
                             post.isBoosted ? 'ring-2 ring-[#ffc94d]/60' : ''
                           }`}
@@ -264,7 +282,7 @@ export default function FeedPage() {
                           {post.thumbnailUrl || post.type === 'photo' ? (
                             <img src={post.thumbnailUrl || post.mediaUrl} alt="" className="w-full h-full object-cover" />
                           ) : (
-                            <video src={post.mediaUrl} className="w-full h-full object-cover" muted />
+                            <video src={post.mediaUrl} className="w-full h-full object-cover" loop muted playsInline />
                           )}
                           {post.isBoosted && (
                             <div className="absolute top-1.5 left-1.5 z-10">
