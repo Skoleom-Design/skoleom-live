@@ -33,8 +33,38 @@ export default function PostDetailPage() {
   const [shareOpen, setShareOpen] = useState(false);
   const [capsuleOpen, setCapsuleOpen] = useState(false);
   const [playing, setPlaying] = useState(true);
+  const musicAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [musicMuted, setMusicMuted] = useState(false);
 
   const fetchedIdRef = useRef<string | null>(null);
+
+  // Lecture auto de la musique du post — uniquement pour les photos (une video a deja sa
+  // propre piste audio geree par `muted` ci-dessus, pas de raison de superposer les deux).
+  useEffect(() => {
+    if (!post || post.type !== 'photo' || !post.musicUrl) return;
+    const audioEl = new Audio(post.musicUrl);
+    audioEl.loop = true;
+    musicAudioRef.current = audioEl;
+    audioEl.play().catch(() => {
+      // Lecture avec son bloquee par le navigateur (pas de geste utilisateur reconnu) —
+      // on retente en muet, l'utilisateur peut reactiver le son via le bouton dedie.
+      audioEl.muted = true;
+      setMusicMuted(true);
+      audioEl.play().catch(() => {});
+    });
+    return () => {
+      audioEl.pause();
+      musicAudioRef.current = null;
+    };
+  }, [post]);
+
+  function toggleMusicMute() {
+    if (!musicAudioRef.current) return;
+    const next = !musicAudioRef.current.muted;
+    musicAudioRef.current.muted = next;
+    if (!next) musicAudioRef.current.play().catch(() => {});
+    setMusicMuted(next);
+  }
 
   useEffect(() => {
     if (!id) return;
@@ -192,12 +222,12 @@ export default function PostDetailPage() {
                   </div>
                 )}
 
-                {post.type === 'video' && (
+                {(post.type === 'video' || (post.type === 'photo' && post.musicUrl)) && (
                   <button
-                    onClick={() => setMuted((m) => !m)}
+                    onClick={() => (post.type === 'video' ? setMuted((m) => !m) : toggleMusicMute())}
                     className="absolute top-3 right-3 w-9 h-9 rounded-full bg-black/40 backdrop-blur-sm flex items-center justify-center"
                   >
-                    {muted
+                    {(post.type === 'video' ? muted : musicMuted)
                       ? <VolumeX size={16} className="text-white" />
                       : <Volume2 size={16} className="text-white" />
                     }
@@ -273,7 +303,18 @@ export default function PostDetailPage() {
               {/* Music + stats */}
               <div className="px-3 py-0.5 pb-3 flex items-center justify-between">
                 {post.musicName ? (
-                  <p className="text-[11px] text-white/35">🎵 {post.musicName}</p>
+                  post.type === 'photo' && post.musicUrl ? (
+                    <button
+                      type="button"
+                      onClick={toggleMusicMute}
+                      className="flex items-center gap-1 text-[11px] text-white/35 hover:text-white/60 transition-colors"
+                    >
+                      {musicMuted ? <VolumeX size={11} /> : <Volume2 size={11} />}
+                      🎵 {post.musicName}
+                    </button>
+                  ) : (
+                    <p className="text-[11px] text-white/35">🎵 {post.musicName}</p>
+                  )
                 ) : <span />}
                 <p className="text-[11px] text-white/30">
                   {formatCount(post.viewCount)} vues{totalSold > 0 ? ` · ${totalSold} vendu${totalSold > 1 ? 's' : ''}` : ''}

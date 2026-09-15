@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import Head from 'next/head';
 import Link from 'next/link';
 import { useRouter } from 'next/router';
@@ -42,6 +42,23 @@ export default function FeedPage() {
   const [hasMore, setHasMore] = useState(true);
   const [likedIds, setLikedIds] = useState<Set<string>>(new Set());
   const [query, setQuery] = useState('');
+  const hoverAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // Apercu sonore au survol des tuiles de la grille "Explorer" — un seul <audio> reutilise
+  // (pas une instance par tuile), coupe des qu'on quitte la tuile ou qu'on en survole une autre.
+  function playPreview(url: string) {
+    if (!hoverAudioRef.current) hoverAudioRef.current = new Audio();
+    const audioEl = hoverAudioRef.current;
+    audioEl.src = url;
+    audioEl.currentTime = 0;
+    audioEl.play().catch(() => {});
+  }
+
+  function stopPreview() {
+    hoverAudioRef.current?.pause();
+  }
+
+  useEffect(() => stopPreview, []);
 
   useEffect(() => {
     if (!router.isReady) return;
@@ -229,6 +246,8 @@ export default function FeedPage() {
                         <Link
                           key={post.id}
                           href={`/post/${post.id}`}
+                          onMouseEnter={() => post.musicUrl && playPreview(post.musicUrl)}
+                          onMouseLeave={stopPreview}
                           className={`relative aspect-square bg-white/[0.04] overflow-hidden group ${
                             post.isBoosted ? 'ring-2 ring-[#ffc94d]/60' : ''
                           }`}
