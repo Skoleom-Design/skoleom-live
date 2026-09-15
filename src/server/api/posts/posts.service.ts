@@ -235,7 +235,10 @@ export class PostsService {
     return this.postsRepo
       .createQueryBuilder('post')
       .innerJoin('post.likedBy', 'liker', 'liker.id = :userId', { userId })
-      .leftJoinAndSelect('post.creator', 'creator')
+      // innerJoin (pas leftJoinAndSelect) sur le createur : un post dont le compte a ete
+      // suspendu ou supprime (isActive/deletedAt, geres independamment du statut du post lui-
+      // meme) ne doit pas rester visible dans les favoris de quelqu'un d'autre.
+      .innerJoinAndSelect('post.creator', 'creator', 'creator."isActive" = true AND creator."deletedAt" IS NULL')
       .leftJoinAndSelect('post.capsules', 'capsules')
       .where('post.status = :status', { status: PostStatus.ACTIVE })
       .orderBy('post.createdAt', 'DESC')

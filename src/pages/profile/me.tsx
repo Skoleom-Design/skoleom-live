@@ -1086,9 +1086,24 @@ export default function ProfilePage() {
                   {likedPosts.map((post) => (
                     <Link key={post.id} href={`/post/${post.id}`} className="relative aspect-square bg-white/[0.04] rounded-lg overflow-hidden group">
                       {post.thumbnailUrl || post.type === 'photo' ? (
-                        <img src={post.thumbnailUrl || post.mediaUrl} alt="" className="w-full h-full object-cover" />
+                        <img
+                          src={post.thumbnailUrl || post.mediaUrl}
+                          alt=""
+                          className="w-full h-full object-cover"
+                          // Le back-end exclut deja les posts supprimes/archives des favoris
+                          // (voir getLikedByUser, filtre sur status ACTIVE) — ce filet de securite
+                          // masque en plus la tuile si le media lui-meme est introuvable (fichier
+                          // efface, URL cassee...), plutot que d'afficher l'icone d'image cassee
+                          // par defaut du navigateur.
+                          onError={() => setLikedPosts((prev) => prev.filter((p) => p.id !== post.id))}
+                        />
                       ) : post.type === 'video' ? (
-                        <video src={post.mediaUrl} className="w-full h-full object-cover" muted />
+                        <video
+                          src={post.mediaUrl}
+                          className="w-full h-full object-cover"
+                          muted
+                          onError={() => setLikedPosts((prev) => prev.filter((p) => p.id !== post.id))}
+                        />
                       ) : (
                         <div className="w-full h-full flex items-center justify-center bg-white/[0.03]">
                           <Heart size={20} className="text-white/15" />
