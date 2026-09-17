@@ -12,10 +12,9 @@ import {
   getSizeFieldLabel,
   getSubcategoryOptions,
   subcategoryLabel,
-  getCapsuleGroupLimit,
 } from '../../constants/capsule';
 import { useLanguage } from '../../i18n/LanguageContext';
-import { getStoredUser, uploadFile } from '../../../shared/api/http';
+import { uploadFile } from '../../../shared/api/http';
 import { CameraCaptureModal } from '../Post/CameraCaptureModal';
 
 export interface CapsuleProductInput {
@@ -50,20 +49,11 @@ function emptyDraft(): Draft {
   return { name: '', brand: '', description: '', imageUrl: '', category: '', subcategory: '', size: '', condition: '', colors: [], price: '', stock: '' };
 }
 
-function isDraftEmpty(d: Draft): boolean {
-  return !d.name.trim() && !d.brand.trim() && !d.description.trim() && !d.category && !d.price && !d.stock;
-}
-
 export interface CapsuleProductFormHandle {
-  /** Retourne le nom de la capsule (obligatoire). Retourne null (avec message d'erreur affiche)
-   *  si le champ est vide. */
-  getGroupName: () => string | null;
-  /** Retourne la liste complete (produits deja ajoutes + brouillon courant s'il est valide).
-   *  Retourne null si rien n'est pret — un message d'erreur est alors deja affiche dans le formulaire. */
-  getProducts: () => CapsuleProductInput[] | null;
-  /** Mode edition (un seul produit existant, pas de groupe) : valide et retourne le brouillon
-   *  courant. Retourne null (avec message d'erreur affiche) s'il est invalide. */
-  getSingleProduct: () => CapsuleProductInput | null;
+  /** Valide et retourne le produit courant (creation ou edition — un formulaire ne gere plus
+   *  qu'un seul produit a la fois, voir le commentaire du composant). Retourne null (avec message
+   *  d'erreur affiche dans le formulaire) si un champ requis manque. */
+  getProduct: () => CapsuleProductInput | null;
 }
 
 function productToDraft(p: CapsuleProductInput): Draft {
@@ -83,9 +73,7 @@ function productToDraft(p: CapsuleProductInput): Draft {
 }
 
 interface CapsuleProductFormProps {
-  /** 'edit' cache la partie "nom de la capsule + liste de produits" (creation de groupe) pour
-   *  n'afficher que les champs d'un produit existant, pre-rempli via `initialProduct`. */
-  mode?: 'create' | 'edit';
+  /** Pre-remplit le formulaire pour l'edition d'un produit existant. Absent = creation. */
   initialProduct?: CapsuleProductInput;
 }
 
@@ -95,22 +83,22 @@ const chipClass = (active: boolean) =>
     active ? 'bg-[#ffc94d] text-black border-[#ffc94d]' : 'bg-white/[0.04] text-white/70 border-white/10 hover:bg-white/[0.08] hover:border-white/20'
   }`;
 
+// Un produit = un formulaire, un article a vendre (nom, photo, prix, stock...). Il n'y a plus de
+// notion de "capsule" (collection nommee regroupant plusieurs produits crees ensemble) — chaque
+// produit est cree individuellement et le createur les fait defiler un par un pendant son live
+// (voir le picker de produit en vedette sur studio/live.tsx), plutot que de les grouper a la
+// creation. Les anciennes capsules-groupes existantes restent affichees telles quelles dans la
+// liste (voir profile/me.tsx), ce composant ne sert qu'a creer/editer un produit desormais.
 export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle, CapsuleProductFormProps>(function CapsuleProductForm(
-  { mode = 'create', initialProduct },
+  { initialProduct },
   ref,
 ) {
   const { t } = useLanguage();
-  const [groupName, setGroupName] = useState('');
-  const [products, setProducts] = useState<CapsuleProductInput[]>([]);
   const [draft, setDraft] = useState<Draft>(() => (initialProduct ? productToDraft(initialProduct) : emptyDraft()));
   const [error, setError] = useState('');
   const [cameraOpen, setCameraOpen] = useState(false);
   const [imageUploading, setImageUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const plan = getStoredUser()?.plan;
-  const limit = getCapsuleGroupLimit(plan);
-  const limitReached = limit !== null && products.length >= limit;
 
   async function applyImageFile(file: File) {
     setImageUploading(true);
@@ -165,58 +153,8 @@ export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle, CapsulePr
     };
   }
 
-  function addProduct() {
-    if (limitReached) {
-      setError(t('studio.capsuleLimitReached', { limit: limit as number }));
-      return;
-    }
-    const result = validateDraft(draft);
-    if (typeof result === 'string') {
-      setError(result);
-      return;
-    }
-    setError('');
-    setProducts((prev) => [...prev, result]);
-    setDraft(emptyDraft());
-  }
-
-  function removeProduct(index: number) {
-    setProducts((prev) => prev.filter((_, i) => i !== index));
-  }
-
   useImperativeHandle(ref, () => ({
-    getGroupName() {
-      if (!groupName.trim()) {
-        setError(t('studio.capsuleNameRequired'));
-        return null;
-      }
-      setError('');
-      return groupName.trim();
-    },
-    getProducts() {
-      let result: CapsuleProductInput[];
-      if (isDraftEmpty(draft)) {
-        if (products.length === 0) {
-          setError(t('studio.fillProductFirst'));
-          return null;
-        }
-        result = products;
-      } else {
-        const validated = validateDraft(draft);
-        if (typeof validated === 'string') {
-          setError(validated);
-          return null;
-        }
-        result = [...products, validated];
-      }
-      if (limit !== null && result.length > limit) {
-        setError(t('studio.capsuleLimitReached', { limit }));
-        return null;
-      }
-      setError('');
-      return result;
-    },
-    getSingleProduct() {
+    getProduct() {
       const validated = validateDraft(draft);
       if (typeof validated === 'string') {
         setError(validated);
@@ -229,74 +167,6 @@ export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle, CapsulePr
 
   return (
     <div className="space-y-4">
-      {mode === 'create' && (
-        <>
-      <div>
-        <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40 mb-2">
-          {t('capsuleForm.capsuleName')} <span className="text-[#ffc94d]">*</span>
-        </p>
-        <input
-          type="text"
-          value={groupName}
-          onChange={(e) => setGroupName(e.target.value)}
-          placeholder={t('capsuleForm.capsuleNamePlaceholder')}
-          className={fieldClass}
-        />
-        <p className="text-xs text-white/35 mt-1.5">
-          {limit === null
-            ? t('studio.capsuleLimitUnlimited')
-            : t('studio.capsuleLimitHint', { limit })}
-        </p>
-      </div>
-
-      {/* Demarcation entre la capsule (conteneur) et ses produits individuels. */}
-      <div className="h-px bg-white/10" />
-        </>
-      )}
-
-      {mode === 'create' && products.length > 0 && (
-        <div className="space-y-2">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-white/40">
-            {t('studio.productsInCapsule', { count: products.length, plural: products.length > 1 ? 's' : '' })}
-          </p>
-          {products.map((p, i) => (
-            <div key={i} className="flex items-center gap-3 bg-white/[0.04] border border-white/10 rounded-xl p-2.5">
-              <div className="w-9 h-9 rounded-lg bg-white/[0.05] overflow-hidden flex items-center justify-center shrink-0">
-                {p.imageUrl ? (
-                  <img src={p.imageUrl} alt="" className="w-full h-full object-cover" />
-                ) : (
-                  <Package size={15} className="text-white/30" />
-                )}
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-semibold text-white truncate">{p.name}{p.brand ? ` · ${p.brand}` : ''}</p>
-                <p className="text-xs text-white/40">{p.price.toFixed(2)} € · {p.stock} en stock</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => removeProduct(i)}
-                title={t('studio.removeProduct')}
-                className="w-7 h-7 rounded-full hover:bg-red-500/20 flex items-center justify-center text-white/30 hover:text-red-400 transition-all shrink-0"
-              >
-                <X size={13} />
-              </button>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Demarcation claire : chaque produit est numerote, comme une fiche d'article separee
-          (inspire du flow d'ajout d'articles de Whatnot avant un live). Pas de sens en edition
-          d'un produit unique existant. */}
-      {mode === 'create' && (
-        <div className="flex items-center gap-3 pt-2">
-          <span className="text-[11px] font-bold uppercase tracking-[0.15em] text-[#ffc94d] whitespace-nowrap">
-            {t('capsuleForm.productNumber', { n: products.length + 1 })}
-          </span>
-          <div className="flex-1 h-px bg-white/10" />
-        </div>
-      )}
-
       <input
         type="text"
         value={draft.name}
@@ -505,21 +375,6 @@ export const CapsuleProductForm = forwardRef<CapsuleProductFormHandle, CapsulePr
         <p className="text-red-400 text-sm bg-red-400/10 px-4 py-2.5 rounded-xl border border-red-400/20">
           {error}
         </p>
-      )}
-
-      {mode === 'create' && (
-        <button
-          type="button"
-          onClick={addProduct}
-          disabled={limitReached}
-          className={`w-full py-2.5 rounded-xl border border-dashed text-sm font-medium transition-all ${
-            limitReached
-              ? 'border-white/10 text-white/25 cursor-not-allowed'
-              : 'border-white/15 text-white/60 hover:bg-white/[0.04] hover:text-white hover:border-white/25'
-          }`}
-        >
-          {limitReached ? t('studio.capsuleLimitReached', { limit: limit as number }) : t('studio.addAnotherProduct')}
-        </button>
       )}
     </div>
   );

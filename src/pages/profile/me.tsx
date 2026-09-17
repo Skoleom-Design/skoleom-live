@@ -422,7 +422,7 @@ export default function ProfilePage() {
   async function handleUpdateCapsuleItem(e: React.FormEvent) {
     e.preventDefault();
     if (!editCapsuleItemTarget) return;
-    const product = editCapsuleItemFormRef.current?.getSingleProduct();
+    const product = editCapsuleItemFormRef.current?.getProduct();
     if (!product) return;
 
     setEditCapsuleItemError('');
@@ -745,17 +745,14 @@ export default function ProfilePage() {
     e.preventDefault();
     setNewCapsuleError('');
 
-    const name = newCapsuleFormRef.current?.getGroupName();
-    if (!name) return;
-    const products = newCapsuleFormRef.current?.getProducts();
-    if (!products) return;
+    const product = newCapsuleFormRef.current?.getProduct();
+    if (!product) return;
 
     setNewCapsuleSaving(true);
     try {
-      await api.post('/capsules/groups', {
-        name,
+      await api.post('/capsules', {
+        ...product,
         postId: newCapsulePostId || undefined,
-        products,
       });
       const refreshed = await api.get<CapsuleData[]>('/capsules/mine');
       setMyCapsules(refreshed);
@@ -1528,7 +1525,6 @@ export default function ProfilePage() {
               <div className="flex-1 overflow-y-auto scrollbar-hide space-y-4 pb-1">
                 <CapsuleProductForm
                   ref={editCapsuleItemFormRef}
-                  mode="edit"
                   initialProduct={{
                     name: editCapsuleItemTarget.name,
                     brand: editCapsuleItemTarget.brand,

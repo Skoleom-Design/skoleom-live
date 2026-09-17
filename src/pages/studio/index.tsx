@@ -243,14 +243,12 @@ export default function StudioPage() {
     e.preventDefault();
     setCapsuleError('');
 
-    const name = productFormRef.current?.getGroupName();
-    if (!name) return;
-    const products = productFormRef.current?.getProducts();
-    if (!products) return;
+    const product = productFormRef.current?.getProduct();
+    if (!product) return;
 
     setCapsuleLoading(true);
     try {
-      await api.post('/capsules/groups', { name, postId, products });
+      await api.post('/capsules', { ...product, postId });
       setStep('done');
     } catch (err) {
       setCapsuleError(err instanceof ApiError ? err.message : t('common.genericError'));
