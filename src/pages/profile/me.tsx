@@ -47,12 +47,6 @@ const LANGUAGES = [
   { code: 'ar', label: 'العربية' },
 ] as const;
 
-const PLANS: { key: PlanKey; price: string }[] = [
-  { key: 'free', price: '0€' },
-  { key: 'premium', price: '9,90€' },
-  { key: 'ultra', price: '29,90€' },
-];
-
 interface CapsuleData {
   id: string;
   name: string;
@@ -141,7 +135,7 @@ type StatsView = 'creator' | 'buyer';
 
 export default function ProfilePage() {
   const router = useRouter();
-  const { language, setLanguage, t, dict } = useLanguage();
+  const { language, setLanguage, t } = useLanguage();
   const [user, setUser] = useState<MeUser | null>(null);
   const [analytics, setAnalytics] = useState<Analytics | null>(null);
   const [myCapsules, setMyCapsules] = useState<CapsuleData[]>([]);
@@ -188,8 +182,6 @@ export default function ProfilePage() {
   }, [myCapsules]);
 
   const [likedPosts, setLikedPosts] = useState<LikedPost[]>([]);
-  const [planSaving, setPlanSaving] = useState(false);
-  const [planError, setPlanError] = useState('');
   const [boostOpen, setBoostOpen] = useState(false);
   const [boostPost, setBoostPost] = useState<PostData | null>(null);
 
@@ -338,20 +330,6 @@ export default function ProfilePage() {
       // silent — la liste reflète toujours l'état serveur au prochain rechargement
     } finally {
       setDeliveringId(null);
-    }
-  }
-
-  async function handleChangePlan(plan: PlanKey) {
-    if (!user || plan === user.plan) return;
-    setPlanSaving(true);
-    setPlanError('');
-    try {
-      const updated = await api.patch<MeUser>('/users/me', { plan });
-      setUser((prev) => (prev ? { ...prev, ...updated } : updated));
-    } catch (err) {
-      setPlanError(err instanceof ApiError ? err.message : t('common.genericError'));
-    } finally {
-      setPlanSaving(false);
     }
   }
 
@@ -981,49 +959,6 @@ export default function ProfilePage() {
 
             {tab === 'capsules' && (
               <div className="space-y-6">
-                <div>
-                  <h3 className="text-[13px] font-semibold text-white/70 uppercase tracking-wider mb-3">
-                    {t('profile.subscriptionTitle')}
-                  </h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-2">
-                    {PLANS.map((p) => {
-                      const active = user.plan === p.key;
-                      return (
-                        <button
-                          key={p.key}
-                          onClick={() => handleChangePlan(p.key)}
-                          disabled={planSaving}
-                          className={`text-left p-4 rounded-[16px] border transition-all disabled:opacity-60 ${
-                            active
-                              ? 'border-[#ffc94d] bg-[#ffc94d]/10 shadow-glow-lime-sm'
-                              : 'border-white/[0.08] bg-white/[0.03] hover:bg-white/[0.06]'
-                          }`}
-                        >
-                          <div className="flex items-center justify-between mb-1">
-                            <span
-                              className="text-[13px] font-bold"
-                              style={{ color: active ? PLAN_BADGE[p.key].color : 'white' }}
-                            >
-                              {PLAN_BADGE[p.key].label}
-                            </span>
-                            {active && <span className="text-[10px] font-bold text-[#ffc94d]">{t('profile.current')}</span>}
-                          </div>
-                          <p className="text-[12px] text-white/40 mb-2">{p.price}{t('profile.perMonth')}</p>
-                          <ul className="space-y-1">
-                            {dict.profile.planPerks[p.key].map((perk) => (
-                              <li key={perk} className="text-[11px] text-white/50">• {perk}</li>
-                            ))}
-                          </ul>
-                        </button>
-                      );
-                    })}
-                  </div>
-                  {planError && <p className="text-red-400 text-xs">{planError}</p>}
-                  <p className="text-[11px] text-white/25">
-                    {t('profile.planNoPayment')}
-                  </p>
-                </div>
-
                 <button
                   onClick={openCapsuleModal}
                   className="btn-skoleom flex items-center gap-2 px-4 py-2 rounded-full text-[13px] hover:shadow-glow-lime-sm transition-all"
@@ -1039,7 +974,7 @@ export default function ProfilePage() {
                     <div key={group.key} className="bg-white/[0.03] border border-white/[0.07] rounded-[16px] p-3 space-y-2">
                       {group.name && (
                         <p className="text-[11px] font-semibold uppercase tracking-[0.15em] text-[#ffc94d] px-1">
-                          Capsule · {group.name}
+                          Produit · {group.name}
                         </p>
                       )}
                       {group.items.map((c) => (
