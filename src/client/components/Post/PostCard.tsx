@@ -191,7 +191,7 @@ export function PostCard({ post }: Props) {
                   alt="Skoleom"
                   className="skoleom-capsule-btn-logo"
                 />
-                <span>Capsule</span>
+                <span>Produit</span>
               </button>
             )}
           </div>

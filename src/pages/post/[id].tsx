@@ -260,7 +260,7 @@ export default function PostDetailPage() {
                     className="skoleom-capsule-btn skoleom-capsule-btn--breathe absolute bottom-3 right-3 z-10"
                   >
                     <img src="/skoleom-mark.png" alt="Skoleom" className="skoleom-capsule-btn-logo" />
-                    <span>Capsule</span>
+                    <span>Produit</span>
                   </button>
                 )}
               </div>

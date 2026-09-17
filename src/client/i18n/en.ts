@@ -191,7 +191,7 @@ export const en = {
   },
   post: {
     sponsored: 'Sponsored',
-    capsule: 'Capsule',
+    capsule: 'Product',
     likesCount: '{{count}} likes',
     viewComments: 'View {{count}} comment{{plural}}',
     likeAria: 'Like',

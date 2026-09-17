@@ -1136,7 +1136,7 @@ export default function StudioLivePage() {
                       className="skoleom-capsule-btn skoleom-capsule-btn--breathe absolute bottom-3 right-3 z-10"
                     >
                       <img src="/skoleom-mark.png" alt="Skoleom" className="skoleom-capsule-btn-logo" />
-                      <span>Capsule</span>
+                      <span>Produit</span>
                     </button>
                   )}
 
@@ -1436,7 +1436,7 @@ export default function StudioLivePage() {
 
                     <p className="text-[11px] text-white/25 text-center leading-relaxed">
                       Ta caméra et ton micro seront diffusés en direct aux spectateurs.
-                      {mode === 'auction' ? ' Tu choisiras tes capsules à mettre aux enchères une fois en direct.' : ''} Le chat et les
+                      {mode === 'auction' ? ' Tu choisiras tes produits à mettre aux enchères une fois en direct.' : ''} Le chat et les
                       ventes en direct fonctionnent réellement.
                     </p>
                   </div>
@@ -1489,7 +1489,7 @@ export default function StudioLivePage() {
                                   href="/profile/me?tab=capsules&openCapsule=1"
                                   className="flex items-center justify-center gap-2 py-3 rounded-xl border border-dashed border-white/15 text-white/50 text-xs font-medium hover:bg-white/[0.04] hover:text-white hover:border-white/25 transition-all"
                                 >
-                                  <Package size={14} /> Crée d&apos;abord une capsule depuis ton profil
+                                  <Package size={14} /> Crée d&apos;abord un produit depuis ton profil
                                 </Link>
                               ) : (
                                 <div className="space-y-1.5 max-h-40 overflow-y-auto scrollbar-hide">

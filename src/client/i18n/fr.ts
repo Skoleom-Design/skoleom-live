@@ -191,7 +191,7 @@ export const fr = {
   },
   post: {
     sponsored: 'Sponsorisé',
-    capsule: 'Capsule',
+    capsule: 'Produit',
     likesCount: "{{count}} j'aime",
     viewComments: 'Voir les {{count}} commentaire{{plural}}',
     likeAria: "J'aime",
