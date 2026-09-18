@@ -1,11 +1,15 @@
 import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
 import { fr } from './fr';
 import { en } from './en';
+import { es } from './es';
+import { ar } from './ar';
 
-export type Language = 'fr' | 'en';
+export type Language = 'fr' | 'en' | 'es' | 'ar';
 
-const DICTIONARIES: Record<Language, any> = { fr, en };
+const DICTIONARIES: Record<Language, any> = { fr, en, es, ar };
+const RTL_LANGUAGES: Language[] = ['ar'];
 const STORAGE_KEY = 'skoleom:lang';
+const VALID_LANGUAGES: Language[] = ['fr', 'en', 'es', 'ar'];
 
 function getByPath(obj: any, path: string): string | undefined {
   return path.split('.').reduce((acc, key) => (acc && typeof acc === 'object' ? acc[key] : undefined), obj);
@@ -35,8 +39,13 @@ export function LanguageProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === 'fr' || stored === 'en') setLanguageState(stored);
+    if (VALID_LANGUAGES.includes(stored as Language)) setLanguageState(stored as Language);
   }, []);
+
+  useEffect(() => {
+    document.documentElement.lang = language;
+    document.documentElement.dir = RTL_LANGUAGES.includes(language) ? 'rtl' : 'ltr';
+  }, [language]);
 
   const setLanguage = useCallback((lang: Language) => {
     setLanguageState(lang);

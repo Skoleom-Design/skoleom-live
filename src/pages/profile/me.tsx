@@ -2060,7 +2060,7 @@ export default function ProfilePage() {
                 {LANGUAGES.map((l) => (
                   <button
                     key={l.code}
-                    onClick={() => (l.code === 'fr' || l.code === 'en' ? setLanguage(l.code) : showComingSoon(l.label))}
+                    onClick={() => setLanguage(l.code)}
                     className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl text-[13px] font-medium transition-all ${
                       l.code === language
                         ? 'bg-[#ffc94d]/10 text-[#ffc94d]'
